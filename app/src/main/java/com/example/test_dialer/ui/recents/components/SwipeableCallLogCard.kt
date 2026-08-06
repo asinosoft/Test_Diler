@@ -48,10 +48,12 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -103,10 +105,12 @@ fun SwipeableCallLogCard(
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val haptic = LocalHapticFeedback.current
     val offsetX = remember { Animatable(0f) }
     val density = LocalDensity.current
     val thresholdPx = with(density) { 90.dp.toPx() }
     val maxDragPx = with(density) { 160.dp.toPx() }
+    var hasVibratedThreshold by remember { mutableStateOf(false) }
 
     Box(
         modifier = modifier
@@ -172,13 +176,25 @@ fun SwipeableCallLogCard(
                                 if (finalOffset > thresholdPx) onCall(item.number)
                                 else if (finalOffset < -thresholdPx) onSms(item.number)
                                 offsetX.animateTo(0f, animationSpec = spring())
+                                hasVibratedThreshold = false
                             }
                         },
-                        onDragCancel = { coroutineScope.launch { offsetX.animateTo(0f, animationSpec = spring()) } },
+                        onDragCancel = {
+                            coroutineScope.launch {
+                                offsetX.animateTo(0f, animationSpec = spring())
+                                hasVibratedThreshold = false
+                            }
+                        },
                         onHorizontalDrag = { change, dragAmount ->
                             change.consume()
                             coroutineScope.launch {
                                 val newOffset = (offsetX.value + dragAmount).coerceIn(-maxDragPx, maxDragPx)
+                                if (!hasVibratedThreshold && (newOffset > thresholdPx || newOffset < -thresholdPx)) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    hasVibratedThreshold = true
+                                } else if (hasVibratedThreshold && newOffset in -thresholdPx..thresholdPx) {
+                                    hasVibratedThreshold = false
+                                }
                                 offsetX.snapTo(newOffset)
                             }
                         }
