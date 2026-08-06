@@ -1,8 +1,10 @@
 package com.example.test_dialer.ui.recents.components
 
-import android.text.format.DateUtils
+import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Box
@@ -26,19 +28,25 @@ import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -52,7 +60,9 @@ import com.example.test_dialer.ui.theme.MissedRed
 import com.example.test_dialer.ui.theme.OutgoingBlue
 import com.example.test_dialer.ui.theme.SamsungGreen
 import com.example.test_dialer.ui.theme.SamsungSmsBlue
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -74,7 +84,7 @@ fun SwipeableCallLogCard(
     Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(84.dp)
+            .height(70.dp)
             .clip(RoundedCornerShape(20.dp))
     ) {
         val currentOffset = offsetX.value
@@ -89,7 +99,7 @@ fun SwipeableCallLogCard(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(start = 24.dp)
                     ) {
-                                                Icon(
+                        Icon(
                             imageVector = Icons.Default.Phone,
                             contentDescription = "Позвонить",
                             tint = Color.White,
@@ -112,7 +122,7 @@ fun SwipeableCallLogCard(
                     ) {
                         Text("Сообщение", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         Spacer(Modifier.width(12.dp))
-                                                Icon(
+                        Icon(
                             imageVector = Icons.AutoMirrored.Filled.Message,
                             contentDescription = "Написать SMS",
                             tint = Color.White,
@@ -152,79 +162,116 @@ fun SwipeableCallLogCard(
             tonalElevation = 1.dp
         ) {
             Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 12.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                AvatarView(name = item.name ?: item.number)
+                AvatarView(name = item.name ?: item.number, photoUri = item.photoUri)
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     val isMissed = item.type == CallType.MISSED || item.type == CallType.REJECTED
+                    val baseName = item.name ?: item.number
+                    val displayName = if (item.count > 1) "$baseName (${item.count})" else baseName
+
                     Text(
-                        text = item.name ?: item.number,
+                        text = displayName,
                         fontSize = 17.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = if (isMissed) MissedRed else MaterialTheme.colorScheme.onSurface,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(2.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CallTypeIcon(item.type)
                         Spacer(Modifier.width(6.dp))
-                        if (item.name != null) {
-                            Text(
-                                text = "${item.number} • ",
-                                fontSize = 13.sp,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        val subText = if (item.name != null) {
+                            item.number
+                        } else {
+                            when (item.type) {
+                                CallType.INCOMING -> "Входящий"
+                                CallType.OUTGOING -> "Исходящий"
+                                CallType.MISSED -> "Пропущенный"
+                                CallType.REJECTED -> "Отклоненный"
+                            }
                         }
                         Text(
-                            text = formatTimestamp(item.timestamp),
+                            text = subText,
                             fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
                 Spacer(Modifier.width(8.dp))
-                IconButton(
-                    onClick = { onCall(item.number) },
-                    colors = IconButtonDefaults.iconButtonColors(
-                        containerColor = SamsungGreen.copy(alpha = 0.15f),
-                        contentColor = SamsungGreen
-                    ),
-                    modifier = Modifier.size(42.dp)
-                ) {
-                    Icon(Icons.Default.Phone, "Позвонить", Modifier.size(20.dp))
-                }
+                Text(
+                    text = formatTimeOnly(item.timestamp),
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    maxLines = 1
+                )
             }
         }
     }
 }
 
 @Composable
-private fun AvatarView(name: String) {
-    val initial = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-    val avatarBgColor = remember(name) {
-        val colors = listOf(
-            Color(0xFFE57373), Color(0xFFF06292), Color(0xFFBA68C8),
-            Color(0xFF9575CD), Color(0xFF7986CB), Color(0xFF64B5F6),
-            Color(0xFF4FC3F7), Color(0xFF4DB6AC), Color(0xFF81C784),
-            Color(0xFFAED581), Color(0xFFFF8A65), Color(0xFFA1887F)
-        )
-        val index = (name.hashCode() and Int.MAX_VALUE) % colors.size
-        colors[index]
+private fun AvatarView(name: String, photoUri: String?) {
+    val context = LocalContext.current
+    var avatarBitmap by remember(photoUri) { mutableStateOf<ImageBitmap?>(null) }
+
+    LaunchedEffect(photoUri) {
+        if (!photoUri.isNullOrEmpty()) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val uri = Uri.parse(photoUri)
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        val bitmap = BitmapFactory.decodeStream(stream)
+                        avatarBitmap = bitmap?.asImageBitmap()
+                    }
+                } catch (e: Exception) {
+                    avatarBitmap = null
+                }
+            }
+        } else {
+            avatarBitmap = null
+        }
     }
 
-    Box(
-        modifier = Modifier
-            .size(48.dp)
-            .clip(CircleShape)
-            .background(avatarBgColor),
-        contentAlignment = Alignment.Center
-    ) {
-        Text(text = initial, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+    val bitmap = avatarBitmap
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap,
+            contentDescription = "Фото контакта",
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        val initial = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+        val avatarBgColor = remember(name) {
+            val colors = listOf(
+                Color(0xFFE57373), Color(0xFFF06292), Color(0xFFBA68C8),
+                Color(0xFF9575CD), Color(0xFF7986CB), Color(0xFF64B5F6),
+                Color(0xFF4FC3F7), Color(0xFF4DB6AC), Color(0xFF81C784),
+                Color(0xFFAED581), Color(0xFFFF8A65), Color(0xFFA1887F)
+            )
+            val index = (name.hashCode() and Int.MAX_VALUE) % colors.size
+            colors[index]
+        }
+
+        Box(
+            modifier = Modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(avatarBgColor),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(text = initial, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 20.sp)
+        }
     }
 }
 
@@ -240,11 +287,7 @@ private fun CallTypeIcon(type: CallType) {
     Icon(imageVector = icon, contentDescription = desc, tint = color, modifier = Modifier.size(16.dp))
 }
 
-private fun formatTimestamp(timestamp: Long): String {
+private fun formatTimeOnly(timestamp: Long): String {
     if (timestamp == 0L) return ""
-    return if (DateUtils.isToday(timestamp)) {
-        "Сегодня, ${SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))}"
-    } else {
-        SimpleDateFormat("dd MMM, HH:mm", Locale.forLanguageTag("ru")).format(Date(timestamp))
-    }
+    return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))
 }

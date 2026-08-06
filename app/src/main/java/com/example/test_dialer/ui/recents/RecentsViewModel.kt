@@ -50,9 +50,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    init {
-        loadCallLogs()
-    }
+    // No auto-load in init; call logs will be loaded after permissions check
 
     fun loadCallLogs() {
         viewModelScope.launch {

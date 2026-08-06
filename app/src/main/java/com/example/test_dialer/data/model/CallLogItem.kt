@@ -11,8 +11,9 @@ data class CallLogItem(
     val id: String,
     val number: String,
     val name: String?,
-    val photoUri: String?, // Добавлено поле
+    val photoUri: String?,
     val type: CallType,
     val timestamp: Long,
-    val duration: Long
+    val duration: Long,
+    val count: Int = 1
 )

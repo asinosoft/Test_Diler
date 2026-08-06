@@ -1,5 +1,6 @@
 package com.example.test_dialer.ui.recents
 
+import android.text.format.DateUtils
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -49,6 +50,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.test_dialer.ui.recents.components.SwipeableCallLogCard
 import com.example.test_dialer.ui.theme.SamsungGreen
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +65,10 @@ fun RecentsScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val showOnlyMissed by viewModel.showOnlyMissed.collectAsState()
     var showHint by remember { mutableStateOf(true) }
+
+    val groupedCallLogs = remember(callLogs) {
+        callLogs.groupBy { formatDateHeader(it.timestamp) }
+    }
 
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background
@@ -252,17 +260,44 @@ fun RecentsScreen(
                     }
                 }
             } else {
-                items(
-                    items = callLogs,
-                    key = { it.id }
-                ) { item ->
-                    SwipeableCallLogCard(
-                        item = item,
-                        onCall = onCall,
-                        onSms = onSms
-                    )
+                groupedCallLogs.forEach { (dateHeader, logsInDay) ->
+                    if (dateHeader.isNotEmpty()) {
+                        item(key = "header_$dateHeader") {
+                            Text(
+                                text = dateHeader,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                                modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 2.dp)
+                            )
+                        }
+                    }
+
+                    items(
+                        items = logsInDay,
+                        key = { it.id }
+                    ) { item ->
+                        SwipeableCallLogCard(
+                            item = item,
+                            onCall = onCall,
+                            onSms = onSms
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+private fun formatDateHeader(timestamp: Long): String {
+    if (timestamp == 0L) return ""
+    if (DateUtils.isToday(timestamp)) return "Сегодня"
+    if (DateUtils.isToday(timestamp + 24 * 3600 * 1000L)) return "Вчера"
+
+    val ruLocale = Locale.forLanguageTag("ru")
+    val dateStr = SimpleDateFormat("d MMMM", ruLocale).format(Date(timestamp))
+    val dayOfWeek = SimpleDateFormat("EEEE", ruLocale).format(Date(timestamp))
+        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(ruLocale) else it.toString() }
+
+    return "$dateStr, $dayOfWeek"
 }
