@@ -41,16 +41,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.test_dialer.data.model.CallLogItem
@@ -67,6 +75,25 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+
+class SimCardShape(private val cutSizeDp: Float = 2.5f) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val cut = density.density * cutSizeDp
+        val path = Path().apply {
+            moveTo(0f, 0f)
+            lineTo(size.width - cut, 0f)
+            lineTo(size.width, cut)
+            lineTo(size.width, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
 
 @Composable
 fun SwipeableCallLogCard(
@@ -185,16 +212,13 @@ fun SwipeableCallLogCard(
                     Spacer(Modifier.height(2.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CallTypeIcon(item.type)
-                        Spacer(Modifier.width(6.dp))
+                        Spacer(Modifier.width(5.dp))
+                        SimBadge(simNumber = item.simNumber)
+                        Spacer(Modifier.width(5.dp))
                         val subText = if (item.name != null) {
                             item.number
                         } else {
-                            when (item.type) {
-                                CallType.INCOMING -> "Входящий"
-                                CallType.OUTGOING -> "Исходящий"
-                                CallType.MISSED -> "Пропущенный"
-                                CallType.REJECTED -> "Отклоненный"
-                            }
+                            "Не сохранено"
                         }
                         Text(
                             text = subText,
@@ -214,6 +238,32 @@ fun SwipeableCallLogCard(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun SimBadge(simNumber: Int) {
+    val simBgColor = if (simNumber == 2) SamsungGreen else SamsungSmsBlue
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(width = 10.dp, height = 12.dp)
+            .clip(SimCardShape(cutSizeDp = 2.5f))
+            .background(simBgColor)
+    ) {
+        Text(
+            text = "$simNumber",
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Black,
+            color = Color.White,
+            style = TextStyle(
+                platformStyle = PlatformTextStyle(
+                    includeFontPadding = false
+                )
+            ),
+            modifier = Modifier.offset(y = (-0.5).dp)
+        )
     }
 }
 

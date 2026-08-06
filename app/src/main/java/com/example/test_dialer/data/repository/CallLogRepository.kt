@@ -1,9 +1,11 @@
 package com.example.test_dialer.data.repository
 
 import android.content.Context
+import android.database.Cursor
 import android.net.Uri
 import android.provider.CallLog
 import android.provider.ContactsContract
+import android.telephony.SubscriptionManager
 import com.example.test_dialer.data.model.CallLogItem
 import com.example.test_dialer.data.model.CallType
 import kotlinx.coroutines.Dispatchers
@@ -17,19 +19,20 @@ class CallLogRepository(private val context: Context) {
         val rawCallLogs = mutableListOf<CallLogItem>()
 
         try {
-            val projection = arrayOf(
+            val projectionList = mutableListOf(
                 CallLog.Calls._ID,
                 CallLog.Calls.NUMBER,
                 CallLog.Calls.CACHED_NAME,
                 CallLog.Calls.CACHED_PHOTO_URI,
                 CallLog.Calls.TYPE,
                 CallLog.Calls.DATE,
-                CallLog.Calls.DURATION
+                CallLog.Calls.DURATION,
+                CallLog.Calls.PHONE_ACCOUNT_ID
             )
 
             val cursor = context.contentResolver.query(
                 CallLog.Calls.CONTENT_URI,
-                projection,
+                projectionList.toTypedArray(),
                 null,
                 null,
                 "${CallLog.Calls.DATE} DESC"
@@ -43,17 +46,25 @@ class CallLogRepository(private val context: Context) {
                 val typeIndex = c.getColumnIndex(CallLog.Calls.TYPE)
                 val dateIndex = c.getColumnIndex(CallLog.Calls.DATE)
                 val durationIndex = c.getColumnIndex(CallLog.Calls.DURATION)
+                val accountIdIndex = c.getColumnIndex(CallLog.Calls.PHONE_ACCOUNT_ID)
+
+                val subIdIndex = getColumnIndexSafe(c, "sub_id", "subscription_id")
+                val simIdIndex = getColumnIndexSafe(c, "sim_id", "sim_slot")
 
                 while (c.moveToNext()) {
                     val id = if (idIndex != -1) c.getString(idIndex) else ""
                     val number = if (numberIndex != -1) c.getString(numberIndex) else ""
                     val name = if (nameIndex != -1) c.getString(nameIndex) else null
                     var photoUri = if (photoIndex != -1) c.getString(photoIndex) else null
+                    val accountId = if (accountIdIndex != -1) c.getString(accountIdIndex) else null
+                    val subIdStr = if (subIdIndex != -1) c.getString(subIdIndex) else null
+                    val simIdStr = if (simIdIndex != -1) c.getString(simIdIndex) else null
 
                     if (photoUri.isNullOrEmpty() && number.isNotBlank()) {
                         photoUri = getContactPhotoUri(number)
                     }
 
+                    val simNumber = detectSimNumber(accountId, subIdStr, simIdStr)
                     val rawType = if (typeIndex != -1) c.getInt(typeIndex) else CallLog.Calls.INCOMING_TYPE
                     val date = if (dateIndex != -1) c.getLong(dateIndex) else 0L
                     val duration = if (durationIndex != -1) c.getLong(durationIndex) else 0L
@@ -74,7 +85,8 @@ class CallLogRepository(private val context: Context) {
                             photoUri = photoUri,
                             type = type,
                             timestamp = date,
-                            duration = duration
+                            duration = duration,
+                            simNumber = simNumber
                         )
                     )
                 }
@@ -125,6 +137,67 @@ class CallLogRepository(private val context: Context) {
         return grouped
     }
 
+    private fun getColumnIndexSafe(cursor: Cursor, vararg columnNames: String): Int {
+        for (col in columnNames) {
+            val idx = cursor.getColumnIndex(col)
+            if (idx != -1) return idx
+        }
+        return -1
+    }
+
+    @Suppress("MissingPermission")
+    private fun detectSimNumber(
+        accountHandleId: String?,
+        subIdStr: String?,
+        simIdStr: String?
+    ): Int {
+        try {
+            val subManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+            if (subManager != null) {
+                val activeList = subManager.activeSubscriptionInfoList
+                if (!activeList.isNullOrEmpty()) {
+                    for (info in activeList) {
+                        val subId = info.subscriptionId.toString()
+                        val slotIndex = info.simSlotIndex // 0 for SIM1, 1 for SIM2
+                        val iccId = info.iccId ?: ""
+
+                        if ((subIdStr != null && subIdStr == subId) ||
+                            (simIdStr != null && simIdStr == subId) ||
+                            (accountHandleId != null && accountHandleId == subId) ||
+                            (!accountHandleId.isNullOrBlank() && iccId.isNotBlank() && accountHandleId.contains(iccId))) {
+                            return slotIndex + 1
+                        }
+
+                        if (accountHandleId == slotIndex.toString() ||
+                            subIdStr == slotIndex.toString() ||
+                            simIdStr == slotIndex.toString()) {
+                            return slotIndex + 1
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // ignore
+        }
+
+        // Check fallback string indicators
+        val combined = "${accountHandleId.orEmpty()} ${subIdStr.orEmpty()} ${simIdStr.orEmpty()}".lowercase().trim()
+
+        if (simIdStr == "1" || subIdStr == "1" || accountHandleId == "1" ||
+            combined.contains("sim2") || combined.contains("sub2") || combined.contains("slot2") ||
+            combined.endsWith("_2") || combined.endsWith(":1")) {
+            return 2
+        }
+
+        if (simIdStr == "0" || subIdStr == "0" || accountHandleId == "0" ||
+            combined.contains("sim1") || combined.contains("sub1") || combined.contains("slot1") ||
+            combined.endsWith("_1") || combined.endsWith(":0")) {
+            return 1
+        }
+
+        return 1
+    }
+
     private fun getContactPhotoUri(phoneNumber: String): String? {
         if (phoneNumber.isBlank()) return null
         if (photoCache.containsKey(phoneNumber)) return photoCache[phoneNumber]
@@ -163,14 +236,14 @@ class CallLogRepository(private val context: Context) {
         val day = 24 * hour
 
         return listOf(
-            CallLogItem("1", "+7 (999) 123-45-67", "Мама", null, CallType.INCOMING, now - (15 * 60_000L), 184),
-            CallLogItem("2", "+7 (999) 123-45-67", "Мама", null, CallType.INCOMING, now - (20 * 60_000L), 120),
-            CallLogItem("3", "+7 (921) 987-65-43", "Алексей Смирнов", null, CallType.MISSED, now - (2 * hour), 0),
-            CallLogItem("4", "+7 (800) 555-35-35", "Банк Поддержка", null, CallType.OUTGOING, now - (5 * hour), 45),
-            CallLogItem("5", "+7 (911) 444-22-11", "Елена Работа", null, CallType.MISSED, now - (1 * day), 0),
-            CallLogItem("6", "+7 (911) 444-22-11", "Елена Работа", null, CallType.MISSED, now - (1 * day + 10 * 60_000L), 0),
-            CallLogItem("7", "+7 (911) 444-22-11", "Елена Работа", null, CallType.MISSED, now - (1 * day + 20 * 60_000L), 0),
-            CallLogItem("8", "+7 (905) 333-22-11", "Доставка Озон", null, CallType.INCOMING, now - (1 * day + 3 * hour), 62)
+            CallLogItem("1", "+7 (999) 123-45-67", "Мама", null, CallType.INCOMING, now - (15 * 60_000L), 184, simNumber = 1),
+            CallLogItem("2", "+7 (999) 123-45-67", "Мама", null, CallType.INCOMING, now - (20 * 60_000L), 120, simNumber = 1),
+            CallLogItem("3", "+7 (921) 987-65-43", "Алексей Смирнов", null, CallType.MISSED, now - (2 * hour), 0, simNumber = 2),
+            CallLogItem("4", "+7 (800) 555-35-35", "Банк Поддержка", null, CallType.OUTGOING, now - (5 * hour), 45, simNumber = 1),
+            CallLogItem("5", "+7 (911) 444-22-11", "Елена Работа", null, CallType.MISSED, now - (1 * day), 0, simNumber = 2),
+            CallLogItem("6", "+7 (911) 444-22-11", "Елена Работа", null, CallType.MISSED, now - (1 * day + 10 * 60_000L), 0, simNumber = 2),
+            CallLogItem("7", "+7 (911) 444-22-11", "Елена Работа", null, CallType.MISSED, now - (1 * day + 20 * 60_000L), 0, simNumber = 2),
+            CallLogItem("8", "+7 (905) 333-22-11", "Доставка Озон", null, CallType.INCOMING, now - (1 * day + 3 * hour), 62, simNumber = 1)
         )
     }
 }

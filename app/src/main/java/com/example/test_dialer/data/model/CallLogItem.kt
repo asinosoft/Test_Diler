@@ -15,5 +15,6 @@ data class CallLogItem(
     val type: CallType,
     val timestamp: Long,
     val duration: Long,
-    val count: Int = 1
+    val count: Int = 1,
+    val simNumber: Int = 1
 )
