@@ -70,6 +70,7 @@ import com.example.test_dialer.ui.theme.MissedRed
 import com.example.test_dialer.ui.theme.OutgoingBlue
 import com.example.test_dialer.ui.theme.SamsungGreen
 import com.example.test_dialer.ui.theme.SamsungSmsBlue
+import com.example.test_dialer.util.formatPhoneNumber
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -210,11 +211,11 @@ fun SwipeableCallLogCard(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                AvatarView(name = item.name ?: item.number, photoUri = item.photoUri)
+                AvatarView(name = item.name ?: formatPhoneNumber(item.number), photoUri = item.photoUri)
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     val isMissed = item.type == CallType.MISSED || item.type == CallType.REJECTED
-                    val baseName = item.name ?: item.number
+                    val baseName = item.name ?: formatPhoneNumber(item.number)
                     val displayName = if (item.count > 1) "$baseName (${item.count})" else baseName
 
                     Text(
@@ -232,7 +233,7 @@ fun SwipeableCallLogCard(
                         SimBadge(simNumber = item.simNumber)
                         Spacer(Modifier.width(5.dp))
                         val subText = if (item.name != null) {
-                            item.number
+                            formatPhoneNumber(item.number)
                         } else {
                             "Не сохранено"
                         }
