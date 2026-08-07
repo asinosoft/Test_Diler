@@ -55,6 +55,9 @@ import androidx.compose.ui.unit.sp
 import com.example.test_dialer.data.model.FavoriteContact
 import com.example.test_dialer.ui.theme.SamsungGreen
 import com.example.test_dialer.ui.theme.SamsungSmsBlue
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.zIndex
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -68,6 +71,11 @@ fun FavoriteContactCard(
     onSms: (String) -> Unit,
     onSelect: (FavoriteContact) -> Unit,
     onContactClick: ((FavoriteContact) -> Unit)? = null,
+    isDragging: Boolean = false,
+    dragVisualOffset: Offset = Offset.Zero,
+    onDragStart: (() -> Unit)? = null,
+    onDrag: ((Offset) -> Unit)? = null,
+    onDragEnd: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -84,7 +92,18 @@ fun FavoriteContactCard(
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier
+            .fillMaxWidth()
+            .zIndex(if (isDragging) 100f else 0f)
+            .graphicsLayer {
+                if (isDragging) {
+                    translationX = dragVisualOffset.x
+                    translationY = dragVisualOffset.y
+                    scaleX = 1.08f
+                    scaleY = 1.08f
+                    shadowElevation = 12f
+                }
+            }
     ) {
         // 3D Cube Container (compacted by 20%)
         BoxWithConstraints(
@@ -93,13 +112,26 @@ fun FavoriteContactCard(
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(16.dp))
                 .pointerInput(contact.id) {
-                    detectTapGestures(
-                        onLongPress = {
-                            if (abs(offsetX.value) < 2f) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                onSelect(contact)
-                            }
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = {
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            onSelect(contact)
+                            onDragStart?.invoke()
                         },
+                        onDrag = { change, dragAmount ->
+                            change.consume()
+                            onDrag?.invoke(dragAmount)
+                        },
+                        onDragEnd = {
+                            onDragEnd?.invoke()
+                        },
+                        onDragCancel = {
+                            onDragEnd?.invoke()
+                        }
+                    )
+                }
+                .pointerInput(contact.id) {
+                    detectTapGestures(
                         onTap = {
                             if (abs(offsetX.value) < 2f) {
                                 if (onContactClick != null) {
@@ -111,40 +143,42 @@ fun FavoriteContactCard(
                         }
                     )
                 }
-                .pointerInput(contact.id) {
-                    detectHorizontalDragGestures(
-                        onDragEnd = {
-                            coroutineScope.launch {
-                                val finalOffset = offsetX.value
-                                if (finalOffset > thresholdPx) {
-                                    onCall(contact.number)
-                                } else if (finalOffset < -thresholdPx) {
-                                    onSms(contact.number)
-                                }
-                                offsetX.animateTo(0f, animationSpec = spring())
-                                hasVibratedThreshold = false
-                            }
-                        },
-                        onDragCancel = {
-                            coroutineScope.launch {
-                                offsetX.animateTo(0f, animationSpec = spring())
-                                hasVibratedThreshold = false
-                            }
-                        },
-                        onHorizontalDrag = { change, dragAmount ->
-                            change.consume()
-                            coroutineScope.launch {
-                                val newOffset = (offsetX.value + dragAmount).coerceIn(-maxDragPx, maxDragPx)
-                                if (!hasVibratedThreshold && (newOffset > thresholdPx || newOffset < -thresholdPx)) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    hasVibratedThreshold = true
-                                } else if (hasVibratedThreshold && newOffset in -thresholdPx..thresholdPx) {
+                .pointerInput(contact.id, isDragging) {
+                    if (!isDragging) {
+                        detectHorizontalDragGestures(
+                            onDragEnd = {
+                                coroutineScope.launch {
+                                    val finalOffset = offsetX.value
+                                    if (finalOffset > thresholdPx) {
+                                        onCall(contact.number)
+                                    } else if (finalOffset < -thresholdPx) {
+                                        onSms(contact.number)
+                                    }
+                                    offsetX.animateTo(0f, animationSpec = spring())
                                     hasVibratedThreshold = false
                                 }
-                                offsetX.snapTo(newOffset)
+                            },
+                            onDragCancel = {
+                                coroutineScope.launch {
+                                    offsetX.animateTo(0f, animationSpec = spring())
+                                    hasVibratedThreshold = false
+                                }
+                            },
+                            onHorizontalDrag = { change, dragAmount ->
+                                change.consume()
+                                coroutineScope.launch {
+                                    val newOffset = (offsetX.value + dragAmount).coerceIn(-maxDragPx, maxDragPx)
+                                    if (!hasVibratedThreshold && (newOffset > thresholdPx || newOffset < -thresholdPx)) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        hasVibratedThreshold = true
+                                    } else if (hasVibratedThreshold && newOffset in -thresholdPx..thresholdPx) {
+                                        hasVibratedThreshold = false
+                                    }
+                                    offsetX.snapTo(newOffset)
+                                }
                             }
-                        }
-                    )
+                        )
+                    }
                 }
         ) {
             val cardWidthPx = with(density) { maxWidth.toPx() }

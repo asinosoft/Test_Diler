@@ -119,6 +119,28 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun reorderFavorites(fromIndex: Int, toIndex: Int) {
+        val list = _favorites.value.toMutableList()
+        if (fromIndex in list.indices && toIndex in list.indices && fromIndex != toIndex) {
+            val item = list.removeAt(fromIndex)
+            list.add(toIndex, item)
+            val updated = list.mapIndexed { index, contact -> contact.copy(order = index) }
+            _favorites.value = updated
+            viewModelScope.launch {
+                favoritesRepository.saveFavorites(updated)
+            }
+        }
+    }
+
+    fun swapFavorites(contact1Id: String, contact2Id: String) {
+        val list = _favorites.value.toMutableList()
+        val idx1 = list.indexOfFirst { it.id == contact1Id }
+        val idx2 = list.indexOfFirst { it.id == contact2Id }
+        if (idx1 != -1 && idx2 != -1 && idx1 != idx2) {
+            reorderFavorites(idx1, idx2)
+        }
+    }
+
     fun openAddFavoriteDialog() {
         _isAddFavoriteOpen.value = true
     }

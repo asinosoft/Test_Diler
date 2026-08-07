@@ -45,6 +45,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,8 +53,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -68,6 +71,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,6 +81,7 @@ fun RecentsScreen(
     onSms: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
     val callLogs by viewModel.filteredCallLogs.collectAsState(initial = emptyList())
     val favorites by viewModel.favorites.collectAsState()
@@ -90,6 +95,11 @@ fun RecentsScreen(
     val isLoading by viewModel.isLoading.collectAsState()
     var showHint by remember { mutableStateOf(true) }
     var initialScrollDone by remember { mutableStateOf(false) }
+
+    var draggingContactId by remember { mutableStateOf<String?>(null) }
+    var dragFromIndex by remember { mutableIntStateOf(-1) }
+    var dragToIndex by remember { mutableIntStateOf(-1) }
+    var dragOffset by remember { mutableStateOf(Offset.Zero) }
 
     val listState = rememberLazyListState()
 
@@ -165,6 +175,7 @@ fun RecentsScreen(
         ) { innerPadding ->
             LazyColumn(
                 state = listState,
+                userScrollEnabled = draggingContactId == null,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
@@ -398,13 +409,82 @@ fun RecentsScreen(
                             for (i in 0 until 3) {
                                 if (i < rowItems.size) {
                                     val contact = rowItems[i]
+                                    val contactIndex = favorites.indexOfFirst { it.id == contact.id }
+                                    val isTargetSlot = draggingContactId != null && dragToIndex == contactIndex && draggingContactId != contact.id
+
                                     FavoriteContactCard(
                                         contact = contact,
-                                        isSelected = selectedFavorite?.id == contact.id,
+                                        isSelected = selectedFavorite?.id == contact.id || isTargetSlot,
+                                        isDragging = draggingContactId == contact.id,
+                                        dragVisualOffset = if (draggingContactId == contact.id) dragOffset else Offset.Zero,
                                         onCall = { num -> onCall(num, null) },
                                         onSms = onSms,
                                         onSelect = { viewModel.selectFavorite(it) },
                                         onContactClick = { viewModel.openContactDetail(it) },
+                                        onDragStart = {
+                                            val idx = favorites.indexOfFirst { it.id == contact.id }
+                                            if (idx != -1) {
+                                                draggingContactId = contact.id
+                                                dragFromIndex = idx
+                                                dragToIndex = idx
+                                                dragOffset = Offset.Zero
+                                            }
+                                        },
+                                        onDrag = { delta ->
+                                            dragOffset += delta
+                                            if (dragFromIndex != -1 && favorites.size > 1) {
+                                                val cellWidthPx = with(density) { 110.dp.toPx() }
+                                                val cellHeightPx = with(density) { 110.dp.toPx() }
+
+                                                val remainder = favorites.size % 3
+
+                                                val startRow: Int
+                                                val startCol: Int
+                                                if (remainder == 0) {
+                                                    startRow = dragFromIndex / 3
+                                                    startCol = dragFromIndex % 3
+                                                } else {
+                                                    if (dragFromIndex < remainder) {
+                                                        startRow = 0
+                                                        startCol = dragFromIndex
+                                                    } else {
+                                                        startRow = 1 + (dragFromIndex - remainder) / 3
+                                                        startCol = (dragFromIndex - remainder) % 3
+                                                    }
+                                                }
+
+                                                val colShift = (dragOffset.x / cellWidthPx).roundToInt()
+                                                val rowShift = (dragOffset.y / cellHeightPx).roundToInt()
+
+                                                val totalRows = favoriteRows.size
+                                                val targetRow = (startRow + rowShift).coerceIn(0, totalRows - 1)
+                                                val targetCol = (startCol + colShift).coerceIn(0, 2)
+
+                                                val newTargetIndex: Int
+                                                if (remainder == 0) {
+                                                    newTargetIndex = (targetRow * 3 + targetCol).coerceIn(0, favorites.size - 1)
+                                                } else {
+                                                    if (targetRow == 0) {
+                                                        newTargetIndex = targetCol.coerceIn(0, remainder - 1)
+                                                    } else {
+                                                        newTargetIndex = (remainder + (targetRow - 1) * 3 + targetCol).coerceIn(0, favorites.size - 1)
+                                                    }
+                                                }
+
+                                                if (newTargetIndex != dragToIndex) {
+                                                    dragToIndex = newTargetIndex
+                                                }
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            if (dragFromIndex in favorites.indices && dragToIndex in favorites.indices && dragFromIndex != dragToIndex) {
+                                                viewModel.reorderFavorites(dragFromIndex, dragToIndex)
+                                            }
+                                            draggingContactId = null
+                                            dragFromIndex = -1
+                                            dragToIndex = -1
+                                            dragOffset = Offset.Zero
+                                        },
                                         modifier = Modifier.weight(1f)
                                     )
                                 } else {
