@@ -58,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.test_dialer.ui.recents.components.AddFavoriteDialog
+import com.example.test_dialer.ui.recents.components.ContactDetailDialog
 import com.example.test_dialer.ui.recents.components.FavoriteContactCard
 import com.example.test_dialer.ui.recents.components.FavoritesTopBar
 import com.example.test_dialer.ui.recents.components.SwipeableCallLogCard
@@ -82,6 +83,7 @@ fun RecentsScreen(
     val selectedFavorite by viewModel.selectedFavorite.collectAsState()
     val isTopBarVisible by viewModel.isTopBarVisible.collectAsState()
     val isAddFavoriteOpen by viewModel.isAddFavoriteOpen.collectAsState()
+    val contactDetailToShow by viewModel.contactDetailToShow.collectAsState()
 
     val searchQuery by viewModel.searchQuery.collectAsState()
     val showOnlyMissed by viewModel.showOnlyMissed.collectAsState()
@@ -391,6 +393,7 @@ fun RecentsScreen(
                                         onCall = onCall,
                                         onSms = onSms,
                                         onSelect = { viewModel.selectFavorite(it) },
+                                        onContactClick = { viewModel.openContactDetail(it) },
                                         modifier = Modifier.weight(1f)
                                     )
                                 } else {
@@ -464,6 +467,17 @@ fun RecentsScreen(
                 onContactSelect = { newContact ->
                     viewModel.addFavorite(newContact)
                 }
+            )
+        }
+
+        // Contact Detail Bottom Sheet Dialog
+        contactDetailToShow?.let { contact ->
+            ContactDetailDialog(
+                contact = contact,
+                onDismiss = { viewModel.closeContactDetail() },
+                onCall = onCall,
+                onSms = onSms,
+                onRemoveFavorite = { viewModel.removeFavorite(it) }
             )
         }
     }

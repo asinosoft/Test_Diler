@@ -31,6 +31,7 @@ fun FavoritesSection(
     onSms: (String) -> Unit,
     onSelectContact: (FavoriteContact) -> Unit,
     onAddFavoriteClick: () -> Unit,
+    onContactClick: ((FavoriteContact) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -102,6 +103,7 @@ fun FavoritesSection(
                                     onCall = onCall,
                                     onSms = onSms,
                                     onSelect = onSelectContact,
+                                    onContactClick = onContactClick,
                                     modifier = Modifier.weight(1f)
                                 )
                             } else {

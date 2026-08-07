@@ -33,6 +33,9 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     private val _isAddFavoriteOpen = MutableStateFlow(false)
     val isAddFavoriteOpen: StateFlow<Boolean> = _isAddFavoriteOpen.asStateFlow()
 
+    private val _contactDetailToShow = MutableStateFlow<FavoriteContact?>(null)
+    val contactDetailToShow: StateFlow<FavoriteContact?> = _contactDetailToShow.asStateFlow()
+
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
@@ -117,6 +120,14 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     fun closeAddFavoriteDialog() {
         _isAddFavoriteOpen.value = false
+    }
+
+    fun openContactDetail(contact: FavoriteContact) {
+        _contactDetailToShow.value = contact
+    }
+
+    fun closeContactDetail() {
+        _contactDetailToShow.value = null
     }
 
     fun onSearchQueryChange(newQuery: String) {

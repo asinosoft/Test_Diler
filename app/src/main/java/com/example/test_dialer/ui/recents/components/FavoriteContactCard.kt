@@ -67,6 +67,7 @@ fun FavoriteContactCard(
     onCall: (String) -> Unit,
     onSms: (String) -> Unit,
     onSelect: (FavoriteContact) -> Unit,
+    onContactClick: ((FavoriteContact) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -101,7 +102,11 @@ fun FavoriteContactCard(
                         },
                         onTap = {
                             if (abs(offsetX.value) < 2f) {
-                                onCall(contact.number)
+                                if (onContactClick != null) {
+                                    onContactClick(contact)
+                                } else {
+                                    onCall(contact.number)
+                                }
                             }
                         }
                     )
