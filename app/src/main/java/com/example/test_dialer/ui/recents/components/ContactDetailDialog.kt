@@ -1,13 +1,17 @@
 package com.example.test_dialer.ui.recents.components
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.ContactsContract
+import android.telephony.SubscriptionManager
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -50,14 +54,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -80,7 +92,7 @@ data class ContactPhoneNumber(
 fun ContactDetailDialog(
     contact: FavoriteContact,
     onDismiss: () -> Unit,
-    onCall: (String) -> Unit,
+    onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
     onRemoveFavorite: (FavoriteContact) -> Unit
 ) {
@@ -88,6 +100,29 @@ fun ContactDetailDialog(
     var avatarBitmap by remember(contact.photoUri) { mutableStateOf<ImageBitmap?>(null) }
     var phoneNumbersList by remember(contact) {
         mutableStateOf(listOf(ContactPhoneNumber(number = contact.number, label = "Мобильный")))
+    }
+    var activeSimCount by remember { mutableStateOf(1) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            try {
+                val hasPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.READ_PHONE_STATE
+                ) == PackageManager.PERMISSION_GRANTED
+
+                if (hasPermission) {
+                    val sm = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+                    @Suppress("MissingPermission")
+                    val count = sm?.activeSubscriptionInfoCount ?: 1
+                    activeSimCount = if (count > 1) count else 1
+                } else {
+                    activeSimCount = 1
+                }
+            } catch (e: Exception) {
+                activeSimCount = 1
+            }
+        }
     }
 
     LaunchedEffect(contact) {
@@ -259,7 +294,7 @@ fun ContactDetailDialog(
                                 contentColor = Color.White,
                                 onClick = {
                                     onDismiss()
-                                    onCall(primaryNumber)
+                                    onCall(primaryNumber, null)
                                 }
                             )
 
@@ -327,25 +362,95 @@ fun ContactDetailDialog(
                                             )
                                         }
 
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                            IconButton(
-                                                onClick = {
-                                                    onDismiss()
-                                                    onCall(phoneItem.number)
-                                                },
-                                                modifier = Modifier
-                                                    .size(40.dp)
-                                                    .clip(CircleShape)
-                                                    .background(SamsungGreen.copy(alpha = 0.12f))
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Phone,
-                                                    contentDescription = "Вызов",
-                                                    tint = SamsungGreen,
-                                                    modifier = Modifier.size(20.dp)
-                                                )
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                            if (activeSimCount > 1) {
+                                                // SIM 1 Call Button
+                                                IconButton(
+                                                    onClick = {
+                                                        onDismiss()
+                                                        onCall(phoneItem.number, 1)
+                                                    },
+                                                    modifier = Modifier
+                                                        .size(40.dp)
+                                                        .clip(CircleShape)
+                                                        .background(SamsungSmsBlue.copy(alpha = 0.12f))
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier.fillMaxSize()
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Phone,
+                                                            contentDescription = "Вызов SIM 1",
+                                                            tint = SamsungSmsBlue,
+                                                            modifier = Modifier
+                                                                .size(28.dp)
+                                                                .align(Alignment.Center)
+                                                                .offset(x = (-1).dp, y = 2.dp)
+                                                        )
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .align(Alignment.TopEnd)
+                                                                .padding(top = 8.dp, end = 8.dp)
+                                                        ) {
+                                                            SimCardBadge(simNumber = 1)
+                                                        }
+                                                    }
+                                                }
+
+                                                // SIM 2 Call Button
+                                                IconButton(
+                                                    onClick = {
+                                                        onDismiss()
+                                                        onCall(phoneItem.number, 2)
+                                                    },
+                                                    modifier = Modifier
+                                                        .size(40.dp)
+                                                        .clip(CircleShape)
+                                                        .background(SamsungGreen.copy(alpha = 0.12f))
+                                                ) {
+                                                    Box(
+                                                        modifier = Modifier.fillMaxSize()
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.Phone,
+                                                            contentDescription = "Вызов SIM 2",
+                                                            tint = SamsungGreen,
+                                                            modifier = Modifier
+                                                                .size(28.dp)
+                                                                .align(Alignment.Center)
+                                                                .offset(x = (-1).dp, y = 2.dp)
+                                                        )
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .align(Alignment.TopEnd)
+                                                                .padding(top = 8.dp, end = 8.dp)
+                                                        ) {
+                                                            SimCardBadge(simNumber = 2)
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                // Single Call Button
+                                                IconButton(
+                                                    onClick = {
+                                                        onDismiss()
+                                                        onCall(phoneItem.number, null)
+                                                    },
+                                                    modifier = Modifier
+                                                        .size(40.dp)
+                                                        .clip(CircleShape)
+                                                        .background(SamsungGreen.copy(alpha = 0.12f))
+                                                ) {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Phone,
+                                                        contentDescription = "Вызов",
+                                                        tint = SamsungGreen,
+                                                        modifier = Modifier.size(20.dp)
+                                                    )
+                                                }
                                             }
 
+                                            // SMS Button
                                             IconButton(
                                                 onClick = {
                                                     onDismiss()
@@ -354,13 +459,13 @@ fun ContactDetailDialog(
                                                 modifier = Modifier
                                                     .size(40.dp)
                                                     .clip(CircleShape)
-                                                    .background(SamsungSmsBlue.copy(alpha = 0.12f))
+                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.AutoMirrored.Filled.Message,
                                                     contentDescription = "SMS",
-                                                    tint = SamsungSmsBlue,
-                                                    modifier = Modifier.size(20.dp)
+                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    modifier = Modifier.size(18.dp)
                                                 )
                                             }
                                         }
@@ -602,5 +707,50 @@ private fun openSystemContact(context: Context, contactNumber: String) {
         } catch (ex: Exception) {
             Toast.makeText(context, "Не удалось открыть информацию о контакте", Toast.LENGTH_SHORT).show()
         }
+    }
+}
+
+private class DetailSimCardShape(private val cutSizeDp: Float = 2.5f) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val cut = density.density * cutSizeDp
+        val path = Path().apply {
+            moveTo(0f, 0f)
+            lineTo(size.width - cut, 0f)
+            lineTo(size.width, cut)
+            lineTo(size.width, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
+
+@Composable
+private fun SimCardBadge(simNumber: Int) {
+    val simBgColor = if (simNumber == 2) SamsungGreen else SamsungSmsBlue
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(width = 10.dp, height = 12.dp)
+            .clip(DetailSimCardShape(cutSizeDp = 2.5f))
+            .background(simBgColor)
+    ) {
+        Text(
+            text = "$simNumber",
+            fontSize = 9.sp,
+            fontWeight = FontWeight.Black,
+            color = Color.White,
+            style = TextStyle(
+                platformStyle = PlatformTextStyle(
+                    includeFontPadding = false
+                )
+            ),
+            modifier = Modifier.offset(y = (-0.5).dp)
+        )
     }
 }

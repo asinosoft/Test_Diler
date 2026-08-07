@@ -73,7 +73,7 @@ import kotlin.math.abs
 @Composable
 fun RecentsScreen(
     viewModel: RecentsViewModel,
-    onCall: (String) -> Unit,
+    onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit
 ) {
     val context = LocalContext.current
@@ -390,7 +390,7 @@ fun RecentsScreen(
                                     FavoriteContactCard(
                                         contact = contact,
                                         isSelected = selectedFavorite?.id == contact.id,
-                                        onCall = onCall,
+                                        onCall = { num -> onCall(num, null) },
                                         onSms = onSms,
                                         onSelect = { viewModel.selectFavorite(it) },
                                         onContactClick = { viewModel.openContactDetail(it) },
@@ -439,7 +439,7 @@ fun RecentsScreen(
                         ) { item ->
                             SwipeableCallLogCard(
                                 item = item,
-                                onCall = onCall,
+                                onCall = { num -> onCall(num, null) },
                                 onSms = onSms
                             )
                         }

@@ -10,6 +10,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.telecom.TelecomManager
+import android.telephony.SubscriptionManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -107,7 +108,7 @@ class MainActivity : ComponentActivity() {
                 if (isPermissionsGranted) {
                     RecentsScreen(
                         viewModel = viewModel,
-                        onCall = { number -> makeCall(number) },
+                        onCall = { number, simSlot -> makeCall(number, simSlot) },
                         onSms = { number -> sendSms(number) }
                     )
                 } else {
@@ -141,7 +142,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun makeCall(phoneNumber: String) {
+    private fun makeCall(phoneNumber: String, simSlot: Int? = null) {
         if (phoneNumber.isBlank()) return
 
         val cleanNumber = phoneNumber.replace(Regex("[^0-9+]"), "")
@@ -155,8 +156,33 @@ class MainActivity : ComponentActivity() {
         if (hasCallPermission) {
             try {
                 val telecomManager = getSystemService(TELECOM_SERVICE) as? TelecomManager
+                val subscriptionManager = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+
+                val extras = Bundle()
+                if (telecomManager != null && subscriptionManager != null && simSlot != null) {
+                    try {
+                        val activeSubscriptions = subscriptionManager.activeSubscriptionInfoList
+                        if (!activeSubscriptions.isNullOrEmpty()) {
+                            val targetSub = activeSubscriptions.find { it.simSlotIndex == simSlot - 1 } ?: activeSubscriptions.firstOrNull()
+                            if (targetSub != null) {
+                                val phoneAccountHandles = telecomManager.callCapablePhoneAccounts
+                                val targetAccountHandle = phoneAccountHandles.find { handle ->
+                                    handle.id.contains(targetSub.subscriptionId.toString()) ||
+                                            handle.id.contains(targetSub.iccId.orEmpty())
+                                } ?: phoneAccountHandles.getOrNull((simSlot - 1).coerceIn(0, (phoneAccountHandles.size - 1).coerceAtLeast(0)))
+
+                                if (targetAccountHandle != null) {
+                                    extras.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, targetAccountHandle)
+                                }
+                            }
+                        }
+                    } catch (e: SecurityException) {
+                        // ignore
+                    }
+                }
+
                 if (telecomManager != null) {
-                    telecomManager.placeCall(uri, Bundle())
+                    telecomManager.placeCall(uri, extras)
                     return
                 }
             } catch (e: SecurityException) {
