@@ -1,6 +1,9 @@
 package com.example.test_dialer.ui.recents
 
 import android.app.Application
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.test_dialer.data.model.CallLogItem
@@ -50,8 +53,41 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
+    private var callLogObserver: ContentObserver? = null
+
     init {
         loadFavorites()
+        startObservingCallLogs()
+    }
+
+    fun startObservingCallLogs() {
+        if (callLogObserver != null) return
+        callLogObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                super.onChange(selfChange)
+                loadCallLogs()
+            }
+        }
+        try {
+            getApplication<Application>().contentResolver.registerContentObserver(
+                android.provider.CallLog.Calls.CONTENT_URI,
+                true,
+                callLogObserver!!
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        callLogObserver?.let {
+            try {
+                getApplication<Application>().contentResolver.unregisterContentObserver(it)
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
     }
 
     val filteredCallLogs = combine(
