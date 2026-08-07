@@ -2,6 +2,7 @@ package com.example.test_dialer.ui.recents
 
 import android.text.format.DateUtils
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -19,6 +20,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -38,10 +41,13 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -52,13 +58,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.test_dialer.ui.recents.components.AddFavoriteDialog
-import com.example.test_dialer.ui.recents.components.FavoritesSection
+import com.example.test_dialer.ui.recents.components.FavoriteContactCard
 import com.example.test_dialer.ui.recents.components.FavoritesTopBar
 import com.example.test_dialer.ui.recents.components.SwipeableCallLogCard
 import com.example.test_dialer.ui.theme.SamsungGreen
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -68,6 +76,7 @@ fun RecentsScreen(
     onSms: (String) -> Unit
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val callLogs by viewModel.filteredCallLogs.collectAsState(initial = emptyList())
     val favorites by viewModel.favorites.collectAsState()
     val selectedFavorite by viewModel.selectedFavorite.collectAsState()
@@ -76,7 +85,50 @@ fun RecentsScreen(
 
     val searchQuery by viewModel.searchQuery.collectAsState()
     val showOnlyMissed by viewModel.showOnlyMissed.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     var showHint by remember { mutableStateOf(true) }
+    var initialScrollDone by remember { mutableStateOf(false) }
+
+    val listState = rememberLazyListState()
+
+    val favoriteRows = remember(favorites) {
+        favorites.chunked(3)
+    }
+
+    // Target row index for startup: 3rd row from the bottom of favorites
+    val targetFavoriteRowIndex = remember(favoriteRows) {
+        if (favoriteRows.isEmpty()) 0 else (favoriteRows.size - 3).coerceAtLeast(0)
+    }
+
+    // LazyColumn item index corresponding to target favorite row
+    val initialItemIndex = remember(targetFavoriteRowIndex) {
+        1 + targetFavoriteRowIndex
+    }
+
+    // Scroll to initial position AFTER call logs and favorites finish loading
+    LaunchedEffect(isLoading, favorites, callLogs) {
+        if (!isLoading && !initialScrollDone && favoriteRows.isNotEmpty()) {
+            listState.scrollToItem(initialItemIndex, 0)
+            initialScrollDone = true
+        }
+    }
+
+    // Check if scrolled away by more than 33% of viewport / threshold
+    val isScrolledFar by remember(initialItemIndex) {
+        derivedStateOf {
+            val currentIndex = listState.firstVisibleItemIndex
+            val offset = listState.firstVisibleItemScrollOffset
+            val indexDiff = abs(currentIndex - initialItemIndex)
+            indexDiff >= 2 || (indexDiff == 1 && offset > 200)
+        }
+    }
+
+    // Handle system Back button: return to initial startup scroll position if scrolled far
+    BackHandler(enabled = isScrolledFar) {
+        coroutineScope.launch {
+            listState.animateScrollToItem(initialItemIndex, 0)
+        }
+    }
 
     val groupedCallLogs = remember(callLogs) {
         callLogs.groupBy { formatDateHeader(it.timestamp) }
@@ -89,7 +141,7 @@ fun RecentsScreen(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
-                // 5.3: Tap outside floating top bar dismisses selection
+                // Tap outside floating top bar dismisses selection
                 if (isTopBarVisible) {
                     viewModel.clearFavoriteSelection()
                 }
@@ -99,13 +151,14 @@ fun RecentsScreen(
             containerColor = MaterialTheme.colorScheme.background
         ) { innerPadding ->
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
-                item {
+                item(key = "top_header") {
                     // Samsung One UI Top Header
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -268,21 +321,88 @@ fun RecentsScreen(
 
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    // 1: Favorites Section
-                    FavoritesSection(
-                        favorites = favorites,
-                        selectedContact = selectedFavorite,
-                        onCall = onCall,
-                        onSms = onSms,
-                        onSelectContact = { viewModel.selectFavorite(it) },
-                        onAddFavoriteClick = { viewModel.openAddFavoriteDialog() }
-                    )
+                    // Favorites Section Title
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Избранные контакты",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = "Добавить",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SamsungGreen,
+                            modifier = Modifier
+                                .clickable { viewModel.openAddFavoriteDialog() }
+                                .padding(vertical = 4.dp, horizontal = 8.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                // Favorites Grid Rows (Each row is a separate item)
+                if (favoriteRows.isEmpty()) {
+                    item(key = "empty_favorites") {
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.openAddFavoriteDialog() }
+                        ) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 18.dp)
+                                ) {
+                                Text(
+                                    text = "+ Добавить избранные контакты",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = SamsungGreen
+                                )
+                            }
+                        }
+                    }
+                } else {
+                    itemsIndexed(
+                        items = favoriteRows,
+                        key = { index, _ -> "fav_row_$index" }
+                    ) { _, rowItems ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            for (i in 0 until 3) {
+                                if (i < rowItems.size) {
+                                    val contact = rowItems[i]
+                                    FavoriteContactCard(
+                                        contact = contact,
+                                        isSelected = selectedFavorite?.id == contact.id,
+                                        onCall = onCall,
+                                        onSms = onSms,
+                                        onSelect = { viewModel.selectFavorite(it) },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
+                            }
+                        }
+                    }
                 }
 
                 if (callLogs.isEmpty()) {
-                    item {
+                    item(key = "empty_call_logs") {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -325,7 +445,7 @@ fun RecentsScreen(
             }
         }
 
-        // 5.2: Top Floating Action Bar
+        // Top Floating Action Bar
         FavoritesTopBar(
             isVisible = isTopBarVisible,
             selectedContact = selectedFavorite,
@@ -337,7 +457,7 @@ fun RecentsScreen(
             modifier = Modifier.align(Alignment.TopCenter)
         )
 
-        // 5.2.2: Add Favorite Contact Bottom Sheet Dialog
+        // Add Favorite Contact Bottom Sheet Dialog
         if (isAddFavoriteOpen) {
             AddFavoriteDialog(
                 onDismiss = { viewModel.closeAddFavoriteDialog() },
