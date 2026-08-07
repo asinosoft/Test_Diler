@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
 import android.telephony.SubscriptionManager
 import android.widget.Toast
@@ -156,28 +157,74 @@ class MainActivity : ComponentActivity() {
         if (hasCallPermission) {
             try {
                 val telecomManager = getSystemService(TELECOM_SERVICE) as? TelecomManager
-                val subscriptionManager = getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+                val subscriptionManager = getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
 
                 val extras = Bundle()
                 if (telecomManager != null && subscriptionManager != null && simSlot != null) {
                     try {
-                        val activeSubscriptions = subscriptionManager.activeSubscriptionInfoList
-                        if (!activeSubscriptions.isNullOrEmpty()) {
-                            val targetSub = activeSubscriptions.find { it.simSlotIndex == simSlot - 1 } ?: activeSubscriptions.firstOrNull()
-                            if (targetSub != null) {
-                                val phoneAccountHandles = telecomManager.callCapablePhoneAccounts
-                                val targetAccountHandle = phoneAccountHandles.find { handle ->
-                                    handle.id.contains(targetSub.subscriptionId.toString()) ||
-                                            handle.id.contains(targetSub.iccId.orEmpty())
-                                } ?: phoneAccountHandles.getOrNull((simSlot - 1).coerceIn(0, (phoneAccountHandles.size - 1).coerceAtLeast(0)))
+                        val targetSlotIndex = simSlot - 1 // 0 for SIM1, 1 for SIM2
+                        val activeSubscriptions = try {
+                            subscriptionManager.activeSubscriptionInfoList
+                        } catch (e: SecurityException) {
+                            null
+                        }
 
-                                if (targetAccountHandle != null) {
-                                    extras.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, targetAccountHandle)
+                        val targetSub = activeSubscriptions?.find { it.simSlotIndex == targetSlotIndex }
+                            ?: activeSubscriptions?.getOrNull(targetSlotIndex)
+
+                        val phoneAccountHandles = telecomManager.callCapablePhoneAccounts
+
+                        if (!phoneAccountHandles.isNullOrEmpty()) {
+                            var targetHandle: PhoneAccountHandle? = null
+
+                            val subIdStr = targetSub?.subscriptionId?.toString()
+                            val iccIdStr = targetSub?.iccId.orEmpty()
+
+                            for (handle in phoneAccountHandles) {
+                                val hId = handle.id
+                                if ((subIdStr != null && subIdStr.isNotBlank() && hId == subIdStr) ||
+                                    (iccIdStr.isNotBlank() && hId.contains(iccIdStr)) ||
+                                    hId == targetSlotIndex.toString() ||
+                                    hId.endsWith(":$targetSlotIndex") ||
+                                    hId.endsWith("_$targetSlotIndex") ||
+                                    hId.contains("slot$targetSlotIndex", ignoreCase = true) ||
+                                    hId.contains("sim${targetSlotIndex + 1}", ignoreCase = true)) {
+                                    targetHandle = handle
+                                    break
                                 }
                             }
+
+                            if (targetHandle == null && targetSub != null) {
+                                for (handle in phoneAccountHandles) {
+                                    if (subIdStr != null && handle.id.contains(subIdStr)) {
+                                        targetHandle = handle
+                                        break
+                                    }
+                                }
+                            }
+
+                            if (targetHandle == null) {
+                                targetHandle = phoneAccountHandles.getOrNull(targetSlotIndex)
+                                    ?: phoneAccountHandles.firstOrNull()
+                            }
+
+                            if (targetHandle != null) {
+                                extras.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, targetHandle)
+                            }
                         }
-                    } catch (e: SecurityException) {
-                        // ignore
+
+                        extras.putInt("com.android.phone.extra.slot", targetSlotIndex)
+                        extras.putInt("simSlot", targetSlotIndex)
+                        extras.putInt("slot", targetSlotIndex)
+                        extras.putInt("sim_slot", targetSlotIndex)
+                        extras.putInt("com.android.phone.force.slot", targetSlotIndex)
+
+                        if (targetSub != null) {
+                            extras.putInt("subscription", targetSub.subscriptionId)
+                            extras.putInt("sub_id", targetSub.subscriptionId)
+                        }
+                    } catch (e: Exception) {
+                        e.printStackTrace()
                     }
                 }
 
@@ -196,6 +243,14 @@ class MainActivity : ComponentActivity() {
             Intent(Intent.ACTION_CALL, uri)
         } else {
             Intent(Intent.ACTION_DIAL, uri)
+        }
+
+        if (simSlot != null) {
+            val slotIdx = simSlot - 1
+            intent.putExtra("com.android.phone.extra.slot", slotIdx)
+            intent.putExtra("simSlot", slotIdx)
+            intent.putExtra("slot", slotIdx)
+            intent.putExtra("sim_slot", slotIdx)
         }
 
         try {

@@ -1,6 +1,13 @@
 package com.example.test_dialer.ui.incall
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import android.telecom.Call
+import android.telephony.SubscriptionManager
+import androidx.core.content.ContextCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -10,9 +17,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
@@ -31,30 +41,86 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.PlatformTextStyle
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.test_dialer.service.CallManager
 import com.example.test_dialer.ui.theme.MissedRed
 import com.example.test_dialer.ui.theme.OneUIBgDark
 import com.example.test_dialer.ui.theme.SamsungGreen
+import com.example.test_dialer.ui.theme.SamsungSmsBlue
+import com.example.test_dialer.util.formatPhoneNumber
 import kotlinx.coroutines.delay
 import java.util.Locale
+
+class SimCardShape(private val cutSizeDp: Float = 3f) : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val cut = density.density * cutSizeDp
+        val path = Path().apply {
+            moveTo(0f, 0f)
+            lineTo(size.width - cut, 0f)
+            lineTo(size.width, cut)
+            lineTo(size.width, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
 
 @Composable
 fun InCallScreen(
     onFinish: () -> Unit
 ) {
+    val context = LocalContext.current
     val activeCall by CallManager.currentCall.collectAsState()
 
     var callState by remember { mutableIntStateOf(activeCall?.state ?: Call.STATE_DISCONNECTED) }
     var durationSeconds by remember { mutableIntStateOf(0) }
+    var activeSimCount by remember { mutableIntStateOf(1) }
 
     val handle = activeCall?.details?.handle
     val rawNumber = handle?.schemeSpecificPart ?: ""
     val displayName = activeCall?.details?.callerDisplayName ?: rawNumber
+
+    val simNumber = remember(activeCall) { getSimNumberFromCall(activeCall, context) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            try {
+                val hasPermission = ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.READ_PHONE_STATE
+                ) == PackageManager.PERMISSION_GRANTED
+
+                if (hasPermission) {
+                    val sm = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+                    @Suppress("MissingPermission")
+                    val count = sm?.activeSubscriptionInfoCount ?: 1
+                    activeSimCount = if (count > 1) count else 1
+                } else {
+                    activeSimCount = 1
+                }
+            } catch (e: Exception) {
+                activeSimCount = 1
+            }
+        }
+    }
 
     // Call state callback listener
     DisposableEffect(activeCall) {
@@ -133,8 +199,16 @@ fun InCallScreen(
 
                 Spacer(modifier = Modifier.height(20.dp))
 
+                val formattedTitle = if (displayName.isBlank()) {
+                    "Неизвестный номер"
+                } else if (displayName == rawNumber) {
+                    formatPhoneNumber(displayName)
+                } else {
+                    displayName
+                }
+
                 Text(
-                    text = if (displayName.isBlank()) "Неизвестный номер" else displayName,
+                    text = formattedTitle,
                     fontSize = 26.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
@@ -144,7 +218,7 @@ fun InCallScreen(
                 if (rawNumber.isNotBlank() && rawNumber != displayName) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = rawNumber,
+                        text = formatPhoneNumber(rawNumber),
                         fontSize = 16.sp,
                         color = Color.White.copy(alpha = 0.6f)
                     )
@@ -168,6 +242,29 @@ fun InCallScreen(
                     fontWeight = FontWeight.Medium,
                     color = SamsungGreen
                 )
+
+                if (activeSimCount > 1) {
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // SIM Card Indicator Chip
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color.White.copy(alpha = 0.12f))
+                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                    ) {
+                        InCallSimBadge(simNumber = simNumber)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "СИМ $simNumber",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = Color.White.copy(alpha = 0.85f)
+                        )
+                    }
+                }
             }
 
             // Bottom Section: Action Buttons (Answer / End Call)
@@ -236,6 +333,94 @@ fun InCallScreen(
             }
         }
     }
+}
+
+@Composable
+private fun InCallSimBadge(simNumber: Int) {
+    val simBgColor = if (simNumber == 2) SamsungGreen else SamsungSmsBlue
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier
+            .size(width = 12.dp, height = 15.dp)
+            .clip(SimCardShape(cutSizeDp = 3f))
+            .background(simBgColor)
+    ) {
+        Text(
+            text = "$simNumber",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Black,
+            color = Color.White,
+            style = TextStyle(
+                platformStyle = PlatformTextStyle(
+                    includeFontPadding = false
+                )
+            ),
+            modifier = Modifier.offset(y = (-0.5).dp)
+        )
+    }
+}
+
+private fun getSimNumberFromCall(call: Call?, context: Context): Int {
+    if (call == null) return 1
+    val details = call.details ?: return 1
+    val accountHandle = details.accountHandle ?: return 1
+    val accountId = accountHandle.id ?: return 1
+
+    try {
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_PHONE_STATE
+        ) == PackageManager.PERMISSION_GRANTED
+
+        if (hasPermission) {
+            val subManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+            @Suppress("MissingPermission")
+            val activeList = subManager?.activeSubscriptionInfoList
+
+            if (!activeList.isNullOrEmpty()) {
+                if (activeList.size == 1) {
+                    return activeList[0].simSlotIndex + 1
+                }
+
+                for (info in activeList) {
+                    val subId = info.subscriptionId.toString()
+                    val slotIndex = info.simSlotIndex // 0 for SIM1, 1 for SIM2
+                    val iccId = info.iccId.orEmpty()
+
+                    if (accountId == subId || accountId == "sub_$subId") {
+                        return slotIndex + 1
+                    }
+
+                    if (iccId.isNotBlank() && accountId.contains(iccId)) {
+                        return slotIndex + 1
+                    }
+
+                    if (accountId == slotIndex.toString() ||
+                        accountId.endsWith(":$slotIndex") ||
+                        accountId.endsWith("_$slotIndex") ||
+                        accountId.contains("slot$slotIndex", ignoreCase = true) ||
+                        accountId.contains("sim${slotIndex + 1}", ignoreCase = true)) {
+                        return slotIndex + 1
+                    }
+                }
+            }
+        }
+    } catch (e: Exception) {
+        // ignore
+    }
+
+    val cleanId = accountId.lowercase().trim()
+
+    if (cleanId.contains("sim2") || cleanId.contains("slot1") || cleanId.contains("sub2") || cleanId.endsWith("_1") || cleanId.endsWith(":1")) {
+        return 2
+    }
+
+    if (cleanId.contains("sim1") || cleanId.contains("slot0") || cleanId.contains("sub1") || cleanId.endsWith("_0") || cleanId.endsWith(":0")) {
+        return 1
+    }
+
+    return 1
 }
 
 private fun formatDuration(seconds: Int): String {
