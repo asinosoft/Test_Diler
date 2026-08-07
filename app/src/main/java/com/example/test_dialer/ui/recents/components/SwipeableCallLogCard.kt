@@ -7,6 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -103,6 +104,7 @@ fun SwipeableCallLogCard(
     item: CallLogItem,
     onCall: (String) -> Unit,
     onSms: (String) -> Unit,
+    onItemClick: ((CallLogItem) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
@@ -169,6 +171,15 @@ fun SwipeableCallLogCard(
             modifier = Modifier
                 .fillMaxSize()
                 .offset { IntOffset(currentOffset.roundToInt(), 0) }
+                .pointerInput(item.id) {
+                    detectTapGestures(
+                        onTap = {
+                            if (kotlin.math.abs(offsetX.value) < 2f && onItemClick != null) {
+                                onItemClick(item)
+                            }
+                        }
+                    )
+                }
                 .pointerInput(item.id) {
                     detectHorizontalDragGestures(
                         onDragEnd = {

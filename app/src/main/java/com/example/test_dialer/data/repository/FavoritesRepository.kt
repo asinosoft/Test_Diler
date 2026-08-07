@@ -14,21 +14,30 @@ class FavoritesRepository(private val context: Context) {
         val savedFavorites = getSavedFavorites()
         val systemStarred = getSystemStarredContacts()
 
-        // Combine saved & system starred contacts without duplicates
+        // Combine saved & system starred contacts without duplicates by name and ID
         val combined = mutableListOf<FavoriteContact>()
-        val addedNumbers = mutableSetOf<String>()
+        val addedNames = mutableSetOf<String>()
+        val addedIds = mutableSetOf<String>()
 
         savedFavorites.forEach { fav ->
-            val cleanNum = fav.number.replace(Regex("[^0-9+]"), "")
+            val nameKey = fav.name.trim().lowercase()
             combined.add(fav)
-            if (cleanNum.isNotEmpty()) addedNumbers.add(cleanNum)
+            if (nameKey.isNotEmpty()) addedNames.add(nameKey)
+            if (fav.id.isNotEmpty()) addedIds.add(fav.id)
         }
 
         systemStarred.forEach { starred ->
-            val cleanNum = starred.number.replace(Regex("[^0-9+]"), "")
-            if (cleanNum.isEmpty() || !addedNumbers.contains(cleanNum)) {
+            val nameKey = starred.name.trim().lowercase()
+            val rawIdKey = starred.id.replace("starred_", "").trim()
+
+            val isDuplicate = addedNames.contains(nameKey) ||
+                    addedIds.contains(starred.id) ||
+                    (rawIdKey.isNotEmpty() && addedIds.contains(rawIdKey))
+
+            if (!isDuplicate) {
                 combined.add(starred.copy(order = combined.size))
-                if (cleanNum.isNotEmpty()) addedNumbers.add(cleanNum)
+                if (nameKey.isNotEmpty()) addedNames.add(nameKey)
+                if (starred.id.isNotEmpty()) addedIds.add(starred.id)
             }
         }
 
@@ -88,7 +97,7 @@ class FavoritesRepository(private val context: Context) {
                 val numberIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
                 val photoIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
 
-                val addedNumbers = mutableSetOf<String>()
+                val addedContactKeys = mutableSetOf<String>()
 
                 while (c.moveToNext()) {
                     val id = if (idIndex != -1) c.getString(idIndex) else ""
@@ -96,9 +105,10 @@ class FavoritesRepository(private val context: Context) {
                     val number = if (numberIndex != -1) c.getString(numberIndex) else ""
                     val photoUri = if (photoIndex != -1) c.getString(photoIndex) else null
 
-                    val cleanNumber = number.replace(Regex("[^0-9+]"), "")
-                    if (cleanNumber.isNotBlank() && !addedNumbers.contains(cleanNumber)) {
-                        addedNumbers.add(cleanNumber)
+                    val key = if (id.isNotBlank()) id else name.trim().lowercase()
+
+                    if (!addedContactKeys.contains(key)) {
+                        addedContactKeys.add(key)
                         list.add(
                             FavoriteContact(
                                 id = "starred_$id",
@@ -133,7 +143,10 @@ class FavoritesRepository(private val context: Context) {
 
     fun addFavorite(contact: FavoriteContact): List<FavoriteContact> {
         val current = getFavorites().toMutableList()
-        if (current.none { it.id == contact.id || (it.number.isNotBlank() && it.number == contact.number) }) {
+        val isAlreadyAdded = current.any {
+            it.id == contact.id || it.name.trim().equals(contact.name.trim(), ignoreCase = true)
+        }
+        if (!isAlreadyAdded) {
             current.add(contact.copy(order = current.size))
             saveFavorites(current)
         }

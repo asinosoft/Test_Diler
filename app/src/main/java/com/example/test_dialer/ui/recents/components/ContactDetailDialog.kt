@@ -1,17 +1,14 @@
 package com.example.test_dialer.ui.recents.components
 
-import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.ContactsContract
 import android.telephony.SubscriptionManager
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -34,20 +31,30 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.CallMade
+import androidx.compose.material.icons.automirrored.filled.CallMissed
+import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.automirrored.filled.Message
+import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -68,20 +75,29 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.example.test_dialer.data.model.CallLogItem
+import com.example.test_dialer.data.model.CallType
 import com.example.test_dialer.data.model.FavoriteContact
+import com.example.test_dialer.data.repository.CallLogRepository
+import com.example.test_dialer.ui.theme.IncomingGreen
+import com.example.test_dialer.ui.theme.MissedRed
+import com.example.test_dialer.ui.theme.OutgoingBlue
 import com.example.test_dialer.ui.theme.SamsungGreen
 import com.example.test_dialer.ui.theme.SamsungSmsBlue
 import com.example.test_dialer.util.formatPhoneNumber
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 data class ContactPhoneNumber(
     val number: String,
@@ -91,6 +107,7 @@ data class ContactPhoneNumber(
 @Composable
 fun ContactDetailDialog(
     contact: FavoriteContact,
+    initialTab: Int = 0,
     onDismiss: () -> Unit,
     onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
@@ -101,24 +118,19 @@ fun ContactDetailDialog(
     var phoneNumbersList by remember(contact) {
         mutableStateOf(listOf(ContactPhoneNumber(number = contact.number, label = "Мобильный")))
     }
-    var activeSimCount by remember { mutableStateOf(1) }
+    var activeSimCount by remember { mutableIntStateOf(1) }
+    var selectedTab by remember(initialTab, contact) { mutableIntStateOf(initialTab) }
+
+    var historyLogs by remember { mutableStateOf<List<CallLogItem>>(emptyList()) }
+    var isLoadingHistory by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             try {
-                val hasPermission = ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.READ_PHONE_STATE
-                ) == PackageManager.PERMISSION_GRANTED
-
-                if (hasPermission) {
-                    val sm = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
-                    @Suppress("MissingPermission")
-                    val count = sm?.activeSubscriptionInfoCount ?: 1
-                    activeSimCount = if (count > 1) count else 1
-                } else {
-                    activeSimCount = 1
-                }
+                val sm = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+                @Suppress("MissingPermission")
+                val count = sm?.activeSubscriptionInfoCount ?: 1
+                activeSimCount = if (count > 1) count else 1
             } catch (e: Exception) {
                 activeSimCount = 1
             }
@@ -146,6 +158,29 @@ fun ContactDetailDialog(
         val loadedNumbers = loadContactPhoneNumbers(context, contact)
         if (loadedNumbers.isNotEmpty()) {
             phoneNumbersList = loadedNumbers
+        }
+    }
+
+    // Load call history when History tab selected
+    LaunchedEffect(selectedTab, contact) {
+        if (selectedTab == 1) {
+            isLoadingHistory = true
+            withContext(Dispatchers.IO) {
+                try {
+                    val repository = CallLogRepository(context)
+                    val allLogs = repository.getCallLogs()
+                    val cleanContactNum = contact.number.replace(Regex("[^0-9+]"), "")
+
+                    historyLogs = allLogs.filter { log ->
+                        val cleanLogNum = log.number.replace(Regex("[^0-9+]"), "")
+                        (cleanContactNum.isNotBlank() && cleanLogNum.takeLast(7) == cleanContactNum.takeLast(7)) ||
+                                (!log.name.isNullOrBlank() && log.name.equals(contact.name, ignoreCase = true))
+                    }
+                } catch (e: Exception) {
+                    historyLogs = emptyList()
+                }
+            }
+            isLoadingHistory = false
         }
     }
 
@@ -188,7 +223,7 @@ fun ContactDetailDialog(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(300.dp)
+                        .height(280.dp)
                         .background(avatarBgColor)
                 ) {
                     val bitmap = avatarBitmap
@@ -267,250 +302,53 @@ fun ContactDetailDialog(
                             modifier = Modifier.fillMaxWidth()
                         )
 
-                        Spacer(modifier = Modifier.height(4.dp))
-
-                        // Primary Phone Number
-                        Text(
-                            text = formatPhoneNumber(contact.number),
-                            fontSize = 16.sp,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                            textAlign = TextAlign.Center
-                        )
-
-                        Spacer(modifier = Modifier.height(28.dp))
-
-                        // Quick Action Buttons Row (Call, SMS, Info)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            val primaryNumber = phoneNumbersList.firstOrNull()?.number ?: contact.number
-
-                            ActionButtonItem(
-                                icon = Icons.Default.Phone,
-                                label = "Вызов",
-                                containerColor = SamsungGreen,
-                                contentColor = Color.White,
-                                onClick = {
-                                    onDismiss()
-                                    onCall(primaryNumber, null)
-                                }
-                            )
-
-                            ActionButtonItem(
-                                icon = Icons.AutoMirrored.Filled.Message,
-                                label = "SMS",
-                                containerColor = SamsungSmsBlue,
-                                contentColor = Color.White,
-                                onClick = {
-                                    onDismiss()
-                                    onSms(primaryNumber)
-                                }
-                            )
-
-                            ActionButtonItem(
-                                icon = Icons.Default.Person,
-                                label = "Инфо",
-                                containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                onClick = {
-                                    openSystemContact(context, primaryNumber)
-                                }
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(28.dp))
-
-                        // ALL PHONE NUMBERS CARD
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 1.dp
-                        ) {
-                            Column {
-                                phoneNumbersList.forEachIndexed { index, phoneItem ->
-                                    if (index > 0) {
-                                        HorizontalDivider(
-                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                            thickness = 1.dp,
-                                            modifier = Modifier.padding(horizontal = 16.dp)
-                                        )
-                                    }
-
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(horizontal = 18.dp, vertical = 14.dp),
-                                        verticalAlignment = Alignment.CenterVertically,
-                                        horizontalArrangement = Arrangement.SpaceBetween
-                                    ) {
-                                        Column(modifier = Modifier.weight(1f)) {
-                                            Text(
-                                                text = phoneItem.label,
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                            )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = formatPhoneNumber(phoneItem.number),
-                                                fontSize = 16.sp,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onSurface
-                                            )
-                                        }
-
-                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                            if (activeSimCount > 1) {
-                                                // SIM 1 Call Button
-                                                IconButton(
-                                                    onClick = {
-                                                        onDismiss()
-                                                        onCall(phoneItem.number, 1)
-                                                    },
-                                                    modifier = Modifier
-                                                        .size(40.dp)
-                                                        .clip(CircleShape)
-                                                        .background(SamsungSmsBlue.copy(alpha = 0.12f))
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier.fillMaxSize()
-                                                    ) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.Phone,
-                                                            contentDescription = "Вызов SIM 1",
-                                                            tint = SamsungSmsBlue,
-                                                            modifier = Modifier
-                                                                .size(28.dp)
-                                                                .align(Alignment.Center)
-                                                                .offset(x = (-1).dp, y = 2.dp)
-                                                        )
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .align(Alignment.TopEnd)
-                                                                .padding(top = 8.dp, end = 8.dp)
-                                                        ) {
-                                                            SimCardBadge(simNumber = 1)
-                                                        }
-                                                    }
-                                                }
-
-                                                // SIM 2 Call Button
-                                                IconButton(
-                                                    onClick = {
-                                                        onDismiss()
-                                                        onCall(phoneItem.number, 2)
-                                                    },
-                                                    modifier = Modifier
-                                                        .size(40.dp)
-                                                        .clip(CircleShape)
-                                                        .background(SamsungGreen.copy(alpha = 0.12f))
-                                                ) {
-                                                    Box(
-                                                        modifier = Modifier.fillMaxSize()
-                                                    ) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.Phone,
-                                                            contentDescription = "Вызов SIM 2",
-                                                            tint = SamsungGreen,
-                                                            modifier = Modifier
-                                                                .size(28.dp)
-                                                                .align(Alignment.Center)
-                                                                .offset(x = (-1).dp, y = 2.dp)
-                                                        )
-                                                        Box(
-                                                            modifier = Modifier
-                                                                .align(Alignment.TopEnd)
-                                                                .padding(top = 8.dp, end = 8.dp)
-                                                        ) {
-                                                            SimCardBadge(simNumber = 2)
-                                                        }
-                                                    }
-                                                }
-                                            } else {
-                                                // Single Call Button
-                                                IconButton(
-                                                    onClick = {
-                                                        onDismiss()
-                                                        onCall(phoneItem.number, null)
-                                                    },
-                                                    modifier = Modifier
-                                                        .size(40.dp)
-                                                        .clip(CircleShape)
-                                                        .background(SamsungGreen.copy(alpha = 0.12f))
-                                                ) {
-                                                    Icon(
-                                                        imageVector = Icons.Default.Phone,
-                                                        contentDescription = "Вызов",
-                                                        tint = SamsungGreen,
-                                                        modifier = Modifier.size(20.dp)
-                                                    )
-                                                }
-                                            }
-
-                                            // SMS Button
-                                            IconButton(
-                                                onClick = {
-                                                    onDismiss()
-                                                    onSms(phoneItem.number)
-                                                },
-                                                modifier = Modifier
-                                                    .size(40.dp)
-                                                    .clip(CircleShape)
-                                                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                                            ) {
-                                                Icon(
-                                                    imageVector = Icons.AutoMirrored.Filled.Message,
-                                                    contentDescription = "SMS",
-                                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                    modifier = Modifier.size(18.dp)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // Additional Options Card
-                        Surface(
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(20.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 1.dp
-                        ) {
-                            Column {
-                                OptionRow(
-                                    icon = Icons.Default.ContentCopy,
-                                    label = "Скопировать номер",
-                                    onClick = {
-                                        val primaryNumber = phoneNumbersList.firstOrNull()?.number ?: contact.number
-                                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                        val clip = ClipData.newPlainText("Phone Number", primaryNumber)
-                                        clipboard.setPrimaryClip(clip)
-                                        Toast.makeText(context, "Номер скопирован", Toast.LENGTH_SHORT).show()
-                                    }
-                                )
+                        // FLOATING TAB BAR (Контакт | История | Настройки)
+                        FloatingTabBar(
+                            selectedTab = selectedTab,
+                            onTabSelected = { selectedTab = it }
+                        )
 
-                                HorizontalDivider(
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                    thickness = 1.dp,
-                                    modifier = Modifier.padding(horizontal = 16.dp)
-                                )
+                        Spacer(modifier = Modifier.height(24.dp))
 
-                                OptionRow(
-                                    icon = Icons.Default.Delete,
-                                    label = "Удалить из избранных",
-                                    labelColor = MaterialTheme.colorScheme.error,
-                                    iconTint = MaterialTheme.colorScheme.error,
-                                    onClick = {
+                        // TAB CONTENT SWITCHING
+                        when (selectedTab) {
+                            0 -> {
+                                // TAB 0: КОНТАКТ
+                                ContactTabContent(
+                                    phoneNumbersList = phoneNumbersList,
+                                    activeSimCount = activeSimCount,
+                                    contact = contact,
+                                    context = context,
+                                    onCall = onCall,
+                                    onSms = onSms,
+                                    onDismiss = onDismiss,
+                                    onRemoveFavorite = onRemoveFavorite
+                                )
+                            }
+                            1 -> {
+                                // TAB 1: ИСТОРИЯ
+                                HistoryTabContent(
+                                    isLoading = isLoadingHistory,
+                                    logs = historyLogs,
+                                    onCall = { num ->
                                         onDismiss()
-                                        onRemoveFavorite(contact)
+                                        onCall(num, null)
+                                    },
+                                    onSms = { num ->
+                                        onDismiss()
+                                        onSms(num)
                                     }
+                                )
+                            }
+                            2 -> {
+                                // TAB 2: НАСТРОЙКИ
+                                SettingsTabContent(
+                                    contact = contact,
+                                    context = context,
+                                    onDismiss = onDismiss,
+                                    onRemoveFavorite = onRemoveFavorite
                                 )
                             }
                         }
@@ -550,6 +388,575 @@ fun ContactDetailDialog(
                         modifier = Modifier.size(22.dp)
                     )
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingTabBar(
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val tabs = listOf(
+                Triple(0, "Контакт", Icons.Default.Person),
+                Triple(1, "История", Icons.Default.History),
+                Triple(2, "Настройки", Icons.Default.Settings)
+            )
+
+            tabs.forEach { (index, title, icon) ->
+                val isSelected = selectedTab == index
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { onTabSelected(index) },
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (isSelected) SamsungGreen else Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = title,
+                            tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = title,
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContactTabContent(
+    phoneNumbersList: List<ContactPhoneNumber>,
+    activeSimCount: Int,
+    contact: FavoriteContact,
+    context: Context,
+    onCall: (String, Int?) -> Unit,
+    onSms: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onRemoveFavorite: (FavoriteContact) -> Unit
+) {
+    val primaryNumber = phoneNumbersList.firstOrNull()?.number ?: contact.number
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // ALL PHONE NUMBERS CARD
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp
+        ) {
+            Column {
+                phoneNumbersList.forEachIndexed { index, phoneItem ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            thickness = 1.dp,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = phoneItem.label,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = formatPhoneNumber(phoneItem.number),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            if (activeSimCount > 1) {
+                                // SIM 1 Call Button
+                                IconButton(
+                                    onClick = {
+                                        onDismiss()
+                                        onCall(phoneItem.number, 1)
+                                    },
+                                    modifier = Modifier
+                                        .size(37.6.dp)
+                                        .clip(CircleShape)
+                                        .background(SamsungSmsBlue.copy(alpha = 0.12f))
+                                ) {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Phone,
+                                            contentDescription = "Вызов SIM 1",
+                                            tint = SamsungSmsBlue,
+                                            modifier = Modifier
+                                                .size(26.dp)
+                                                .align(Alignment.Center)
+                                                .offset(x = (-1).dp, y = 2.dp)
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(top = 7.dp, end = 7.dp)
+                                        ) {
+                                            SimCardBadge(simNumber = 1)
+                                        }
+                                    }
+                                }
+
+                                // SIM 2 Call Button
+                                IconButton(
+                                    onClick = {
+                                        onDismiss()
+                                        onCall(phoneItem.number, 2)
+                                    },
+                                    modifier = Modifier
+                                        .size(37.6.dp)
+                                        .clip(CircleShape)
+                                        .background(SamsungGreen.copy(alpha = 0.12f))
+                                ) {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Phone,
+                                            contentDescription = "Вызов SIM 2",
+                                            tint = SamsungGreen,
+                                            modifier = Modifier
+                                                .size(26.dp)
+                                                .align(Alignment.Center)
+                                                .offset(x = (-1).dp, y = 2.dp)
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(top = 7.dp, end = 7.dp)
+                                        ) {
+                                            SimCardBadge(simNumber = 2)
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Single Call Button
+                                IconButton(
+                                    onClick = {
+                                        onDismiss()
+                                        onCall(phoneItem.number, null)
+                                    },
+                                    modifier = Modifier
+                                        .size(37.6.dp)
+                                        .clip(CircleShape)
+                                        .background(SamsungGreen.copy(alpha = 0.12f))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Phone,
+                                        contentDescription = "Вызов",
+                                        tint = SamsungGreen,
+                                        modifier = Modifier.size(19.dp)
+                                    )
+                                }
+                            }
+
+                            // SMS Button
+                            IconButton(
+                                onClick = {
+                                    onDismiss()
+                                    onSms(phoneItem.number)
+                                },
+                                modifier = Modifier
+                                    .size(37.6.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Message,
+                                    contentDescription = "SMS",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Additional Options Card
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp
+        ) {
+            Column {
+                OptionRow(
+                    icon = Icons.Default.ContentCopy,
+                    label = "Скопировать номер",
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("Phone Number", primaryNumber)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, "Номер скопирован", Toast.LENGTH_SHORT).show()
+                    }
+                )
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                OptionRow(
+                    icon = Icons.Default.Delete,
+                    label = "Удалить из избранных",
+                    labelColor = MaterialTheme.colorScheme.error,
+                    iconTint = MaterialTheme.colorScheme.error,
+                    onClick = {
+                        onDismiss()
+                        onRemoveFavorite(contact)
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // Quick Action Buttons Row (Call, SMS, Info) placed at the bottom
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ActionButtonItem(
+                icon = Icons.Default.Phone,
+                label = "Вызов",
+                containerColor = SamsungGreen,
+                contentColor = Color.White,
+                onClick = {
+                    onDismiss()
+                    onCall(primaryNumber, null)
+                }
+            )
+
+            ActionButtonItem(
+                icon = Icons.AutoMirrored.Filled.Message,
+                label = "SMS",
+                containerColor = SamsungSmsBlue,
+                contentColor = Color.White,
+                onClick = {
+                    onDismiss()
+                    onSms(primaryNumber)
+                }
+            )
+
+            ActionButtonItem(
+                icon = Icons.Default.Person,
+                label = "Инфо",
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = {
+                    openSystemContact(context, primaryNumber)
+                }
+            )
+        }
+    }
+}
+
+@Composable
+private fun HistoryTabContent(
+    isLoading: Boolean,
+    logs: List<CallLogItem>,
+    onCall: (String) -> Unit,
+    onSms: (String) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        if (isLoading) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(120.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Загрузка истории...",
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                )
+            }
+        } else if (logs.isEmpty()) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "История вызовов отсутствует",
+                        fontSize = 15.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                    )
+                }
+            }
+        } else {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
+            ) {
+                Column {
+                    logs.forEachIndexed { index, item ->
+                        if (index > 0) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                thickness = 1.dp,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                val (icon, color, desc) = when (item.type) {
+                                    CallType.INCOMING -> Triple(Icons.AutoMirrored.Filled.CallReceived, IncomingGreen, "Входящий")
+                                    CallType.OUTGOING -> Triple(Icons.AutoMirrored.Filled.CallMade, OutgoingBlue, "Исходящий")
+                                    CallType.MISSED -> Triple(Icons.AutoMirrored.Filled.CallMissed, MissedRed, "Пропущенный")
+                                    CallType.REJECTED -> Triple(Icons.Default.CallEnd, MissedRed, "Отклоненный")
+                                }
+
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = desc,
+                                    tint = color,
+                                    modifier = Modifier.size(20.dp)
+                                )
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                Column {
+                                    Text(
+                                        text = formatCallDate(item.timestamp),
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = if (item.type == CallType.MISSED || item.type == CallType.REJECTED) MissedRed else MaterialTheme.colorScheme.onSurface
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = formatCallDuration(item.duration),
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                }
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                IconButton(
+                                    onClick = { onCall(item.number) },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(SamsungGreen.copy(alpha = 0.12f))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Phone,
+                                        contentDescription = "Вызов",
+                                        tint = SamsungGreen,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
+                                IconButton(
+                                    onClick = { onSms(item.number) },
+                                    modifier = Modifier
+                                        .size(36.dp)
+                                        .clip(CircleShape)
+                                        .background(SamsungSmsBlue.copy(alpha = 0.12f))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Message,
+                                        contentDescription = "SMS",
+                                        tint = SamsungSmsBlue,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsTabContent(
+    contact: FavoriteContact,
+    context: Context,
+    onDismiss: () -> Unit,
+    onRemoveFavorite: (FavoriteContact) -> Unit
+) {
+    var isFavorite by remember { mutableStateOf(true) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Card 1: Favorite Toggle
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Star,
+                        contentDescription = "Избранное",
+                        tint = SamsungGreen,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(14.dp))
+                    Text(
+                        text = "В избранных контактах",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                Switch(
+                    checked = isFavorite,
+                    onCheckedChange = { checked ->
+                        isFavorite = checked
+                        if (!checked) {
+                            onDismiss()
+                            onRemoveFavorite(contact)
+                        }
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = SamsungGreen
+                    )
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Card 2: Contact Options
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp
+        ) {
+            Column {
+                OptionRow(
+                    icon = Icons.Default.ContentCopy,
+                    label = "Скопировать данные контакта",
+                    onClick = {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("Contact Info", "${contact.name}: ${contact.number}")
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(context, "Данные скопированы", Toast.LENGTH_SHORT).show()
+                    }
+                )
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                OptionRow(
+                    icon = Icons.Default.Person,
+                    label = "Открыть в контактах устройства",
+                    onClick = {
+                        openSystemContact(context, contact.number)
+                    }
+                )
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                OptionRow(
+                    icon = Icons.Default.Delete,
+                    label = "Удалить из списка избранных",
+                    labelColor = MaterialTheme.colorScheme.error,
+                    iconTint = MaterialTheme.colorScheme.error,
+                    onClick = {
+                        onDismiss()
+                        onRemoveFavorite(contact)
+                    }
+                )
             }
         }
     }
@@ -693,23 +1100,6 @@ private fun getPhoneTypeLabel(type: Int, customLabel: String?): String {
     }
 }
 
-private fun openSystemContact(context: Context, contactNumber: String) {
-    try {
-        val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(contactNumber))
-        val intent = Intent(Intent.ACTION_VIEW, uri)
-        context.startActivity(intent)
-    } catch (e: Exception) {
-        try {
-            val intent = Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_APP_CONTACTS)
-            }
-            context.startActivity(intent)
-        } catch (ex: Exception) {
-            Toast.makeText(context, "Не удалось открыть информацию о контакте", Toast.LENGTH_SHORT).show()
-        }
-    }
-}
-
 private class DetailSimCardShape(private val cutSizeDp: Float = 2.5f) : Shape {
     override fun createOutline(
         size: Size,
@@ -753,4 +1143,34 @@ private fun SimCardBadge(simNumber: Int) {
             modifier = Modifier.offset(y = (-0.5).dp)
         )
     }
+}
+
+private fun openSystemContact(context: Context, contactNumber: String) {
+    try {
+        val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(contactNumber))
+        val intent = Intent(Intent.ACTION_VIEW, uri)
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        try {
+            val intent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_APP_CONTACTS)
+            }
+            context.startActivity(intent)
+        } catch (ex: Exception) {
+            Toast.makeText(context, "Не удалось открыть информацию о контакте", Toast.LENGTH_SHORT).show()
+        }
+    }
+}
+
+private fun formatCallDate(timestamp: Long): String {
+    if (timestamp == 0L) return ""
+    val ruLocale = Locale.forLanguageTag("ru")
+    return SimpleDateFormat("d MMMM, HH:mm", ruLocale).format(Date(timestamp))
+}
+
+private fun formatCallDuration(seconds: Long): String {
+    if (seconds <= 0L) return "Без ответа"
+    val m = seconds / 60
+    val s = seconds % 60
+    return if (m > 0) "$m мин $s сек" else "$s сек"
 }

@@ -94,7 +94,18 @@ fun RecentsScreen(
     val listState = rememberLazyListState()
 
     val favoriteRows = remember(favorites) {
-        favorites.chunked(3)
+        if (favorites.isEmpty()) {
+            emptyList()
+        } else {
+            val remainder = favorites.size % 3
+            if (remainder == 0) {
+                favorites.chunked(3)
+            } else {
+                val topRow = favorites.take(remainder)
+                val restRows = favorites.drop(remainder).chunked(3)
+                listOf(topRow) + restRows
+            }
+        }
     }
 
     // Target row index for startup: 3rd row from the bottom of favorites
@@ -440,7 +451,8 @@ fun RecentsScreen(
                             SwipeableCallLogCard(
                                 item = item,
                                 onCall = { num -> onCall(num, null) },
-                                onSms = onSms
+                                onSms = onSms,
+                                onItemClick = { viewModel.openContactDetailFromCallLog(it) }
                             )
                         }
                     }
@@ -471,9 +483,10 @@ fun RecentsScreen(
         }
 
         // Contact Detail Bottom Sheet Dialog
-        contactDetailToShow?.let { contact ->
+        contactDetailToShow?.let { detailState ->
             ContactDetailDialog(
-                contact = contact,
+                contact = detailState.contact,
+                initialTab = detailState.initialTab,
                 onDismiss = { viewModel.closeContactDetail() },
                 onCall = onCall,
                 onSms = onSms,

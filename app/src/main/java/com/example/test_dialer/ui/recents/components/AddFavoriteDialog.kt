@@ -253,7 +253,7 @@ private fun loadDeviceContacts(context: Context): List<FavoriteContact> {
             val numberIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
             val photoIndex = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
 
-            val addedNumbers = mutableSetOf<String>()
+            val addedContactKeys = mutableSetOf<String>()
 
             while (c.moveToNext()) {
                 val id = if (idIndex != -1) c.getString(idIndex) else ""
@@ -261,9 +261,10 @@ private fun loadDeviceContacts(context: Context): List<FavoriteContact> {
                 val number = if (numberIndex != -1) c.getString(numberIndex) else ""
                 val photoUri = if (photoIndex != -1) c.getString(photoIndex) else null
 
-                val cleanNumber = number.replace(Regex("[^0-9+]"), "")
-                if (cleanNumber.isNotBlank() && !addedNumbers.contains(cleanNumber)) {
-                    addedNumbers.add(cleanNumber)
+                val key = if (id.isNotBlank()) id else name.trim().lowercase()
+
+                if (!addedContactKeys.contains(key)) {
+                    addedContactKeys.add(key)
                     list.add(
                         FavoriteContact(
                             id = "fav_contact_$id",

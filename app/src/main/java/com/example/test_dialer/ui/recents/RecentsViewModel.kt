@@ -14,6 +14,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
+data class ContactDetailState(
+    val contact: FavoriteContact,
+    val initialTab: Int = 0
+)
+
 class RecentsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = CallLogRepository(application)
@@ -33,8 +38,8 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     private val _isAddFavoriteOpen = MutableStateFlow(false)
     val isAddFavoriteOpen: StateFlow<Boolean> = _isAddFavoriteOpen.asStateFlow()
 
-    private val _contactDetailToShow = MutableStateFlow<FavoriteContact?>(null)
-    val contactDetailToShow: StateFlow<FavoriteContact?> = _contactDetailToShow.asStateFlow()
+    private val _contactDetailToShow = MutableStateFlow<ContactDetailState?>(null)
+    val contactDetailToShow: StateFlow<ContactDetailState?> = _contactDetailToShow.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
@@ -122,8 +127,18 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         _isAddFavoriteOpen.value = false
     }
 
-    fun openContactDetail(contact: FavoriteContact) {
-        _contactDetailToShow.value = contact
+    fun openContactDetail(contact: FavoriteContact, initialTab: Int = 0) {
+        _contactDetailToShow.value = ContactDetailState(contact, initialTab)
+    }
+
+    fun openContactDetailFromCallLog(item: CallLogItem) {
+        val contact = FavoriteContact(
+            id = item.id,
+            name = item.name ?: item.number,
+            number = item.number,
+            photoUri = item.photoUri
+        )
+        openContactDetail(contact, initialTab = 1)
     }
 
     fun closeContactDetail() {
