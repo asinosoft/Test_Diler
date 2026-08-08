@@ -10,6 +10,7 @@ import android.provider.ContactsContract
 import android.telephony.SubscriptionManager
 import android.widget.Toast
 import org.json.JSONArray
+import org.json.JSONObject
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -514,6 +515,8 @@ private fun ContactTabContent(
     var draggingEmailIndex by remember { mutableStateOf<Int?>(null) }
     var emailDragOffsetY by remember { mutableFloatStateOf(0f) }
 
+    var showAddCustomLinkDialog by remember { mutableStateOf(false) }
+
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
 
@@ -815,10 +818,12 @@ private fun ContactTabContent(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = formatPhoneNumber(messenger.accountDetail),
+                                    text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(messenger.accountDetail),
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
                             }
 
@@ -830,7 +835,7 @@ private fun ContactTabContent(
                                             try {
                                                 context.startActivity(messenger.chatIntent)
                                             } catch (e: Exception) {
-                                                Toast.makeText(context, "Не удалось открыть чат ${messenger.messengerName}", Toast.LENGTH_SHORT).show()
+                                                Toast.makeText(context, "Не удалось открыть ссылку ${messenger.messengerName}", Toast.LENGTH_SHORT).show()
                                             }
                                         },
                                         modifier = Modifier
@@ -848,7 +853,7 @@ private fun ContactTabContent(
                                 }
 
                                 // 2. Audio Call
-                                if (messenger.audioCallIntent != null) {
+                                if (!messenger.isCustomLink && messenger.audioCallIntent != null) {
                                     IconButton(
                                         onClick = {
                                             try {
@@ -872,7 +877,7 @@ private fun ContactTabContent(
                                 }
 
                                 // 3. Video Call
-                                if (messenger.videoCallIntent != null) {
+                                if (!messenger.isCustomLink && messenger.videoCallIntent != null) {
                                     IconButton(
                                         onClick = {
                                             try {
@@ -895,6 +900,35 @@ private fun ContactTabContent(
                                     }
                                 }
                             }
+                        }
+                    }
+
+                    // Bottom "+" Button inside Messenger Card
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        IconButton(
+                            onClick = { showAddCustomLinkDialog = true },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(SamsungGreen.copy(alpha = 0.12f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Добавить ссылку",
+                                tint = SamsungGreen,
+                                modifier = Modifier.size(20.dp)
+                            )
                         }
                     }
                 }
@@ -1159,6 +1193,127 @@ private fun ContactTabContent(
                 }
             )
         }
+    }
+
+    if (showAddCustomLinkDialog) {
+        var selectedMessengerIndex by remember { mutableIntStateOf(0) }
+        var dropdownExpanded by remember { mutableStateOf(false) }
+        var customLinkInput by remember { mutableStateOf("") }
+
+        val installedMessengers = remember { getInstalledMessengersList(context) }
+        val activeMessenger = installedMessengers.getOrNull(selectedMessengerIndex) ?: installedMessengers.firstOrNull()
+
+        AlertDialog(
+            onDismissRequest = { showAddCustomLinkDialog = false },
+            title = {
+                Text(text = "Добавить ссылку мессенджера", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            },
+            text = {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        text = "Выберите мессенджер",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    // Messenger Dropdown
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { dropdownExpanded = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = activeMessenger?.messengerName ?: "Мессенджер",
+                                    fontWeight = FontWeight.Bold,
+                                    color = activeMessenger?.brandColor ?: SamsungGreen
+                                )
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = "Выбрать",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        DropdownMenu(
+                            expanded = dropdownExpanded,
+                            onDismissRequest = { dropdownExpanded = false }
+                        ) {
+                            installedMessengers.forEachIndexed { idx, item ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            text = item.messengerName,
+                                            fontWeight = if (idx == selectedMessengerIndex) FontWeight.Bold else FontWeight.Normal,
+                                            color = item.brandColor
+                                        )
+                                    },
+                                    onClick = {
+                                        selectedMessengerIndex = idx
+                                        dropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    OutlinedTextField(
+                        value = customLinkInput,
+                        onValueChange = { customLinkInput = it },
+                        label = { Text("Вставьте ссылку") },
+                        placeholder = { Text("https://t.me/username") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val inputUrl = customLinkInput.trim()
+                        if (inputUrl.isNotBlank() && activeMessenger != null) {
+                            val formattedUrl = if (!inputUrl.startsWith("http://") && !inputUrl.startsWith("https://") && !inputUrl.startsWith("viber://") && !inputUrl.startsWith("skype:")) {
+                                "https://$inputUrl"
+                            } else inputUrl
+
+                            val newAccount = MessengerAccount(
+                                id = "custom_${System.currentTimeMillis()}",
+                                packageName = activeMessenger.packageName,
+                                messengerName = activeMessenger.messengerName,
+                                accountDetail = formattedUrl,
+                                brandColor = activeMessenger.brandColor,
+                                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse(formattedUrl)),
+                                isCustomLink = true
+                            )
+
+                            val updatedList = editableMessengerList + newAccount
+                            editableMessengerList = updatedList
+                            saveCustomMessengerLinks(context, getContactCustomKey(contact), updatedList)
+                            showAddCustomLinkDialog = false
+                        }
+                    }
+                ) {
+                    Text("Добавить", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddCustomLinkDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
     }
 }
 
@@ -1859,8 +2014,9 @@ private data class MessengerAccount(
     val accountDetail: String,
     val brandColor: Color,
     val chatIntent: Intent?,
-    val audioCallIntent: Intent?,
-    val videoCallIntent: Intent?
+    val audioCallIntent: Intent? = null,
+    val videoCallIntent: Intent? = null,
+    val isCustomLink: Boolean = false
 )
 
 private fun isPackageInstalled(context: Context, packageName: String): Boolean {
@@ -2046,6 +2202,11 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
     }
 
     val contactKey = getContactCustomKey(contact)
+    val customSavedLinks = getSavedCustomMessengerLinks(context, contactKey)
+    if (customSavedLinks.isNotEmpty()) {
+        list.addAll(customSavedLinks)
+    }
+
     val savedOrder = getSavedMessengerAccountsOrder(context, contactKey)
     if (savedOrder.isNotEmpty()) {
         list.sortBy { messenger ->
@@ -2055,6 +2216,93 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
     }
 
     return list
+}
+
+private fun saveCustomMessengerLinks(context: Context, contactKey: String, links: List<MessengerAccount>) {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val array = JSONArray()
+        links.filter { it.isCustomLink }.forEach { item ->
+            val obj = JSONObject().apply {
+                put("id", item.id)
+                put("packageName", item.packageName)
+                put("messengerName", item.messengerName)
+                put("accountDetail", item.accountDetail)
+            }
+            array.put(obj)
+        }
+        prefs.edit().putString("custom_msg_links_$contactKey", array.toString()).apply()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private fun getSavedCustomMessengerLinks(context: Context, contactKey: String): List<MessengerAccount> {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val jsonString = prefs.getString("custom_msg_links_$contactKey", null) ?: return emptyList()
+        val array = JSONArray(jsonString)
+        val list = mutableListOf<MessengerAccount>()
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            val pkg = obj.getString("packageName")
+            val name = obj.getString("messengerName")
+            val detail = obj.getString("accountDetail")
+            val color = getMessengerBrandColor(name)
+
+            list.add(
+                MessengerAccount(
+                    id = obj.getString("id"),
+                    packageName = pkg,
+                    messengerName = name,
+                    accountDetail = detail,
+                    brandColor = color,
+                    chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse(detail)),
+                    isCustomLink = true
+                )
+            )
+        }
+        return list
+    } catch (e: Exception) {
+        return emptyList()
+    }
+}
+
+private fun getMessengerBrandColor(messengerName: String): Color {
+    return when {
+        messengerName.contains("WhatsApp", true) -> Color(0xFF25D366)
+        messengerName.contains("Telegram", true) -> Color(0xFF24A1DE)
+        messengerName.contains("Viber", true) -> Color(0xFF7360F2)
+        messengerName.contains("Signal", true) -> Color(0xFF3A76F0)
+        messengerName.contains("Skype", true) -> Color(0xFF00AFF0)
+        messengerName.contains("MAX", true) -> Color(0xFF2A5885)
+        messengerName.contains("VK", true) -> Color(0xFF0077FF)
+        messengerName.contains("Messenger", true) -> Color(0xFF0084FF)
+        messengerName.contains("Snapchat", true) -> Color(0xFFE5C100)
+        messengerName.contains("WeChat", true) -> Color(0xFF07C160)
+        else -> SamsungGreen
+    }
+}
+
+private data class InstalledMessengerItem(
+    val packageName: String,
+    val messengerName: String,
+    val brandColor: Color
+)
+
+private fun getInstalledMessengersList(context: Context): List<InstalledMessengerItem> {
+    return listOf(
+        InstalledMessengerItem("org.telegram.messenger", "Telegram", Color(0xFF24A1DE)),
+        InstalledMessengerItem("com.whatsapp", "WhatsApp", Color(0xFF25D366)),
+        InstalledMessengerItem("ru.max.messenger", "MAX", Color(0xFF2A5885)),
+        InstalledMessengerItem("com.viber.voip", "Viber", Color(0xFF7360F2)),
+        InstalledMessengerItem("com.vk.im", "VK Messenger", Color(0xFF0077FF)),
+        InstalledMessengerItem("org.thoughtcrime.securesms", "Signal", Color(0xFF3A76F0)),
+        InstalledMessengerItem("com.skype.raider", "Skype", Color(0xFF00AFF0)),
+        InstalledMessengerItem("com.facebook.orca", "Messenger", Color(0xFF0084FF)),
+        InstalledMessengerItem("com.snapchat.android", "Snapchat", Color(0xFFE5C100)),
+        InstalledMessengerItem("com.tencent.mm", "WeChat", Color(0xFF07C160))
+    )
 }
 
 private fun getContactCustomKey(contact: FavoriteContact): String {
