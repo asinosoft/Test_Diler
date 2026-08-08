@@ -172,14 +172,13 @@ fun RecentsScreen(
         110.dp * actualRowCount
     }
 
-    // Target row index for startup: based on favoriteRowsCount
-    val targetFavoriteRowIndex = remember(favoriteRows, favoriteRowsCount) {
-        if (favoriteRows.isEmpty()) 0 else (favoriteRows.size - favoriteRowsCount).coerceAtLeast(0)
+    val targetGridRowIndex = remember(maxRowsAcrossAllTabs, favoriteRowsCount) {
+        (maxRowsAcrossAllTabs - favoriteRowsCount).coerceAtLeast(0)
     }
 
     // LazyColumn item index corresponding to target favorite row
-    val initialItemIndex = remember(targetFavoriteRowIndex) {
-        1 + targetFavoriteRowIndex
+    val initialItemIndex = remember(targetGridRowIndex) {
+        1 + targetGridRowIndex
     }
 
     // Scroll to initial position AFTER call logs and favorites finish loading
