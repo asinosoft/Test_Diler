@@ -9,6 +9,7 @@ import android.net.Uri
 import android.provider.ContactsContract
 import android.telephony.SubscriptionManager
 import android.widget.Toast
+import org.json.JSONArray
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -37,9 +38,11 @@ import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
@@ -61,9 +64,11 @@ import com.example.test_dialer.data.model.FavoriteTab
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -79,9 +84,16 @@ import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.zIndex
+import kotlin.math.roundToInt
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -151,6 +163,8 @@ fun ContactDetailDialog(
     }
 
     var messengerAccountsList by remember(contact) { mutableStateOf<List<MessengerAccount>>(emptyList()) }
+    var emailsList by remember(contact) { mutableStateOf<List<ContactEmail>>(emptyList()) }
+    var birthdayInfo by remember(contact) { mutableStateOf<ContactBirthday?>(null) }
 
     LaunchedEffect(contact) {
         withContext(Dispatchers.IO) {
@@ -177,6 +191,12 @@ fun ContactDetailDialog(
 
             // Load messenger accounts for this contact
             messengerAccountsList = loadMessengerAccounts(context, contact)
+
+            // Load emails for this contact
+            emailsList = loadContactEmails(context, contact)
+
+            // Load birthday for this contact
+            birthdayInfo = loadContactBirthday(context, contact)
         }
     }
 
@@ -338,6 +358,8 @@ fun ContactDetailDialog(
                                 ContactTabContent(
                                     phoneNumbersList = phoneNumbersList,
                                     messengerAccountsList = messengerAccountsList,
+                                    emailsList = emailsList,
+                                    birthdayInfo = birthdayInfo,
                                     activeSimCount = activeSimCount,
                                     contact = contact,
                                     context = context,
@@ -470,6 +492,8 @@ private fun FloatingTabBar(
 private fun ContactTabContent(
     phoneNumbersList: List<ContactPhoneNumber>,
     messengerAccountsList: List<MessengerAccount>,
+    emailsList: List<ContactEmail>,
+    birthdayInfo: ContactBirthday?,
     activeSimCount: Int,
     contact: FavoriteContact,
     context: Context,
@@ -478,7 +502,22 @@ private fun ContactTabContent(
     onDismiss: () -> Unit,
     onRemoveFavorite: (FavoriteContact) -> Unit
 ) {
-    val primaryNumber = phoneNumbersList.firstOrNull()?.number ?: contact.number
+    var editablePhoneList by remember(phoneNumbersList) { mutableStateOf(phoneNumbersList) }
+    var draggingPhoneIndex by remember { mutableStateOf<Int?>(null) }
+    var phoneDragOffsetY by remember { mutableFloatStateOf(0f) }
+
+    var editableMessengerList by remember(messengerAccountsList) { mutableStateOf(messengerAccountsList) }
+    var draggingMessengerIndex by remember { mutableStateOf<Int?>(null) }
+    var messengerDragOffsetY by remember { mutableFloatStateOf(0f) }
+
+    var editableEmailList by remember(emailsList) { mutableStateOf(emailsList) }
+    var draggingEmailIndex by remember { mutableStateOf<Int?>(null) }
+    var emailDragOffsetY by remember { mutableFloatStateOf(0f) }
+
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+
+    val primaryNumber = editablePhoneList.firstOrNull()?.number ?: contact.number
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -492,7 +531,7 @@ private fun ContactTabContent(
             tonalElevation = 1.dp
         ) {
             Column {
-                phoneNumbersList.forEachIndexed { index, phoneItem ->
+                editablePhoneList.forEachIndexed { index, phoneItem ->
                     if (index > 0) {
                         HorizontalDivider(
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
@@ -501,14 +540,66 @@ private fun ContactTabContent(
                         )
                     }
 
+                    val isPhoneDragging = draggingPhoneIndex == index
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .graphicsLayer {
+                                if (isPhoneDragging) {
+                                    translationY = phoneDragOffsetY
+                                    shadowElevation = 12f
+                                    scaleX = 1.02f
+                                    scaleY = 1.02f
+                                }
+                            }
+                            .zIndex(if (isPhoneDragging) 10f else 1f)
+                            .pointerInput(index, editablePhoneList.size) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        draggingPhoneIndex = index
+                                        phoneDragOffsetY = 0f
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        phoneDragOffsetY += dragAmount.y
+                                        val currentList = editablePhoneList.toMutableList()
+                                        val currentIndex = draggingPhoneIndex ?: index
+                                        val rowHeightPx = with(density) { 62.dp.toPx() }
+                                        val shift = (phoneDragOffsetY / rowHeightPx).roundToInt()
+                                        val targetIndex = (currentIndex + shift).coerceIn(0, currentList.size - 1)
+
+                                        if (targetIndex != currentIndex) {
+                                            val item = currentList.removeAt(currentIndex)
+                                            currentList.add(targetIndex, item)
+                                            editablePhoneList = currentList
+                                            savePhoneNumbersOrder(context, getContactCustomKey(contact), currentList)
+                                            phoneDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
+                                            draggingPhoneIndex = targetIndex
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        draggingPhoneIndex = null
+                                        phoneDragOffsetY = 0f
+                                    },
+                                    onDragCancel = {
+                                        draggingPhoneIndex = null
+                                        phoneDragOffsetY = 0f
+                                    }
+                                )
+                            }
                             .padding(horizontal = 18.dp, vertical = 14.dp),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    copyToClipboard(context, "Phone Number", phoneItem.number)
+                                }
+                        ) {
                             Text(
                                 text = phoneItem.label,
                                 fontSize = 12.sp,
@@ -518,7 +609,7 @@ private fun ContactTabContent(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = formatPhoneNumber(phoneItem.number),
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -637,7 +728,7 @@ private fun ContactTabContent(
         }
 
         // MESSENGER ACCOUNTS CARD
-        if (messengerAccountsList.isNotEmpty()) {
+        if (editableMessengerList.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
 
             Surface(
@@ -647,7 +738,7 @@ private fun ContactTabContent(
                 tonalElevation = 1.dp
             ) {
                 Column {
-                    messengerAccountsList.forEachIndexed { index, messenger ->
+                    editableMessengerList.forEachIndexed { index, messenger ->
                         if (index > 0) {
                             HorizontalDivider(
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
@@ -656,14 +747,66 @@ private fun ContactTabContent(
                             )
                         }
 
+                        val isMessengerDragging = draggingMessengerIndex == index
+
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .graphicsLayer {
+                                    if (isMessengerDragging) {
+                                        translationY = messengerDragOffsetY
+                                        shadowElevation = 12f
+                                        scaleX = 1.02f
+                                        scaleY = 1.02f
+                                    }
+                                }
+                                .zIndex(if (isMessengerDragging) 10f else 1f)
+                                .pointerInput(index, editableMessengerList.size) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            draggingMessengerIndex = index
+                                            messengerDragOffsetY = 0f
+                                        },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            messengerDragOffsetY += dragAmount.y
+                                            val currentList = editableMessengerList.toMutableList()
+                                            val currentIndex = draggingMessengerIndex ?: index
+                                            val rowHeightPx = with(density) { 62.dp.toPx() }
+                                            val shift = (messengerDragOffsetY / rowHeightPx).roundToInt()
+                                            val targetIndex = (currentIndex + shift).coerceIn(0, currentList.size - 1)
+
+                                            if (targetIndex != currentIndex) {
+                                                val item = currentList.removeAt(currentIndex)
+                                                currentList.add(targetIndex, item)
+                                                editableMessengerList = currentList
+                                                saveMessengerAccountsOrder(context, getContactCustomKey(contact), currentList)
+                                                messengerDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
+                                                draggingMessengerIndex = targetIndex
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            draggingMessengerIndex = null
+                                            messengerDragOffsetY = 0f
+                                        },
+                                        onDragCancel = {
+                                            draggingMessengerIndex = null
+                                            messengerDragOffsetY = 0f
+                                        }
+                                    )
+                                }
                                 .padding(horizontal = 18.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        copyToClipboard(context, "Messenger Account", messenger.accountDetail)
+                                    }
+                            ) {
                                 Text(
                                     text = messenger.messengerName,
                                     fontSize = 12.sp,
@@ -752,6 +895,184 @@ private fun ContactTabContent(
                                     }
                                 }
                             }
+                        }
+                    }
+                }
+            }
+        }
+
+        // E-MAIL CARD
+        if (editableEmailList.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
+            ) {
+                Column {
+                    editableEmailList.forEachIndexed { index, emailItem ->
+                        if (index > 0) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                thickness = 1.dp,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+
+                        val isEmailDragging = draggingEmailIndex == index
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer {
+                                    if (isEmailDragging) {
+                                        translationY = emailDragOffsetY
+                                        shadowElevation = 12f
+                                        scaleX = 1.02f
+                                        scaleY = 1.02f
+                                    }
+                                }
+                                .zIndex(if (isEmailDragging) 10f else 1f)
+                                .pointerInput(index, editableEmailList.size) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            draggingEmailIndex = index
+                                            emailDragOffsetY = 0f
+                                        },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            emailDragOffsetY += dragAmount.y
+                                            val currentList = editableEmailList.toMutableList()
+                                            val currentIndex = draggingEmailIndex ?: index
+                                            val rowHeightPx = with(density) { 62.dp.toPx() }
+                                            val shift = (emailDragOffsetY / rowHeightPx).roundToInt()
+                                            val targetIndex = (currentIndex + shift).coerceIn(0, currentList.size - 1)
+
+                                            if (targetIndex != currentIndex) {
+                                                val item = currentList.removeAt(currentIndex)
+                                                currentList.add(targetIndex, item)
+                                                editableEmailList = currentList
+                                                saveEmailOrder(context, getContactCustomKey(contact), currentList)
+                                                emailDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
+                                                draggingEmailIndex = targetIndex
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            draggingEmailIndex = null
+                                            emailDragOffsetY = 0f
+                                        },
+                                        onDragCancel = {
+                                            draggingEmailIndex = null
+                                            emailDragOffsetY = 0f
+                                        }
+                                    )
+                                }
+                                .padding(horizontal = 18.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        copyToClipboard(context, "Email", emailItem.email)
+                                    }
+                            ) {
+                                Text(
+                                    text = emailItem.label,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = emailItem.email,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            // Yellow Email Action Button
+                            IconButton(
+                                onClick = {
+                                    try {
+                                        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${emailItem.email}"))
+                                        context.startActivity(intent)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Не удалось открыть почту", Toast.LENGTH_SHORT).show()
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(37.6.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFFFB300).copy(alpha = 0.15f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Email,
+                                    contentDescription = "Написать письмо",
+                                    tint = Color(0xFFFFB300),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // BIRTHDAY CARD
+        if (birthdayInfo != null) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "День рождения",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = birthdayInfo.formattedDate,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    if (!birthdayInfo.ageText.isNullOrBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = birthdayInfo.ageText!!,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            )
                         }
                     }
                 }
@@ -1369,6 +1690,17 @@ private suspend fun loadContactPhoneNumbers(
         numbersList.add(ContactPhoneNumber(number = contact.number, label = "Мобильный"))
     }
 
+    val contactKey = getContactCustomKey(contact)
+    val savedOrder = getSavedPhoneNumbersOrder(context, contactKey)
+    if (savedOrder.isNotEmpty()) {
+        val cleanSaved = savedOrder.map { it.replace(Regex("[^0-9+]"), "") }
+        numbersList.sortBy { item ->
+            val clean = item.number.replace(Regex("[^0-9+]"), "")
+            val idx = cleanSaved.indexOf(clean)
+            if (idx != -1) idx else 999
+        }
+    }
+
     numbersList
 }
 
@@ -1507,6 +1839,17 @@ private fun formatCallDuration(seconds: Long): String {
     val m = seconds / 60
     val s = seconds % 60
     return if (m > 0) "$m мин $s сек" else "$s сек"
+}
+
+private fun copyToClipboard(context: Context, label: String, textToCopy: String) {
+    try {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText(label, textToCopy)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(context, "Скопировано!", Toast.LENGTH_SHORT).show()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
 }
 
 private data class MessengerAccount(
@@ -1702,5 +2045,311 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
         )
     }
 
+    val contactKey = getContactCustomKey(contact)
+    val savedOrder = getSavedMessengerAccountsOrder(context, contactKey)
+    if (savedOrder.isNotEmpty()) {
+        list.sortBy { messenger ->
+            val idx = savedOrder.indexOf(messenger.id)
+            if (idx != -1) idx else 999
+        }
+    }
+
     return list
+}
+
+private fun getContactCustomKey(contact: FavoriteContact): String {
+    return if (contact.id.isNotBlank()) contact.id else contact.number.replace(Regex("[^0-9+]"), "")
+}
+
+private fun savePhoneNumbersOrder(context: Context, contactKey: String, numbers: List<ContactPhoneNumber>) {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val array = JSONArray()
+        numbers.forEach { array.put(it.number) }
+        prefs.edit().putString("phones_order_$contactKey", array.toString()).apply()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private fun getSavedPhoneNumbersOrder(context: Context, contactKey: String): List<String> {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val jsonString = prefs.getString("phones_order_$contactKey", null) ?: return emptyList()
+        val array = JSONArray(jsonString)
+        val list = mutableListOf<String>()
+        for (i in 0 until array.length()) {
+            list.add(array.getString(i))
+        }
+        return list
+    } catch (e: Exception) {
+        return emptyList()
+    }
+}
+
+private fun saveMessengerAccountsOrder(context: Context, contactKey: String, messengers: List<MessengerAccount>) {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val array = JSONArray()
+        messengers.forEach { array.put(it.id) }
+        prefs.edit().putString("messengers_order_$contactKey", array.toString()).apply()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private fun getSavedMessengerAccountsOrder(context: Context, contactKey: String): List<String> {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val jsonString = prefs.getString("messengers_order_$contactKey", null) ?: return emptyList()
+        val array = JSONArray(jsonString)
+        val list = mutableListOf<String>()
+        for (i in 0 until array.length()) {
+            list.add(array.getString(i))
+        }
+        return list
+    } catch (e: Exception) {
+        return emptyList()
+    }
+}
+
+private data class ContactEmail(
+    val email: String,
+    val label: String
+)
+
+private data class ContactBirthday(
+    val dateString: String,
+    val formattedDate: String,
+    val ageText: String?
+)
+
+private fun getEmailTypeLabel(type: Int, customLabel: String?): String {
+    return when (type) {
+        ContactsContract.CommonDataKinds.Email.TYPE_HOME -> "Личный"
+        ContactsContract.CommonDataKinds.Email.TYPE_WORK -> "Рабочий"
+        ContactsContract.CommonDataKinds.Email.TYPE_MOBILE -> "Мобильный"
+        ContactsContract.CommonDataKinds.Email.TYPE_OTHER -> "Другой"
+        ContactsContract.CommonDataKinds.Email.TYPE_CUSTOM -> customLabel ?: "Другой"
+        else -> "Личный"
+    }
+}
+
+private fun saveEmailOrder(context: Context, contactKey: String, emails: List<ContactEmail>) {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val array = JSONArray()
+        emails.forEach { array.put(it.email) }
+        prefs.edit().putString("emails_order_$contactKey", array.toString()).apply()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private fun getSavedEmailOrder(context: Context, contactKey: String): List<String> {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val jsonString = prefs.getString("emails_order_$contactKey", null) ?: return emptyList()
+        val array = JSONArray(jsonString)
+        val list = mutableListOf<String>()
+        for (i in 0 until array.length()) {
+            list.add(array.getString(i))
+        }
+        return list
+    } catch (e: Exception) {
+        return emptyList()
+    }
+}
+
+private suspend fun loadContactEmails(context: Context, contact: FavoriteContact): List<ContactEmail> = withContext(Dispatchers.IO) {
+    val list = mutableListOf<ContactEmail>()
+    val addedAddresses = mutableSetOf<String>()
+
+    try {
+        var contactId: String? = null
+        if (contact.number.isNotBlank()) {
+            try {
+                val lookupUri = Uri.withAppendedPath(
+                    ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                    Uri.encode(contact.number)
+                )
+                val lookupCursor = context.contentResolver.query(
+                    lookupUri,
+                    arrayOf(ContactsContract.PhoneLookup._ID),
+                    null, null, null
+                )
+                lookupCursor?.use { c ->
+                    if (c.moveToFirst()) {
+                        val idIdx = c.getColumnIndex(ContactsContract.PhoneLookup._ID)
+                        if (idIdx != -1) contactId = c.getString(idIdx)
+                    }
+                }
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+
+        val selection: String
+        val selectionArgs: Array<String>
+        if (!contactId.isNullOrBlank()) {
+            selection = "${ContactsContract.CommonDataKinds.Email.CONTACT_ID} = ? OR ${ContactsContract.CommonDataKinds.Email.DISPLAY_NAME} = ?"
+            selectionArgs = arrayOf(contactId!!, contact.name)
+        } else {
+            selection = "${ContactsContract.CommonDataKinds.Email.DISPLAY_NAME} = ?"
+            selectionArgs = arrayOf(contact.name)
+        }
+
+        val cursor = context.contentResolver.query(
+            ContactsContract.CommonDataKinds.Email.CONTENT_URI,
+            arrayOf(
+                ContactsContract.CommonDataKinds.Email.ADDRESS,
+                ContactsContract.CommonDataKinds.Email.TYPE,
+                ContactsContract.CommonDataKinds.Email.LABEL
+            ),
+            selection,
+            selectionArgs,
+            null
+        )
+        cursor?.use { c ->
+            val addrIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Email.ADDRESS)
+            val typeIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Email.TYPE)
+            val labelIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Email.LABEL)
+            while (c.moveToNext()) {
+                val email = if (addrIdx != -1) c.getString(addrIdx) else ""
+                val type = if (typeIdx != -1) c.getInt(typeIdx) else ContactsContract.CommonDataKinds.Email.TYPE_OTHER
+                val customLabel = if (labelIdx != -1) c.getString(labelIdx) else null
+
+                val cleanEmail = email.trim().lowercase()
+                if (cleanEmail.isNotBlank() && !addedAddresses.contains(cleanEmail)) {
+                    addedAddresses.add(cleanEmail)
+                    val labelStr = getEmailTypeLabel(type, customLabel)
+                    list.add(ContactEmail(email.trim(), labelStr))
+                }
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+
+    val contactKey = getContactCustomKey(contact)
+    val savedOrder = getSavedEmailOrder(context, contactKey)
+    if (savedOrder.isNotEmpty()) {
+        val cleanSaved = savedOrder.map { it.trim().lowercase() }
+        list.sortBy { item ->
+            val idx = cleanSaved.indexOf(item.email.trim().lowercase())
+            if (idx != -1) idx else 999
+        }
+    }
+
+    list
+}
+
+private fun formatAgeRu(age: Int): String {
+    val rem100 = age % 100
+    val rem10 = age % 10
+    if (rem100 in 11..14) return "$age лет"
+    return when (rem10) {
+        1 -> "$age год"
+        in 2..4 -> "$age года"
+        else -> "$age лет"
+    }
+}
+
+private fun parseBirthdayString(rawDate: String): ContactBirthday {
+    val cleanDate = rawDate.trim()
+    return try {
+        if (cleanDate.startsWith("--") || cleanDate.length == 5) {
+            val mm = cleanDate.takeLast(5).substring(0, 2).toInt()
+            val dd = cleanDate.takeLast(2).toInt()
+            val monthNames = arrayOf("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря")
+            val mName = if (mm in 1..12) monthNames[mm - 1] else ""
+            ContactBirthday(cleanDate, "$dd $mName", null)
+        } else {
+            val digits = cleanDate.replace(Regex("[^0-9]"), "")
+            if (digits.length >= 8) {
+                val year = digits.substring(0, 4).toInt()
+                val month = digits.substring(4, 6).toInt()
+                val day = digits.substring(6, 8).toInt()
+
+                val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+                val currentMonth = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH) + 1
+                val currentDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH)
+
+                var age = currentYear - year
+                if (currentMonth < month || (currentMonth == month && currentDay < day)) {
+                    age--
+                }
+
+                val monthNames = arrayOf("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря")
+                val mName = if (month in 1..12) monthNames[month - 1] else ""
+                val formatted = "$day $mName $year г."
+                val ageText = if (age in 0..120) formatAgeRu(age) else null
+
+                ContactBirthday(cleanDate, formatted, ageText)
+            } else {
+                ContactBirthday(cleanDate, cleanDate, null)
+            }
+        }
+    } catch (e: Exception) {
+        ContactBirthday(cleanDate, cleanDate, null)
+    }
+}
+
+private suspend fun loadContactBirthday(context: Context, contact: FavoriteContact): ContactBirthday? = withContext(Dispatchers.IO) {
+    try {
+        var contactId: String? = null
+        if (contact.number.isNotBlank()) {
+            try {
+                val lookupUri = Uri.withAppendedPath(
+                    ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                    Uri.encode(contact.number)
+                )
+                val lookupCursor = context.contentResolver.query(
+                    lookupUri,
+                    arrayOf(ContactsContract.PhoneLookup._ID),
+                    null, null, null
+                )
+                lookupCursor?.use { c ->
+                    if (c.moveToFirst()) {
+                        val idIdx = c.getColumnIndex(ContactsContract.PhoneLookup._ID)
+                        if (idIdx != -1) contactId = c.getString(idIdx)
+                    }
+                }
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+
+        val selection: String
+        val selectionArgs: Array<String>
+        if (!contactId.isNullOrBlank()) {
+            selection = "(${ContactsContract.Data.CONTACT_ID} = ? OR ${ContactsContract.Data.DISPLAY_NAME} = ?) AND ${ContactsContract.Data.MIMETYPE} = ? AND ${ContactsContract.CommonDataKinds.Event.TYPE} = ?"
+            selectionArgs = arrayOf(contactId!!, contact.name, ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE, ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY.toString())
+        } else {
+            selection = "${ContactsContract.Data.DISPLAY_NAME} = ? AND ${ContactsContract.Data.MIMETYPE} = ? AND ${ContactsContract.CommonDataKinds.Event.TYPE} = ?"
+            selectionArgs = arrayOf(contact.name, ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE, ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY.toString())
+        }
+
+        val cursor = context.contentResolver.query(
+            ContactsContract.Data.CONTENT_URI,
+            arrayOf(
+                ContactsContract.CommonDataKinds.Event.START_DATE
+            ),
+            selection,
+            selectionArgs,
+            null
+        )
+        cursor?.use { c ->
+            val dateIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Event.START_DATE)
+            if (c.moveToFirst()) {
+                val rawDate = if (dateIdx != -1) c.getString(dateIdx) else null
+                if (!rawDate.isNullOrBlank()) {
+                    return@withContext parseBirthdayString(rawDate)
+                }
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    null
 }
