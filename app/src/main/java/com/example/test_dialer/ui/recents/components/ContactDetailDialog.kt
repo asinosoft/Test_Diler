@@ -138,10 +138,11 @@ fun ContactDetailDialog(
     }
 
     LaunchedEffect(contact) {
-        if (!contact.photoUri.isNullOrEmpty()) {
-            withContext(Dispatchers.IO) {
+        withContext(Dispatchers.IO) {
+            val highResPhotoUri = getHighResContactPhotoUri(context, contact.number) ?: contact.photoUri
+            if (!highResPhotoUri.isNullOrEmpty()) {
                 try {
-                    val uri = Uri.parse(contact.photoUri)
+                    val uri = Uri.parse(highResPhotoUri)
                     context.contentResolver.openInputStream(uri)?.use { stream ->
                         val bitmap = BitmapFactory.decodeStream(stream)
                         avatarBitmap = bitmap?.asImageBitmap()
@@ -149,15 +150,15 @@ fun ContactDetailDialog(
                 } catch (e: Exception) {
                     avatarBitmap = null
                 }
+            } else {
+                avatarBitmap = null
             }
-        } else {
-            avatarBitmap = null
-        }
 
-        // Query all phone numbers for this contact
-        val loadedNumbers = loadContactPhoneNumbers(context, contact)
-        if (loadedNumbers.isNotEmpty()) {
-            phoneNumbersList = loadedNumbers
+            // Query all phone numbers for this contact
+            val loadedNumbers = loadContactPhoneNumbers(context, contact)
+            if (loadedNumbers.isNotEmpty()) {
+                phoneNumbersList = loadedNumbers
+            }
         }
     }
 
@@ -1178,6 +1179,35 @@ private fun formatCallDate(timestamp: Long): String {
     if (timestamp == 0L) return ""
     val ruLocale = Locale.forLanguageTag("ru")
     return SimpleDateFormat("d MMMM, HH:mm", ruLocale).format(Date(timestamp))
+}
+
+private fun getHighResContactPhotoUri(context: Context, contactNumber: String): String? {
+    if (contactNumber.isBlank()) return null
+    return try {
+        val uri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(contactNumber)
+        )
+        val projection = arrayOf(
+            ContactsContract.PhoneLookup.PHOTO_URI,
+            ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI
+        )
+        val cursor = context.contentResolver.query(uri, projection, null, null, null)
+        var photoUri: String? = null
+        cursor?.use { c ->
+            if (c.moveToFirst()) {
+                val fullIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
+                val thumbIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI)
+                photoUri = if (fullIndex != -1) c.getString(fullIndex) else null
+                if (photoUri.isNullOrEmpty() && thumbIndex != -1) {
+                    photoUri = c.getString(thumbIndex)
+                }
+            }
+        }
+        photoUri
+    } catch (e: Exception) {
+        null
+    }
 }
 
 private fun formatCallDuration(seconds: Long): String {

@@ -60,8 +60,11 @@ class CallLogRepository(private val context: Context) {
                     val subIdStr = if (subIdIndex != -1) c.getString(subIdIndex) else null
                     val simIdStr = if (simIdIndex != -1) c.getString(simIdIndex) else null
 
-                    if (photoUri.isNullOrEmpty() && number.isNotBlank()) {
-                        photoUri = getContactPhotoUri(number)
+                    if (number.isNotBlank()) {
+                        val highResPhoto = getContactPhotoUri(number)
+                        if (!highResPhoto.isNullOrEmpty()) {
+                            photoUri = highResPhoto
+                        }
                     }
 
                     val simNumber = detectSimNumber(accountId, subIdStr, simIdStr)
@@ -208,18 +211,18 @@ class CallLogRepository(private val context: Context) {
                 Uri.encode(phoneNumber)
             )
             val projection = arrayOf(
-                ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI,
-                ContactsContract.PhoneLookup.PHOTO_URI
+                ContactsContract.PhoneLookup.PHOTO_URI,
+                ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI
             )
             val cursor = context.contentResolver.query(uri, projection, null, null, null)
             var photoUri: String? = null
             cursor?.use { c ->
                 if (c.moveToFirst()) {
-                    val thumbIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI)
                     val fullIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
-                    photoUri = if (thumbIndex != -1) c.getString(thumbIndex) else null
-                    if (photoUri.isNullOrEmpty() && fullIndex != -1) {
-                        photoUri = c.getString(fullIndex)
+                    val thumbIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI)
+                    photoUri = if (fullIndex != -1) c.getString(fullIndex) else null
+                    if (photoUri.isNullOrEmpty() && thumbIndex != -1) {
+                        photoUri = c.getString(thumbIndex)
                     }
                 }
             }

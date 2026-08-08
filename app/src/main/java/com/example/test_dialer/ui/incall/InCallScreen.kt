@@ -3,12 +3,20 @@ package com.example.test_dialer.ui.incall
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
+import android.net.Uri
+import android.provider.ContactsContract
 import android.telecom.Call
 import android.telephony.SubscriptionManager
+import androidx.compose.foundation.Image
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -98,7 +106,33 @@ fun InCallScreen(
     val rawNumber = handle?.schemeSpecificPart ?: ""
     val displayName = activeCall?.details?.callerDisplayName ?: rawNumber
 
+    var contactName by remember { mutableStateOf<String?>(null) }
+    var contactPhotoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+
     val simNumber = remember(activeCall) { getSimNumberFromCall(activeCall, context) }
+
+    LaunchedEffect(rawNumber) {
+        if (rawNumber.isNotBlank()) {
+            withContext(Dispatchers.IO) {
+                val result = lookupContactInfo(context, rawNumber)
+                contactName = result.name
+
+                if (!result.photoUri.isNullOrEmpty()) {
+                    try {
+                        val uri = Uri.parse(result.photoUri)
+                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                            val bitmap = BitmapFactory.decodeStream(stream)
+                            contactPhotoBitmap = bitmap?.asImageBitmap()
+                        }
+                    } catch (e: Exception) {
+                        contactPhotoBitmap = null
+                    }
+                } else {
+                    contactPhotoBitmap = null
+                }
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -177,29 +211,44 @@ fun InCallScreen(
         ) {
             Spacer(modifier = Modifier.height(40.dp))
 
-            // Top Section: Avatar & Caller Info
+            // Top Section: Large Photo Avatar (180dp) & Caller Info
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Box(
+                Surface(
                     modifier = Modifier
-                        .size(110.dp)
-                        .clip(CircleShape)
-                        .background(Color(0xFF2B2D31)),
-                    contentAlignment = Alignment.Center
+                        .size(180.dp)
+                        .clip(CircleShape),
+                    shape = CircleShape,
+                    color = Color(0xFF2B2D31)
                 ) {
-                    val initial = displayName.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-                    Text(
-                        text = initial,
-                        color = Color.White,
-                        fontSize = 42.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        if (contactPhotoBitmap != null) {
+                            Image(
+                                bitmap = contactPhotoBitmap!!,
+                                contentDescription = "Фото контакта",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        } else {
+                            val titleForInitial = contactName ?: (if (displayName.isBlank()) rawNumber else displayName)
+                            val initial = titleForInitial.trim().firstOrNull { it.isLetterOrDigit() }?.uppercaseChar()?.toString() ?: "?"
+                            Text(
+                                text = initial,
+                                color = Color.White,
+                                fontSize = 64.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                val formattedTitle = if (displayName.isBlank()) {
+                val formattedName = contactName ?: if (displayName.isBlank()) {
                     "Неизвестный номер"
                 } else if (displayName == rawNumber) {
                     formatPhoneNumber(displayName)
@@ -208,19 +257,20 @@ fun InCallScreen(
                 }
 
                 Text(
-                    text = formattedTitle,
-                    fontSize = 26.sp,
+                    text = formattedName,
+                    fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     textAlign = TextAlign.Center
                 )
 
-                if (rawNumber.isNotBlank() && rawNumber != displayName) {
+                if (rawNumber.isNotBlank() && (contactName != null || displayName != rawNumber)) {
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = formatPhoneNumber(rawNumber),
                         fontSize = 16.sp,
-                        color = Color.White.copy(alpha = 0.6f)
+                        color = Color.White.copy(alpha = 0.7f),
+                        textAlign = TextAlign.Center
                     )
                 }
 
@@ -427,4 +477,44 @@ private fun formatDuration(seconds: Int): String {
     val m = seconds / 60
     val s = seconds % 60
     return String.format(Locale.getDefault(), "%02d:%02d", m, s)
+}
+
+private data class ContactLookupResult(
+    val name: String?,
+    val photoUri: String?
+)
+
+private suspend fun lookupContactInfo(context: Context, phoneNumber: String): ContactLookupResult = withContext(Dispatchers.IO) {
+    if (phoneNumber.isBlank()) return@withContext ContactLookupResult(null, null)
+    try {
+        val uri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(phoneNumber)
+        )
+        val projection = arrayOf(
+            ContactsContract.PhoneLookup.DISPLAY_NAME,
+            ContactsContract.PhoneLookup.PHOTO_URI,
+            ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI
+        )
+        val cursor = context.contentResolver.query(uri, projection, null, null, null)
+        var contactName: String? = null
+        var contactPhotoUri: String? = null
+
+        cursor?.use { c ->
+            if (c.moveToFirst()) {
+                val nameIndex = c.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                val fullPhotoIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
+                val thumbPhotoIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI)
+
+                if (nameIndex != -1) contactName = c.getString(nameIndex)
+                if (fullPhotoIndex != -1) contactPhotoUri = c.getString(fullPhotoIndex)
+                if (contactPhotoUri.isNullOrEmpty() && thumbPhotoIndex != -1) {
+                    contactPhotoUri = c.getString(thumbPhotoIndex)
+                }
+            }
+        }
+        ContactLookupResult(contactName, contactPhotoUri)
+    } catch (e: Exception) {
+        ContactLookupResult(null, null)
+    }
 }
