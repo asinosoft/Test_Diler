@@ -278,8 +278,15 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun openContactDetailFromCallLog(item: CallLogItem) {
-        val contact = FavoriteContact(
-            id = item.id,
+        val cleanCallNum = item.number.replace(Regex("[^0-9+]"), "")
+        val existingFav = _favorites.value.find { fav ->
+            val cleanFavNum = fav.number.replace(Regex("[^0-9+]"), "")
+            (cleanCallNum.isNotBlank() && cleanFavNum.isNotBlank() && cleanCallNum.takeLast(7) == cleanFavNum.takeLast(7)) ||
+                    (!item.name.isNullOrBlank() && fav.name.trim().equals(item.name.trim(), ignoreCase = true))
+        }
+
+        val contact = existingFav ?: FavoriteContact(
+            id = if (cleanCallNum.isNotBlank()) cleanCallNum else "call_log_${item.id}",
             name = item.name ?: item.number,
             number = item.number,
             photoUri = item.photoUri
