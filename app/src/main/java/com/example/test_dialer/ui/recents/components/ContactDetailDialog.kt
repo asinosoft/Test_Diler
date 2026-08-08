@@ -818,12 +818,22 @@ private fun ContactTabContent(
                                         copyToClipboard(context, "Messenger Account", messenger.accountDetail)
                                     }
                             ) {
-                                Text(
-                                    text = messenger.messengerName,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = messenger.brandColor
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    MessengerBrandBadge(
+                                        item = InstalledMessengerItem(
+                                            packageName = messenger.packageName,
+                                            messengerName = messenger.messengerName,
+                                            brandColor = messenger.brandColor
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = messenger.messengerName,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = messenger.brandColor
+                                    )
+                                }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
                                     text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(messenger.accountDetail),
@@ -1240,11 +1250,17 @@ private fun ContactTabContent(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
-                                Text(
-                                    text = activeMessenger?.messengerName ?: "Мессенджер",
-                                    fontWeight = FontWeight.Bold,
-                                    color = activeMessenger?.brandColor ?: SamsungGreen
-                                )
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (activeMessenger != null) {
+                                        MessengerBrandBadge(item = activeMessenger)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                    }
+                                    Text(
+                                        text = activeMessenger?.messengerName ?: "Мессенджер",
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.Black
+                                    )
+                                }
                                 Icon(
                                     imageVector = Icons.Default.ArrowDropDown,
                                     contentDescription = "Выбрать",
@@ -1260,11 +1276,15 @@ private fun ContactTabContent(
                             installedMessengers.forEachIndexed { idx, item ->
                                 DropdownMenuItem(
                                     text = {
-                                        Text(
-                                            text = item.messengerName,
-                                            fontWeight = if (idx == selectedMessengerIndex) FontWeight.Bold else FontWeight.Normal,
-                                            color = item.brandColor
-                                        )
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            MessengerBrandBadge(item = item)
+                                            Spacer(modifier = Modifier.width(10.dp))
+                                            Text(
+                                                text = item.messengerName,
+                                                fontWeight = if (idx == selectedMessengerIndex) FontWeight.Bold else FontWeight.Normal,
+                                                color = Color.Black
+                                            )
+                                        }
                                     },
                                     onClick = {
                                         selectedMessengerIndex = idx
@@ -2285,7 +2305,7 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
     val installedSignal = isPackageInstalled(context, "org.thoughtcrime.securesms")
     val installedSkype = isPackageInstalled(context, "com.skype.raider") || isPackageInstalled(context, "com.skype.android")
     val installedVK = isPackageInstalled(context, "com.vk.im") || isPackageInstalled(context, "com.vkontakte.android")
-    val installedMAX = isPackageInstalled(context, "ru.max.messenger") || isPackageInstalled(context, "com.max.app") || isPackageInstalled(context, "ru.vk.max")
+    val installedMAX = isPackageInstalled(context, "ru.oneme.app") || isPackageInstalled(context, "ru.max.messenger") || isPackageInstalled(context, "com.max.app") || isPackageInstalled(context, "ru.vk.max")
     val installedMessenger = isPackageInstalled(context, "com.facebook.orca")
     val installedSnapchat = isPackageInstalled(context, "com.snapchat.android")
     val installedWeChat = isPackageInstalled(context, "com.tencent.mm")
@@ -2384,10 +2404,10 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
         list.add(
             MessengerAccount(
                 id = "max",
-                packageName = "ru.max.messenger",
+                packageName = "ru.oneme.app",
                 messengerName = "MAX",
                 accountDetail = number,
-                brandColor = Color(0xFF2A5885),
+                brandColor = Color(0xFF3B82F6),
                 chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://max.ru/+$cleanDigits")),
                 audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://max.ru/+$cleanDigits")),
                 videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://max.ru/+$cleanDigits"))
@@ -2523,6 +2543,73 @@ private fun getMessengerBrandColor(messengerName: String): Color {
     }
 }
 
+private fun getApplicationIconBitmap(context: Context, packageName: String): ImageBitmap? {
+    return try {
+        val drawable = context.packageManager.getApplicationIcon(packageName)
+        val bitmap = if (drawable is android.graphics.drawable.BitmapDrawable) {
+            drawable.bitmap
+        } else {
+            val bmp = android.graphics.Bitmap.createBitmap(
+                drawable.intrinsicWidth.coerceAtLeast(1),
+                drawable.intrinsicHeight.coerceAtLeast(1),
+                android.graphics.Bitmap.Config.ARGB_8888
+            )
+            val canvas = android.graphics.Canvas(bmp)
+            drawable.setBounds(0, 0, canvas.width, canvas.height)
+            drawable.draw(canvas)
+            bmp
+        }
+        bitmap.asImageBitmap()
+    } catch (e: Exception) {
+        null
+    }
+}
+
+@Composable
+private fun MessengerBrandBadge(item: InstalledMessengerItem) {
+    val context = LocalContext.current
+    val appIcon = remember(item.packageName) {
+        getApplicationIconBitmap(context, item.packageName)
+    }
+
+    if (appIcon != null) {
+        Image(
+            bitmap = appIcon,
+            contentDescription = item.messengerName,
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(item.brandColor),
+            contentAlignment = Alignment.Center
+        ) {
+            val badgeText = when {
+                item.messengerName.contains("VK", true) -> "VK"
+                item.messengerName.contains("WhatsApp", true) -> "WA"
+                item.messengerName.contains("Telegram", true) -> "TG"
+                item.messengerName.contains("MAX", true) -> "MAX"
+                item.messengerName.contains("Viber", true) -> "V"
+                item.messengerName.contains("Signal", true) -> "S"
+                item.messengerName.contains("Skype", true) -> "Sk"
+                item.messengerName.contains("Snapchat", true) -> "Sn"
+                else -> item.messengerName.take(1).uppercase()
+            }
+            Text(
+                text = badgeText,
+                color = Color.White,
+                fontSize = if (badgeText.length > 2) 8.sp else 10.sp,
+                fontWeight = FontWeight.Black
+            )
+        }
+    }
+}
+
 private data class InstalledMessengerItem(
     val packageName: String,
     val messengerName: String,
@@ -2530,10 +2617,10 @@ private data class InstalledMessengerItem(
 )
 
 private fun getInstalledMessengersList(context: Context): List<InstalledMessengerItem> {
-    return listOf(
+    val candidates = listOf(
         InstalledMessengerItem("org.telegram.messenger", "Telegram", Color(0xFF24A1DE)),
         InstalledMessengerItem("com.whatsapp", "WhatsApp", Color(0xFF25D366)),
-        InstalledMessengerItem("ru.max.messenger", "MAX", Color(0xFF2A5885)),
+        InstalledMessengerItem("ru.oneme.app", "MAX", Color(0xFF2A5885)),
         InstalledMessengerItem("com.viber.voip", "Viber", Color(0xFF7360F2)),
         InstalledMessengerItem("com.vk.im", "VK Messenger", Color(0xFF0077FF)),
         InstalledMessengerItem("org.thoughtcrime.securesms", "Signal", Color(0xFF3A76F0)),
@@ -2541,6 +2628,28 @@ private fun getInstalledMessengersList(context: Context): List<InstalledMessenge
         InstalledMessengerItem("com.facebook.orca", "Messenger", Color(0xFF0084FF)),
         InstalledMessengerItem("com.snapchat.android", "Snapchat", Color(0xFFE5C100)),
         InstalledMessengerItem("com.tencent.mm", "WeChat", Color(0xFF07C160))
+    )
+
+    val installed = candidates.filter { item ->
+        when (item.messengerName) {
+            "Telegram" -> isPackageInstalled(context, "org.telegram.messenger")
+            "WhatsApp" -> isPackageInstalled(context, "com.whatsapp") || isPackageInstalled(context, "com.whatsapp.w4b")
+            "MAX" -> isPackageInstalled(context, "ru.oneme.app") || isPackageInstalled(context, "ru.max.messenger") || isPackageInstalled(context, "com.max.app") || isPackageInstalled(context, "ru.vk.max")
+            "Viber" -> isPackageInstalled(context, "com.viber.voip")
+            "VK Messenger" -> isPackageInstalled(context, "com.vk.im") || isPackageInstalled(context, "com.vkontakte.android")
+            "Signal" -> isPackageInstalled(context, "org.thoughtcrime.securesms")
+            "Skype" -> isPackageInstalled(context, "com.skype.raider") || isPackageInstalled(context, "com.skype.android")
+            "Messenger" -> isPackageInstalled(context, "com.facebook.orca")
+            "Snapchat" -> isPackageInstalled(context, "com.snapchat.android")
+            "WeChat" -> isPackageInstalled(context, "com.tencent.mm")
+            else -> isPackageInstalled(context, item.packageName)
+        }
+    }
+
+    return if (installed.isNotEmpty()) installed else listOf(
+        InstalledMessengerItem("org.telegram.messenger", "Telegram", Color(0xFF24A1DE)),
+        InstalledMessengerItem("com.whatsapp", "WhatsApp", Color(0xFF25D366)),
+        InstalledMessengerItem("ru.oneme.app", "MAX", Color(0xFF2A5885))
     )
 }
 
@@ -2885,12 +2994,30 @@ fun getCustomSwipeAction(context: Context, contactKey: String, isRight: Boolean,
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
         val keySuffix = if (isRight) "swipe_right_" else "swipe_left_"
 
+        // 1. Try with contactKey
         var jsonString = prefs.getString(keySuffix + contactKey, null)
 
+        // 2. Try with clean fallbackNumber
         if (jsonString.isNullOrEmpty() && !fallbackNumber.isNullOrBlank()) {
             val cleanNum = fallbackNumber.replace(Regex("[^0-9+]"), "")
             if (cleanNum.isNotBlank()) {
                 jsonString = prefs.getString(keySuffix + cleanNum, null)
+            }
+        }
+
+        // 3. Fallback: match by last 7 digits of phone number across all saved keys
+        if (jsonString.isNullOrEmpty()) {
+            val searchNum = (if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey).replace(Regex("[^0-9]"), "")
+            if (searchNum.length >= 7) {
+                val last7 = searchNum.takeLast(7)
+                val allKeys = prefs.all.keys.filter { it.startsWith(keySuffix) }
+                for (k in allKeys) {
+                    val cleanKeyDigits = k.replace(Regex("[^0-9]"), "")
+                    if (cleanKeyDigits.length >= 7 && cleanKeyDigits.takeLast(7) == last7) {
+                        jsonString = prefs.getString(k, null)
+                        if (!jsonString.isNullOrEmpty()) break
+                    }
+                }
             }
         }
 
@@ -3293,12 +3420,22 @@ private fun SwipeActionPickerDialog(
                                 horizontalArrangement = Arrangement.SpaceBetween
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = messenger.messengerName,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = messenger.brandColor
-                                    )
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        MessengerBrandBadge(
+                                            item = InstalledMessengerItem(
+                                                packageName = messenger.packageName,
+                                                messengerName = messenger.messengerName,
+                                                brandColor = messenger.brandColor
+                                            )
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = messenger.messengerName,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = messenger.brandColor
+                                        )
+                                    }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
                                         text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(messenger.accountDetail),

@@ -20,6 +20,7 @@
         <package android:name="com.vk.im" />
         <package android:name="com.vkontakte.android" />
         <package android:name="ru.max.messenger" />
+        <package android:name="ru.oneme.app" />
         <package android:name="com.max.app" />
         <package android:name="ru.vk.max" />
         <package android:name="com.facebook.orca" />
