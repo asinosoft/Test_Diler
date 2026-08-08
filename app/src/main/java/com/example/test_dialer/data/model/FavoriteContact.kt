@@ -5,5 +5,6 @@ data class FavoriteContact(
     val name: String,
     val number: String,
     val photoUri: String? = null,
-    val order: Int = 0
+    val order: Int = 0,
+    val tabId: String = "default"
 )

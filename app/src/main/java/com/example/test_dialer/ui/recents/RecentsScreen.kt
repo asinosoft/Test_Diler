@@ -16,10 +16,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -73,6 +75,7 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.example.test_dialer.data.model.FavoriteTab
 import com.example.test_dialer.ui.recents.components.AddFavoriteDialog
 import com.example.test_dialer.ui.recents.components.AppSettingsDialog
 import com.example.test_dialer.ui.recents.components.ContactDetailDialog
@@ -98,7 +101,10 @@ fun RecentsScreen(
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
     val callLogs by viewModel.filteredCallLogs.collectAsState(initial = emptyList())
-    val favorites by viewModel.favorites.collectAsState()
+    val allFavorites by viewModel.favorites.collectAsState()
+    val favorites by viewModel.activeTabFavorites.collectAsState(initial = emptyList())
+    val tabs by viewModel.tabs.collectAsState()
+    val activeTabId by viewModel.activeTabId.collectAsState()
     val selectedFavorite by viewModel.selectedFavorite.collectAsState()
     val isTopBarVisible by viewModel.isTopBarVisible.collectAsState()
     val isAddFavoriteOpen by viewModel.isAddFavoriteOpen.collectAsState()
@@ -147,6 +153,23 @@ fun RecentsScreen(
                 listOf(topRow) + restRows
             }
         }
+    }
+
+    val maxRowsAcrossAllTabs = remember(allFavorites, tabs, favoriteRowsCount) {
+        val tabGroupRows = tabs.map { tab ->
+            val count = allFavorites.count { it.tabId == tab.id }
+            if (count == 0) 0 else (count + 2) / 3
+        }
+        val maxFromTabs = tabGroupRows.maxOrNull() ?: 0
+        maxOf(maxFromTabs, favoriteRowsCount)
+    }
+
+    val actualRowCount = remember(favoriteRows, maxRowsAcrossAllTabs) {
+        if (favoriteRows.isEmpty()) maxRowsAcrossAllTabs else maxOf(favoriteRows.size, maxRowsAcrossAllTabs)
+    }
+
+    val fixedFavoritesHeight = remember(actualRowCount) {
+        110.dp * actualRowCount
     }
 
     // Target row index for startup: based on favoriteRowsCount
@@ -423,30 +446,41 @@ fun RecentsScreen(
 
                 // Favorites Grid Rows (Each row is a separate item)
                 if (favoriteRows.isEmpty()) {
-                    item(key = "empty_favorites") {
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = MaterialTheme.colorScheme.surface,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { viewModel.openAddFavoriteDialog() }
-                        ) {
-                            Box(
-                                contentAlignment = Alignment.Center,
+                    val neededSpacers = maxRowsAcrossAllTabs
+                    items(neededSpacers, key = { index -> "empty_fav_spacer_$index" }) { spacerIndex ->
+                        if (spacerIndex == neededSpacers - 1) {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = MaterialTheme.colorScheme.surface,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 18.dp)
+                                    .height(110.dp)
+                                    .clickable { viewModel.openAddFavoriteDialog() }
+                            ) {
+                                Box(
+                                    contentAlignment = Alignment.Center,
+                                    modifier = Modifier.fillMaxSize()
                                 ) {
-                                Text(
-                                    text = "+ Добавить избранные контакты",
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = SamsungGreen
-                                )
+                                    Text(
+                                        text = "+ Добавить избранные контакты",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = SamsungGreen
+                                    )
+                                }
                             }
+                        } else {
+                            Spacer(modifier = Modifier.fillMaxWidth().height(110.dp))
                         }
                     }
                 } else {
+                    if (favoriteRows.size < maxRowsAcrossAllTabs) {
+                        val extraSpacers = maxRowsAcrossAllTabs - favoriteRows.size
+                        items(extraSpacers, key = { index -> "fav_extra_spacer_$index" }) {
+                            Spacer(modifier = Modifier.fillMaxWidth().height(110.dp))
+                        }
+                    }
+
                     itemsIndexed(
                         items = favoriteRows,
                         key = { index, _ -> "fav_row_$index" }
@@ -565,6 +599,41 @@ fun RecentsScreen(
                     }
                 }
 
+                // Favorite Tabs Selector Bar (if tabs.size > 1)
+                if (tabs.size > 1) {
+                    item(key = "favorite_tabs_selector") {
+                        LazyRow(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 0.dp, bottom = 0.dp),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            itemsIndexed(
+                                items = tabs,
+                                key = { _, tab -> tab.id }
+                            ) { index, tab ->
+                                if (index > 0) {
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                }
+                                val isSelected = tab.id == activeTabId
+                                Surface(
+                                    shape = CircleShape,
+                                    color = if (isSelected) SamsungGreen else MaterialTheme.colorScheme.surface,
+                                    modifier = Modifier.clickable { viewModel.selectTab(tab.id) }
+                                ) {
+                                    Text(
+                                        text = tab.name,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (callLogs.isEmpty()) {
                     item(key = "empty_call_logs") {
                         Box(
@@ -589,7 +658,7 @@ fun RecentsScreen(
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                                    modifier = Modifier.padding(start = 4.dp, top = 8.dp, bottom = 2.dp)
+                                    modifier = Modifier.padding(start = 4.dp, top = 0.dp, bottom = 2.dp)
                                 )
                             }
                         }
@@ -627,9 +696,13 @@ fun RecentsScreen(
             AppSettingsDialog(
                 selectedRowsCount = favoriteRowsCount,
                 maxPossibleRows = 8,
+                tabs = tabs,
                 onRowsCountSelected = { count ->
                     viewModel.setFavoriteRowsCount(count)
                 },
+                onAddTab = { viewModel.addTab(it) },
+                onRenameTab = { id, name -> viewModel.renameTab(id, name) },
+                onDeleteTab = { viewModel.deleteTab(it) },
                 onDismiss = { viewModel.closeAppSettings() }
             )
         }
@@ -649,10 +722,16 @@ fun RecentsScreen(
             ContactDetailDialog(
                 contact = detailState.contact,
                 initialTab = detailState.initialTab,
+                tabs = tabs,
                 onDismiss = { viewModel.closeContactDetail() },
                 onCall = onCall,
                 onSms = onSms,
-                onRemoveFavorite = { viewModel.removeFavorite(it) }
+                onRemoveFavorite = { viewModel.removeFavorite(it) },
+                onUpdateContact = { viewModel.updateFavorite(it) },
+                onAddTab = { name ->
+                    viewModel.addTab(name)
+                    viewModel.tabs.value.lastOrNull() ?: FavoriteTab("default", name)
+                }
             )
         }
     }

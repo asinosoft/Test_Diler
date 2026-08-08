@@ -35,19 +35,28 @@ import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.automirrored.filled.Message
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.TextButton
+import com.example.test_dialer.data.model.FavoriteTab
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -108,10 +117,13 @@ data class ContactPhoneNumber(
 fun ContactDetailDialog(
     contact: FavoriteContact,
     initialTab: Int = 0,
+    tabs: List<FavoriteTab> = emptyList(),
     onDismiss: () -> Unit,
     onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
-    onRemoveFavorite: (FavoriteContact) -> Unit
+    onRemoveFavorite: (FavoriteContact) -> Unit,
+    onUpdateContact: (FavoriteContact) -> Unit = {},
+    onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", "Основные") }
 ) {
     val context = LocalContext.current
     var avatarBitmap by remember(contact.photoUri) { mutableStateOf<ImageBitmap?>(null) }
@@ -340,8 +352,11 @@ fun ContactDetailDialog(
                                 SettingsTabContent(
                                     contact = contact,
                                     context = context,
+                                    tabs = tabs,
                                     onDismiss = onDismiss,
-                                    onRemoveFavorite = onRemoveFavorite
+                                    onRemoveFavorite = onRemoveFavorite,
+                                    onUpdateContact = onUpdateContact,
+                                    onAddTab = onAddTab
                                 )
                             }
                         }
@@ -845,59 +860,206 @@ private fun HistoryTabContent(
 private fun SettingsTabContent(
     contact: FavoriteContact,
     context: Context,
+    tabs: List<FavoriteTab>,
     onDismiss: () -> Unit,
-    onRemoveFavorite: (FavoriteContact) -> Unit
+    onRemoveFavorite: (FavoriteContact) -> Unit,
+    onUpdateContact: (FavoriteContact) -> Unit,
+    onAddTab: (String) -> FavoriteTab
 ) {
     var isFavorite by remember { mutableStateOf(true) }
+    var selectedTabId by remember(contact.tabId) { mutableStateOf(contact.tabId) }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // Card 1: Favorite Toggle
+        // Card 1: Favorite Toggle & Tab Choice
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 1.dp
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.Star,
-                        contentDescription = "Избранное",
-                        tint = SamsungGreen,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Spacer(modifier = Modifier.width(14.dp))
-                    Text(
-                        text = "В избранных контактах",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = "Избранное",
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Text(
+                            text = "В избранных контактах",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Switch(
+                        checked = isFavorite,
+                        onCheckedChange = { checked ->
+                            isFavorite = checked
+                            if (!checked) {
+                                onDismiss()
+                                onRemoveFavorite(contact)
+                            }
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = SamsungGreen
+                        )
                     )
                 }
 
-                Switch(
-                    checked = isFavorite,
-                    onCheckedChange = { checked ->
-                        isFavorite = checked
-                        if (!checked) {
-                            onDismiss()
-                            onRemoveFavorite(contact)
-                        }
-                    },
-                    colors = SwitchDefaults.colors(
-                        checkedThumbColor = Color.White,
-                        checkedTrackColor = SamsungGreen
+                if (isFavorite) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(horizontal = 16.dp)
                     )
-                )
+
+                    var dropdownExpanded by remember { mutableStateOf(false) }
+                    var showCreateTabDialog by remember { mutableStateOf(false) }
+                    var newTabNameInput by remember { mutableStateOf("") }
+
+                    val currentTabName = tabs.find { it.id == selectedTabId }?.name ?: "Основные"
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { dropdownExpanded = true }
+                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.FolderSpecial,
+                                contentDescription = "Вкладка",
+                                tint = SamsungGreen,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Text(
+                                text = "Вкладка избранного",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Box {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = currentTabName,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SamsungGreen
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = "Выбрать",
+                                    tint = SamsungGreen,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = dropdownExpanded,
+                                onDismissRequest = { dropdownExpanded = false }
+                            ) {
+                                tabs.forEach { tab ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = tab.name,
+                                                fontWeight = if (tab.id == selectedTabId) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            dropdownExpanded = false
+                                            selectedTabId = tab.id
+                                            onUpdateContact(contact.copy(tabId = tab.id))
+                                        }
+                                    )
+                                }
+
+                                HorizontalDivider()
+
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Add,
+                                                contentDescription = "Создать",
+                                                tint = SamsungGreen,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = "+ Создать новую",
+                                                fontWeight = FontWeight.Bold,
+                                                color = SamsungGreen
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        dropdownExpanded = false
+                                        newTabNameInput = ""
+                                        showCreateTabDialog = true
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    if (showCreateTabDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showCreateTabDialog = false },
+                            title = { Text("Новая вкладка избранного", fontWeight = FontWeight.Bold) },
+                            text = {
+                                OutlinedTextField(
+                                    value = newTabNameInput,
+                                    onValueChange = { newTabNameInput = it },
+                                    label = { Text("Название вкладки") },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        if (newTabNameInput.isNotBlank()) {
+                                            val createdTab = onAddTab(newTabNameInput.trim())
+                                            selectedTabId = createdTab.id
+                                            onUpdateContact(contact.copy(tabId = createdTab.id))
+                                            showCreateTabDialog = false
+                                        }
+                                    }
+                                ) {
+                                    Text("Создать", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showCreateTabDialog = false }) {
+                                    Text("Отмена")
+                                }
+                            }
+                        )
+                    }
+                }
             }
         }
 

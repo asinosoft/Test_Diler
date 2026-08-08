@@ -3,6 +3,7 @@ package com.example.test_dialer.data.repository
 import android.content.Context
 import android.provider.ContactsContract
 import com.example.test_dialer.data.model.FavoriteContact
+import com.example.test_dialer.data.model.FavoriteTab
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -64,7 +65,8 @@ class FavoritesRepository(private val context: Context) {
                         name = obj.getString("name"),
                         number = obj.getString("number"),
                         photoUri = if (obj.has("photoUri") && !obj.isNull("photoUri")) obj.getString("photoUri") else null,
-                        order = if (obj.has("order")) obj.getInt("order") else i
+                        order = if (obj.has("order")) obj.getInt("order") else i,
+                        tabId = if (obj.has("tabId")) obj.getString("tabId") else "default"
                     )
                 )
             }
@@ -135,21 +137,103 @@ class FavoritesRepository(private val context: Context) {
                 put("number", contact.number)
                 put("photoUri", contact.photoUri ?: JSONObject.NULL)
                 put("order", index)
+                put("tabId", contact.tabId)
             }
             array.put(obj)
         }
         prefs.edit().putString("favorites_list", array.toString()).apply()
     }
 
+    fun getTabs(): List<FavoriteTab> {
+        val jsonString = prefs.getString("favorites_tabs", null)
+        if (jsonString.isNullOrEmpty()) {
+            val defaults = listOf(FavoriteTab("default", "Основные", 0))
+            saveTabs(defaults)
+            return defaults
+        }
+
+        return try {
+            val array = JSONArray(jsonString)
+            val list = mutableListOf<FavoriteTab>()
+            for (i in 0 until array.length()) {
+                val obj = array.getJSONObject(i)
+                list.add(
+                    FavoriteTab(
+                        id = obj.getString("id"),
+                        name = obj.getString("name"),
+                        order = if (obj.has("order")) obj.getInt("order") else i
+                    )
+                )
+            }
+            if (list.isEmpty()) {
+                val defaults = listOf(FavoriteTab("default", "Основные", 0))
+                saveTabs(defaults)
+                defaults
+            } else {
+                list.sortedBy { it.order }
+            }
+        } catch (e: Exception) {
+            listOf(FavoriteTab("default", "Основные", 0))
+        }
+    }
+
+    fun saveTabs(tabs: List<FavoriteTab>) {
+        val array = JSONArray()
+        tabs.forEachIndexed { index, tab ->
+            val obj = JSONObject().apply {
+                put("id", tab.id)
+                put("name", tab.name)
+                put("order", index)
+            }
+            array.put(obj)
+        }
+        prefs.edit().putString("favorites_tabs", array.toString()).apply()
+    }
+
+    fun addTab(name: String): List<FavoriteTab> {
+        val current = getTabs().toMutableList()
+        val newTab = FavoriteTab(
+            id = "tab_${System.currentTimeMillis()}",
+            name = name,
+            order = current.size
+        )
+        current.add(newTab)
+        saveTabs(current)
+        return current
+    }
+
+    fun renameTab(id: String, newName: String): List<FavoriteTab> {
+        val current = getTabs().map {
+            if (it.id == id) it.copy(name = newName) else it
+        }
+        saveTabs(current)
+        return current
+    }
+
+    fun deleteTab(id: String): List<FavoriteTab> {
+        val current = getTabs().filter { it.id != id }
+        if (current.isNotEmpty()) {
+            saveTabs(current)
+            // Reassign contacts from deleted tab to default tab "default"
+            val favorites = getFavorites().map {
+                if (it.tabId == id) it.copy(tabId = "default") else it
+            }
+            saveFavorites(favorites)
+        }
+        return current
+    }
+
     fun addFavorite(contact: FavoriteContact): List<FavoriteContact> {
         val current = getFavorites().toMutableList()
-        val isAlreadyAdded = current.any {
-            it.id == contact.id || it.name.trim().equals(contact.name.trim(), ignoreCase = true)
+        val existingIndex = current.indexOfFirst {
+            it.id == contact.id || (it.name.trim().isNotBlank() && it.name.trim().equals(contact.name.trim(), ignoreCase = true))
         }
-        if (!isAlreadyAdded) {
+        if (existingIndex != -1) {
+            current[existingIndex] = contact
+        } else {
             current.add(contact.copy(order = current.size))
-            saveFavorites(current)
         }
+        saveFavorites(current)
         return current
     }
 
