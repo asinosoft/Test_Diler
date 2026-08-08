@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -149,6 +150,8 @@ fun ContactDetailDialog(
         }
     }
 
+    var messengerAccountsList by remember(contact) { mutableStateOf<List<MessengerAccount>>(emptyList()) }
+
     LaunchedEffect(contact) {
         withContext(Dispatchers.IO) {
             val highResPhotoUri = getHighResContactPhotoUri(context, contact.number) ?: contact.photoUri
@@ -171,6 +174,9 @@ fun ContactDetailDialog(
             if (loadedNumbers.isNotEmpty()) {
                 phoneNumbersList = loadedNumbers
             }
+
+            // Load messenger accounts for this contact
+            messengerAccountsList = loadMessengerAccounts(context, contact)
         }
     }
 
@@ -331,6 +337,7 @@ fun ContactDetailDialog(
                                 // TAB 0: КОНТАКТ
                                 ContactTabContent(
                                     phoneNumbersList = phoneNumbersList,
+                                    messengerAccountsList = messengerAccountsList,
                                     activeSimCount = activeSimCount,
                                     contact = contact,
                                     context = context,
@@ -462,6 +469,7 @@ private fun FloatingTabBar(
 @Composable
 private fun ContactTabContent(
     phoneNumbersList: List<ContactPhoneNumber>,
+    messengerAccountsList: List<MessengerAccount>,
     activeSimCount: Int,
     contact: FavoriteContact,
     context: Context,
@@ -599,7 +607,7 @@ private fun ContactTabContent(
                                         imageVector = Icons.Default.Phone,
                                         contentDescription = "Вызов",
                                         tint = SamsungGreen,
-                                        modifier = Modifier.size(19.dp)
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
                             }
@@ -621,6 +629,128 @@ private fun ContactTabContent(
                                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(17.dp)
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // MESSENGER ACCOUNTS CARD
+        if (messengerAccountsList.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
+            ) {
+                Column {
+                    messengerAccountsList.forEachIndexed { index, messenger ->
+                        if (index > 0) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                thickness = 1.dp,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 18.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = messenger.messengerName,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = messenger.brandColor
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = formatPhoneNumber(messenger.accountDetail),
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                // 1. Chat
+                                if (messenger.chatIntent != null) {
+                                    IconButton(
+                                        onClick = {
+                                            try {
+                                                context.startActivity(messenger.chatIntent)
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Не удалось открыть чат ${messenger.messengerName}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .size(37.6.dp)
+                                            .clip(CircleShape)
+                                            .background(messenger.brandColor.copy(alpha = 0.15f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.Message,
+                                            contentDescription = "Чат",
+                                            tint = messenger.brandColor,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                // 2. Audio Call
+                                if (messenger.audioCallIntent != null) {
+                                    IconButton(
+                                        onClick = {
+                                            try {
+                                                context.startActivity(messenger.audioCallIntent)
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Не удалось совершить звонок в ${messenger.messengerName}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .size(37.6.dp)
+                                            .clip(CircleShape)
+                                            .background(messenger.brandColor.copy(alpha = 0.15f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Phone,
+                                            contentDescription = "Аудиовызов",
+                                            tint = messenger.brandColor,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                // 3. Video Call
+                                if (messenger.videoCallIntent != null) {
+                                    IconButton(
+                                        onClick = {
+                                            try {
+                                                context.startActivity(messenger.videoCallIntent)
+                                            } catch (e: Exception) {
+                                                Toast.makeText(context, "Не удалось начать видеовызов в ${messenger.messengerName}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .size(37.6.dp)
+                                            .clip(CircleShape)
+                                            .background(messenger.brandColor.copy(alpha = 0.15f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Videocam,
+                                            contentDescription = "Видеовызов",
+                                            tint = messenger.brandColor,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
@@ -1377,4 +1507,200 @@ private fun formatCallDuration(seconds: Long): String {
     val m = seconds / 60
     val s = seconds % 60
     return if (m > 0) "$m мин $s сек" else "$s сек"
+}
+
+private data class MessengerAccount(
+    val id: String,
+    val packageName: String,
+    val messengerName: String,
+    val accountDetail: String,
+    val brandColor: Color,
+    val chatIntent: Intent?,
+    val audioCallIntent: Intent?,
+    val videoCallIntent: Intent?
+)
+
+private fun isPackageInstalled(context: Context, packageName: String): Boolean {
+    return try {
+        context.packageManager.getPackageInfo(packageName, 0)
+        true
+    } catch (e: Exception) {
+        try {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+            launchIntent != null
+        } catch (ex: Exception) {
+            false
+        }
+    }
+}
+
+private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): List<MessengerAccount> {
+    val list = mutableListOf<MessengerAccount>()
+    val number = contact.number
+    if (number.isBlank()) return list
+    val cleanDigits = number.replace(Regex("[^0-9]"), "")
+    if (cleanDigits.isBlank()) return list
+
+    val installedWhatsApp = isPackageInstalled(context, "com.whatsapp") || isPackageInstalled(context, "com.whatsapp.w4b")
+    val installedTelegram = isPackageInstalled(context, "org.telegram.messenger")
+    val installedViber = isPackageInstalled(context, "com.viber.voip")
+    val installedSignal = isPackageInstalled(context, "org.thoughtcrime.securesms")
+    val installedSkype = isPackageInstalled(context, "com.skype.raider") || isPackageInstalled(context, "com.skype.android")
+    val installedVK = isPackageInstalled(context, "com.vk.im") || isPackageInstalled(context, "com.vkontakte.android")
+    val installedMAX = isPackageInstalled(context, "ru.max.messenger") || isPackageInstalled(context, "com.max.app") || isPackageInstalled(context, "ru.vk.max")
+    val installedMessenger = isPackageInstalled(context, "com.facebook.orca")
+    val installedSnapchat = isPackageInstalled(context, "com.snapchat.android")
+    val installedWeChat = isPackageInstalled(context, "com.tencent.mm")
+
+    if (installedWhatsApp) {
+        list.add(
+            MessengerAccount(
+                id = "whatsapp",
+                packageName = "com.whatsapp",
+                messengerName = "WhatsApp",
+                accountDetail = number,
+                brandColor = Color(0xFF25D366),
+                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$cleanDigits")),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$cleanDigits")),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$cleanDigits"))
+            )
+        )
+    }
+
+    if (installedTelegram) {
+        list.add(
+            MessengerAccount(
+                id = "telegram",
+                packageName = "org.telegram.messenger",
+                messengerName = "Telegram",
+                accountDetail = number,
+                brandColor = Color(0xFF24A1DE),
+                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/+$cleanDigits")),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/+$cleanDigits")),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/+$cleanDigits"))
+            )
+        )
+    }
+
+    if (installedViber) {
+        list.add(
+            MessengerAccount(
+                id = "viber",
+                packageName = "com.viber.voip",
+                messengerName = "Viber",
+                accountDetail = number,
+                brandColor = Color(0xFF7360F2),
+                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("viber://chat?number=+$cleanDigits")),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("viber://calls?number=+$cleanDigits")),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("viber://calls?number=+$cleanDigits"))
+            )
+        )
+    }
+
+    if (installedSignal) {
+        list.add(
+            MessengerAccount(
+                id = "signal",
+                packageName = "org.thoughtcrime.securesms",
+                messengerName = "Signal",
+                accountDetail = number,
+                brandColor = Color(0xFF3A76F0),
+                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://signal.me/#p/+$cleanDigits")),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://signal.me/#p/+$cleanDigits")),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://signal.me/#p/+$cleanDigits"))
+            )
+        )
+    }
+
+    if (installedSkype) {
+        list.add(
+            MessengerAccount(
+                id = "skype",
+                packageName = "com.skype.raider",
+                messengerName = "Skype",
+                accountDetail = number,
+                brandColor = Color(0xFF00AFF0),
+                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("skype:+$cleanDigits?chat")),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("skype:+$cleanDigits?call")),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("skype:+$cleanDigits?call&video=true"))
+            )
+        )
+    }
+
+    if (installedVK) {
+        list.add(
+            MessengerAccount(
+                id = "vk",
+                packageName = "com.vk.im",
+                messengerName = "VK Messenger",
+                accountDetail = number,
+                brandColor = Color(0xFF0077FF),
+                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://vk.me/+$cleanDigits")),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://vk.me/+$cleanDigits")),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://vk.me/+$cleanDigits"))
+            )
+        )
+    }
+
+    if (installedMAX) {
+        list.add(
+            MessengerAccount(
+                id = "max",
+                packageName = "ru.max.messenger",
+                messengerName = "MAX",
+                accountDetail = number,
+                brandColor = Color(0xFF2A5885),
+                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://max.ru/+$cleanDigits")),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://max.ru/+$cleanDigits")),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://max.ru/+$cleanDigits"))
+            )
+        )
+    }
+
+    if (installedMessenger) {
+        list.add(
+            MessengerAccount(
+                id = "messenger",
+                packageName = "com.facebook.orca",
+                messengerName = "Messenger",
+                accountDetail = number,
+                brandColor = Color(0xFF0084FF),
+                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://m.me/+$cleanDigits")),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://m.me/+$cleanDigits")),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://m.me/+$cleanDigits"))
+            )
+        )
+    }
+
+    if (installedSnapchat) {
+        list.add(
+            MessengerAccount(
+                id = "snapchat",
+                packageName = "com.snapchat.android",
+                messengerName = "Snapchat",
+                accountDetail = number,
+                brandColor = Color(0xFFE5C100),
+                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://snapchat.com/add/+$cleanDigits")),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://snapchat.com/add/+$cleanDigits")),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://snapchat.com/add/+$cleanDigits"))
+            )
+        )
+    }
+
+    if (installedWeChat) {
+        list.add(
+            MessengerAccount(
+                id = "wechat",
+                packageName = "com.tencent.mm",
+                messengerName = "WeChat",
+                accountDetail = number,
+                brandColor = Color(0xFF07C160),
+                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("weixin://dl/chat")),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("weixin://dl/chat")),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("weixin://dl/chat"))
+            )
+        )
+    }
+
+    return list
 }
