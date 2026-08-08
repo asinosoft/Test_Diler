@@ -107,6 +107,7 @@ fun SwipeableCallLogCard(
     onItemClick: ((CallLogItem) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val offsetX = remember { Animatable(0f) }
@@ -185,8 +186,22 @@ fun SwipeableCallLogCard(
                         onDragEnd = {
                             coroutineScope.launch {
                                 val finalOffset = offsetX.value
-                                if (finalOffset > thresholdPx) onCall(item.number)
-                                else if (finalOffset < -thresholdPx) onSms(item.number)
+                                val contactKey = if (item.id.isNotBlank()) item.id else item.number.replace(Regex("[^0-9+]"), "")
+                                if (finalOffset > thresholdPx) {
+                                    val customAction = getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = item.number)
+                                    if (customAction != null) {
+                                        executeCustomSwipeAction(context, customAction, { num, _ -> onCall(num) }, onSms)
+                                    } else {
+                                        onCall(item.number)
+                                    }
+                                } else if (finalOffset < -thresholdPx) {
+                                    val customAction = getCustomSwipeAction(context, contactKey, isRight = false, fallbackNumber = item.number)
+                                    if (customAction != null) {
+                                        executeCustomSwipeAction(context, customAction, { num, _ -> onCall(num) }, onSms)
+                                    } else {
+                                        onSms(item.number)
+                                    }
+                                }
                                 offsetX.animateTo(0f, animationSpec = spring())
                                 hasVibratedThreshold = false
                             }

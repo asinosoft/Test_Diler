@@ -514,7 +514,7 @@ fun RecentsScreen(
                                         isSelected = selectedFavorite?.id == contact.id || isTargetSlot,
                                         isDragging = draggingContactId == contact.id,
                                         dragVisualOffset = if (draggingContactId == contact.id) dragOffset else Offset.Zero,
-                                        onCall = { num -> onCall(num, null) },
+                                        onCall = { num, sim -> onCall(num, sim) },
                                         onSms = onSms,
                                         onSelect = { viewModel.selectFavorite(it) },
                                         onContactClick = { clickedContact ->

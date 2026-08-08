@@ -70,7 +70,7 @@ import kotlin.math.abs
 fun FavoriteContactCard(
     contact: FavoriteContact,
     isSelected: Boolean,
-    onCall: (String) -> Unit,
+    onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
     onSelect: (FavoriteContact) -> Unit,
     onContactClick: ((FavoriteContact) -> Unit)? = null,
@@ -81,6 +81,7 @@ fun FavoriteContactCard(
     onDragEnd: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val offsetX = remember { Animatable(0f) }
@@ -121,7 +122,7 @@ fun FavoriteContactCard(
                                 if (onContactClick != null) {
                                     onContactClick(contact)
                                 } else {
-                                    onCall(contact.number)
+                                    onCall(contact.number, null)
                                 }
                             }
                         }
@@ -152,10 +153,21 @@ fun FavoriteContactCard(
                             onDragEnd = {
                                 coroutineScope.launch {
                                     val finalOffset = offsetX.value
+                                    val contactKey = if (contact.id.isNotBlank()) contact.id else contact.number.replace(Regex("[^0-9+]"), "")
                                     if (finalOffset > thresholdPx) {
-                                        onCall(contact.number)
+                                        val customAction = getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = contact.number)
+                                        if (customAction != null) {
+                                            executeCustomSwipeAction(context, customAction, { num, sim -> onCall(num, sim) }, onSms)
+                                        } else {
+                                            onCall(contact.number, null)
+                                        }
                                     } else if (finalOffset < -thresholdPx) {
-                                        onSms(contact.number)
+                                        val customAction = getCustomSwipeAction(context, contactKey, isRight = false, fallbackNumber = contact.number)
+                                        if (customAction != null) {
+                                            executeCustomSwipeAction(context, customAction, { num, sim -> onCall(num, sim) }, onSms)
+                                        } else {
+                                            onSms(contact.number)
+                                        }
                                     }
                                     offsetX.animateTo(0f, animationSpec = spring())
                                     hasVibratedThreshold = false

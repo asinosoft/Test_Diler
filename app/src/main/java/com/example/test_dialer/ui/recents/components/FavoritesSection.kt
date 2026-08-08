@@ -27,7 +27,7 @@ import com.example.test_dialer.ui.theme.SamsungGreen
 fun FavoritesSection(
     favorites: List<FavoriteContact>,
     selectedContact: FavoriteContact?,
-    onCall: (String) -> Unit,
+    onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
     onSelectContact: (FavoriteContact) -> Unit,
     onAddFavoriteClick: () -> Unit,

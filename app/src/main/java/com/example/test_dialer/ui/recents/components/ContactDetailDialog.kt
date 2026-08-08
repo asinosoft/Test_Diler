@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.automirrored.filled.CallReceived
@@ -54,13 +55,16 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import com.example.test_dialer.data.model.FavoriteTab
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -381,6 +385,10 @@ fun ContactDetailDialog(
                                 // TAB 2: НАСТРОЙКИ
                                 SettingsTabContent(
                                     contact = contact,
+                                    phoneNumbersList = phoneNumbersList,
+                                    messengerAccountsList = messengerAccountsList,
+                                    emailsList = emailsList,
+                                    activeSimCount = activeSimCount,
                                     context = context,
                                     tabs = tabs,
                                     onDismiss = onDismiss,
@@ -1465,6 +1473,10 @@ private fun HistoryTabContent(
 @Composable
 private fun SettingsTabContent(
     contact: FavoriteContact,
+    phoneNumbersList: List<ContactPhoneNumber>,
+    messengerAccountsList: List<MessengerAccount>,
+    emailsList: List<ContactEmail>,
+    activeSimCount: Int,
     context: Context,
     tabs: List<FavoriteTab>,
     onDismiss: () -> Unit,
@@ -1667,6 +1679,233 @@ private fun SettingsTabContent(
                     }
                 }
             }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Card 1.5: Настройка свайпов
+        var showPickerForRight by remember { mutableStateOf(false) }
+        var showPickerForLeft by remember { mutableStateOf(false) }
+
+        val contactKey = remember(contact) { getContactCustomKey(contact) }
+        var swipeRightAction by remember(contact) { mutableStateOf(getCustomSwipeAction(context, contactKey, isRight = true)) }
+        var swipeLeftAction by remember(contact) { mutableStateOf(getCustomSwipeAction(context, contactKey, isRight = false)) }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Настройка свайпов",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                // Row 1: Свайп вправо
+                val rightVisuals = remember(swipeRightAction) { getActionVisuals(swipeRightAction, defaultIsRight = true) }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Свайп вправо",
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Свайп вправо",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = swipeRightAction?.label ?: "Вызов по умолчанию",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { showPickerForRight = true },
+                        modifier = Modifier
+                            .size(37.6.dp)
+                            .clip(CircleShape)
+                            .background(rightVisuals.color.copy(alpha = 0.15f))
+                    ) {
+                        if (rightVisuals.simNumber != null) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    imageVector = rightVisuals.icon,
+                                    contentDescription = "Изменить свайп вправо",
+                                    tint = rightVisuals.color,
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .align(Alignment.Center)
+                                        .offset(x = (-1).dp, y = 2.dp)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 7.dp, end = 7.dp)
+                                ) {
+                                    SimCardBadge(simNumber = rightVisuals.simNumber)
+                                }
+                            }
+                        } else {
+                            Icon(
+                                imageVector = rightVisuals.icon,
+                                contentDescription = "Изменить свайп вправо",
+                                tint = rightVisuals.color,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                // Row 2: Свайп влево
+                val leftVisuals = remember(swipeLeftAction) { getActionVisuals(swipeLeftAction, defaultIsRight = false) }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Свайп влево",
+                            tint = SamsungSmsBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = "Свайп влево",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = swipeLeftAction?.label ?: "SMS по умолчанию",
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { showPickerForLeft = true },
+                        modifier = Modifier
+                            .size(37.6.dp)
+                            .clip(CircleShape)
+                            .background(leftVisuals.color.copy(alpha = 0.15f))
+                    ) {
+                        if (leftVisuals.simNumber != null) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    imageVector = leftVisuals.icon,
+                                    contentDescription = "Изменить свайп влево",
+                                    tint = leftVisuals.color,
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .align(Alignment.Center)
+                                        .offset(x = (-1).dp, y = 2.dp)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 7.dp, end = 7.dp)
+                                ) {
+                                    SimCardBadge(simNumber = leftVisuals.simNumber)
+                                }
+                            }
+                        } else {
+                            Icon(
+                                imageVector = leftVisuals.icon,
+                                contentDescription = "Изменить свайп влево",
+                                tint = leftVisuals.color,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showPickerForRight) {
+            SwipeActionPickerDialog(
+                contact = contact,
+                phoneNumbersList = phoneNumbersList,
+                messengerAccountsList = messengerAccountsList,
+                emailsList = emailsList,
+                activeSimCount = activeSimCount,
+                context = context,
+                onActionSelected = { action ->
+                    swipeRightAction = action
+                    saveCustomSwipeAction(context, contactKey, contact.number, isRight = true, action = action)
+                    showPickerForRight = false
+                },
+                onDismiss = { showPickerForRight = false }
+            )
+        }
+
+        if (showPickerForLeft) {
+            SwipeActionPickerDialog(
+                contact = contact,
+                phoneNumbersList = phoneNumbersList,
+                messengerAccountsList = messengerAccountsList,
+                emailsList = emailsList,
+                activeSimCount = activeSimCount,
+                context = context,
+                onActionSelected = { action ->
+                    swipeLeftAction = action
+                    saveCustomSwipeAction(context, contactKey, contact.number, isRight = false, action = action)
+                    showPickerForLeft = false
+                },
+                onDismiss = { showPickerForLeft = false }
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -2600,4 +2839,566 @@ private suspend fun loadContactBirthday(context: Context, contact: FavoriteConta
         e.printStackTrace()
     }
     null
+}
+
+data class CustomSwipeAction(
+    val actionType: String,
+    val targetValue: String,
+    val label: String,
+    val messengerName: String? = null,
+    val messengerColorHex: String? = null
+)
+
+private fun saveCustomSwipeAction(context: Context, contactKey: String, contactNumber: String, isRight: Boolean, action: CustomSwipeAction?) {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val keySuffix = if (isRight) "swipe_right_" else "swipe_left_"
+        val cleanNum = contactNumber.replace(Regex("[^0-9+]"), "")
+
+        if (action == null) {
+            prefs.edit().remove(keySuffix + contactKey).apply()
+            if (cleanNum.isNotBlank()) prefs.edit().remove(keySuffix + cleanNum).apply()
+            return
+        }
+
+        val obj = JSONObject().apply {
+            put("actionType", action.actionType)
+            put("targetValue", action.targetValue)
+            put("label", action.label)
+            put("messengerName", action.messengerName ?: JSONObject.NULL)
+            put("messengerColorHex", action.messengerColorHex ?: JSONObject.NULL)
+        }
+
+        val editor = prefs.edit()
+        editor.putString(keySuffix + contactKey, obj.toString())
+        if (cleanNum.isNotBlank()) {
+            editor.putString(keySuffix + cleanNum, obj.toString())
+        }
+        editor.apply()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+fun getCustomSwipeAction(context: Context, contactKey: String, isRight: Boolean, fallbackNumber: String? = null): CustomSwipeAction? {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val keySuffix = if (isRight) "swipe_right_" else "swipe_left_"
+
+        var jsonString = prefs.getString(keySuffix + contactKey, null)
+
+        if (jsonString.isNullOrEmpty() && !fallbackNumber.isNullOrBlank()) {
+            val cleanNum = fallbackNumber.replace(Regex("[^0-9+]"), "")
+            if (cleanNum.isNotBlank()) {
+                jsonString = prefs.getString(keySuffix + cleanNum, null)
+            }
+        }
+
+        if (jsonString.isNullOrEmpty()) return null
+
+        val obj = JSONObject(jsonString)
+        return CustomSwipeAction(
+            actionType = obj.getString("actionType"),
+            targetValue = obj.getString("targetValue"),
+            label = obj.getString("label"),
+            messengerName = if (obj.has("messengerName") && !obj.isNull("messengerName")) obj.getString("messengerName") else null,
+            messengerColorHex = if (obj.has("messengerColorHex") && !obj.isNull("messengerColorHex")) obj.getString("messengerColorHex") else null
+        )
+    } catch (e: Exception) {
+        return null
+    }
+}
+
+fun executeCustomSwipeAction(context: Context, action: CustomSwipeAction, onCall: (String, Int?) -> Unit, onSms: (String) -> Unit) {
+    try {
+        when (action.actionType) {
+            "call_sim1" -> onCall(action.targetValue, 1)
+            "call_sim2" -> onCall(action.targetValue, 2)
+            "call_single" -> onCall(action.targetValue, null)
+            "sms" -> onSms(action.targetValue)
+            "email" -> {
+                val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${action.targetValue}"))
+                context.startActivity(intent)
+            }
+            "messenger_chat", "messenger_audio", "messenger_video" -> {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(action.targetValue))
+                context.startActivity(intent)
+            }
+            else -> onCall(action.targetValue, null)
+        }
+    } catch (e: Exception) {
+        Toast.makeText(context, "Не удалось выполнить действие", Toast.LENGTH_SHORT).show()
+    }
+}
+
+private data class ActionVisuals(
+    val icon: ImageVector,
+    val color: Color,
+    val simNumber: Int? = null
+)
+
+private fun getActionVisuals(action: CustomSwipeAction?, defaultIsRight: Boolean): ActionVisuals {
+    if (action == null) {
+        return if (defaultIsRight) {
+            ActionVisuals(Icons.Default.Phone, SamsungGreen)
+        } else {
+            ActionVisuals(Icons.AutoMirrored.Filled.Message, SamsungSmsBlue)
+        }
+    }
+
+    val brandColor = if (!action.messengerName.isNullOrBlank()) {
+        getMessengerBrandColor(action.messengerName)
+    } else null
+
+    return when (action.actionType) {
+        "call_sim1" -> ActionVisuals(Icons.Default.Phone, SamsungSmsBlue, simNumber = 1)
+        "call_sim2" -> ActionVisuals(Icons.Default.Phone, SamsungGreen, simNumber = 2)
+        "call_single" -> ActionVisuals(Icons.Default.Phone, brandColor ?: SamsungGreen)
+        "sms" -> ActionVisuals(Icons.AutoMirrored.Filled.Message, brandColor ?: SamsungSmsBlue)
+        "email" -> ActionVisuals(Icons.Default.Email, Color(0xFFFFB300))
+        "messenger_chat" -> ActionVisuals(Icons.AutoMirrored.Filled.Message, brandColor ?: SamsungGreen)
+        "messenger_audio" -> ActionVisuals(Icons.Default.Phone, brandColor ?: SamsungGreen)
+        "messenger_video" -> ActionVisuals(Icons.Default.Videocam, brandColor ?: SamsungGreen)
+        else -> if (defaultIsRight) ActionVisuals(Icons.Default.Phone, SamsungGreen) else ActionVisuals(Icons.AutoMirrored.Filled.Message, SamsungSmsBlue)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeActionPickerDialog(
+    contact: FavoriteContact,
+    phoneNumbersList: List<ContactPhoneNumber>,
+    messengerAccountsList: List<MessengerAccount>,
+    emailsList: List<ContactEmail>,
+    activeSimCount: Int,
+    context: Context,
+    onActionSelected: (CustomSwipeAction) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.background,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                text = "Выберите иконку действия для свайпа",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            // Section 1: Телефоны
+            if (phoneNumbersList.isNotEmpty()) {
+                Text(
+                    text = "Телефоны",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp
+                ) {
+                    Column {
+                        phoneNumbersList.forEachIndexed { index, phoneItem ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                    thickness = 1.dp,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = phoneItem.label,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = formatPhoneNumber(phoneItem.number),
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    if (activeSimCount > 1) {
+                                        // SIM 1 Call Button
+                                        IconButton(
+                                            onClick = {
+                                                onActionSelected(
+                                                    CustomSwipeAction(
+                                                        actionType = "call_sim1",
+                                                        targetValue = phoneItem.number,
+                                                        label = "Вызов SIM 1 (${formatPhoneNumber(phoneItem.number)})"
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .size(37.6.dp)
+                                                .clip(CircleShape)
+                                                .background(SamsungSmsBlue.copy(alpha = 0.12f))
+                                        ) {
+                                            Box(modifier = Modifier.fillMaxSize()) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Phone,
+                                                    contentDescription = "Вызов SIM 1",
+                                                    tint = SamsungSmsBlue,
+                                                    modifier = Modifier
+                                                        .size(26.dp)
+                                                        .align(Alignment.Center)
+                                                        .offset(x = (-1).dp, y = 2.dp)
+                                                )
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .padding(top = 7.dp, end = 7.dp)
+                                                ) {
+                                                    SimCardBadge(simNumber = 1)
+                                                }
+                                            }
+                                        }
+
+                                        // SIM 2 Call Button
+                                        IconButton(
+                                            onClick = {
+                                                onActionSelected(
+                                                    CustomSwipeAction(
+                                                        actionType = "call_sim2",
+                                                        targetValue = phoneItem.number,
+                                                        label = "Вызов SIM 2 (${formatPhoneNumber(phoneItem.number)})"
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .size(37.6.dp)
+                                                .clip(CircleShape)
+                                                .background(SamsungGreen.copy(alpha = 0.12f))
+                                        ) {
+                                            Box(modifier = Modifier.fillMaxSize()) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Phone,
+                                                    contentDescription = "Вызов SIM 2",
+                                                    tint = SamsungGreen,
+                                                    modifier = Modifier
+                                                        .size(26.dp)
+                                                        .align(Alignment.Center)
+                                                        .offset(x = (-1).dp, y = 2.dp)
+                                                )
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .padding(top = 7.dp, end = 7.dp)
+                                                ) {
+                                                    SimCardBadge(simNumber = 2)
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        // Single Call Button
+                                        IconButton(
+                                            onClick = {
+                                                onActionSelected(
+                                                    CustomSwipeAction(
+                                                        actionType = "call_single",
+                                                        targetValue = phoneItem.number,
+                                                        label = "Вызов (${formatPhoneNumber(phoneItem.number)})"
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .size(37.6.dp)
+                                                .clip(CircleShape)
+                                                .background(SamsungGreen.copy(alpha = 0.12f))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Phone,
+                                                contentDescription = "Вызов",
+                                                tint = SamsungGreen,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // SMS Button
+                                    IconButton(
+                                        onClick = {
+                                            onActionSelected(
+                                                CustomSwipeAction(
+                                                    actionType = "sms",
+                                                    targetValue = phoneItem.number,
+                                                    label = "SMS (${formatPhoneNumber(phoneItem.number)})"
+                                                )
+                                            )
+                                        },
+                                        modifier = Modifier
+                                            .size(37.6.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.Message,
+                                            contentDescription = "SMS",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(17.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // Section 2: Мессенджеры
+            if (messengerAccountsList.isNotEmpty()) {
+                Text(
+                    text = "Мессенджеры",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp
+                ) {
+                    Column {
+                        messengerAccountsList.forEachIndexed { index, messenger ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                    thickness = 1.dp,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = messenger.messengerName,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = messenger.brandColor
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(messenger.accountDetail),
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    // 1. Chat Icon
+                                    if (messenger.chatIntent != null) {
+                                        IconButton(
+                                            onClick = {
+                                                onActionSelected(
+                                                    CustomSwipeAction(
+                                                        actionType = "messenger_chat",
+                                                        targetValue = messenger.chatIntent.dataString ?: "",
+                                                        label = "${messenger.messengerName} Чат",
+                                                        messengerName = messenger.messengerName
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .size(37.6.dp)
+                                                .clip(CircleShape)
+                                                .background(messenger.brandColor.copy(alpha = 0.15f))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.Message,
+                                                contentDescription = "Чат",
+                                                tint = messenger.brandColor,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // 2. Audio Call Icon
+                                    if (!messenger.isCustomLink && messenger.audioCallIntent != null) {
+                                        IconButton(
+                                            onClick = {
+                                                onActionSelected(
+                                                    CustomSwipeAction(
+                                                        actionType = "messenger_audio",
+                                                        targetValue = messenger.audioCallIntent.dataString ?: "",
+                                                        label = "${messenger.messengerName} Аудиовызов",
+                                                        messengerName = messenger.messengerName
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .size(37.6.dp)
+                                                .clip(CircleShape)
+                                                .background(messenger.brandColor.copy(alpha = 0.15f))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Phone,
+                                                contentDescription = "Аудиовызов",
+                                                tint = messenger.brandColor,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // 3. Video Call Icon
+                                    if (!messenger.isCustomLink && messenger.videoCallIntent != null) {
+                                        IconButton(
+                                            onClick = {
+                                                onActionSelected(
+                                                    CustomSwipeAction(
+                                                        actionType = "messenger_video",
+                                                        targetValue = messenger.videoCallIntent.dataString ?: "",
+                                                        label = "${messenger.messengerName} Видеовызов",
+                                                        messengerName = messenger.messengerName
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .size(37.6.dp)
+                                                .clip(CircleShape)
+                                                .background(messenger.brandColor.copy(alpha = 0.15f))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Videocam,
+                                                contentDescription = "Видеовызов",
+                                                tint = messenger.brandColor,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // Section 3: E-mail
+            if (emailsList.isNotEmpty()) {
+                Text(
+                    text = "E-mail",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp
+                ) {
+                    Column {
+                        emailsList.forEachIndexed { index, emailItem ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                    thickness = 1.dp,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = emailItem.label,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = emailItem.email,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                IconButton(
+                                    onClick = {
+                                        onActionSelected(
+                                            CustomSwipeAction(
+                                                actionType = "email",
+                                                targetValue = emailItem.email,
+                                                label = "Email (${emailItem.email})"
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .size(37.6.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFFFB300).copy(alpha = 0.15f))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Email,
+                                        contentDescription = "Письмо",
+                                        tint = Color(0xFFFFB300),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
