@@ -27,7 +27,9 @@ import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -66,6 +68,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.test_dialer.data.model.CallLogItem
 import com.example.test_dialer.data.model.CallType
+import com.example.test_dialer.ui.recents.components.getSwipeBackgroundVisuals
 import com.example.test_dialer.ui.theme.IncomingGreen
 import com.example.test_dialer.ui.theme.MissedRed
 import com.example.test_dialer.ui.theme.OutgoingBlue
@@ -124,10 +127,22 @@ fun SwipeableCallLogCard(
     ) {
         val currentOffset = offsetX.value
 
+        val contactKey = if (item.id.isNotBlank()) item.id else item.number.replace(Regex("[^0-9+]"), "")
+
+        val customRightAction = if (currentOffset > 0f) {
+            getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = item.number)
+        } else null
+        val rightVisuals = getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true)
+
+        val customLeftAction = if (currentOffset < 0f) {
+            getCustomSwipeAction(context, contactKey, isRight = false, fallbackNumber = item.number)
+        } else null
+        val leftVisuals = getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false)
+
         Box(modifier = Modifier.fillMaxSize()) {
             if (currentOffset > 0f) {
                 Box(
-                    modifier = Modifier.fillMaxSize().background(SamsungGreen),
+                    modifier = Modifier.fillMaxSize().background(rightVisuals.backgroundColor),
                     contentAlignment = Alignment.CenterStart
                 ) {
                     Row(
@@ -135,31 +150,31 @@ fun SwipeableCallLogCard(
                         modifier = Modifier.padding(start = 24.dp)
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Phone,
-                            contentDescription = "Позвонить",
+                            imageVector = rightVisuals.icon,
+                            contentDescription = rightVisuals.label,
                             tint = Color.White,
                             modifier = Modifier.size(28.dp)
                         )
                         Spacer(Modifier.width(12.dp))
-                        Text("Вызов", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(rightVisuals.label, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                     }
                 }
             }
 
             if (currentOffset < 0f) {
                 Box(
-                    modifier = Modifier.fillMaxSize().background(SamsungSmsBlue),
+                    modifier = Modifier.fillMaxSize().background(leftVisuals.backgroundColor),
                     contentAlignment = Alignment.CenterEnd
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.padding(end = 24.dp)
                     ) {
-                        Text("Сообщение", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                        Text(leftVisuals.label, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
                         Spacer(Modifier.width(12.dp))
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.Message,
-                            contentDescription = "Написать SMS",
+                            imageVector = leftVisuals.icon,
+                            contentDescription = leftVisuals.label,
                             tint = Color.White,
                             modifier = Modifier.size(28.dp)
                         )

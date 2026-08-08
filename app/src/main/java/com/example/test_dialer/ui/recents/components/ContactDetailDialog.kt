@@ -2931,6 +2931,87 @@ fun executeCustomSwipeAction(context: Context, action: CustomSwipeAction, onCall
     }
 }
 
+data class SwipeBackgroundVisuals(
+    val icon: ImageVector,
+    val backgroundColor: Color,
+    val label: String
+)
+
+fun getSwipeBackgroundVisuals(customAction: CustomSwipeAction?, defaultIsRight: Boolean): SwipeBackgroundVisuals {
+    if (customAction == null) {
+        return if (defaultIsRight) {
+            SwipeBackgroundVisuals(
+                icon = Icons.Default.Phone,
+                backgroundColor = SamsungGreen,
+                label = "Вызов"
+            )
+        } else {
+            SwipeBackgroundVisuals(
+                icon = Icons.AutoMirrored.Filled.Message,
+                backgroundColor = SamsungSmsBlue,
+                label = "SMS"
+            )
+        }
+    }
+
+    return when (customAction.actionType) {
+        "call_sim1", "call_sim2", "call_single" -> {
+            val messenger = customAction.messengerName
+            SwipeBackgroundVisuals(
+                icon = Icons.Default.Phone,
+                backgroundColor = SamsungGreen,
+                label = if (!messenger.isNullOrBlank()) messenger else "Вызов"
+            )
+        }
+        "sms" -> {
+            val messenger = customAction.messengerName
+            SwipeBackgroundVisuals(
+                icon = Icons.AutoMirrored.Filled.Message,
+                backgroundColor = SamsungSmsBlue,
+                label = if (!messenger.isNullOrBlank()) messenger else "SMS"
+            )
+        }
+        "messenger_chat" -> {
+            val messenger = customAction.messengerName ?: "Сообщение"
+            SwipeBackgroundVisuals(
+                icon = Icons.AutoMirrored.Filled.Message,
+                backgroundColor = SamsungSmsBlue,
+                label = messenger
+            )
+        }
+        "messenger_audio" -> {
+            val messenger = customAction.messengerName ?: "Вызов"
+            SwipeBackgroundVisuals(
+                icon = Icons.Default.Phone,
+                backgroundColor = SamsungGreen,
+                label = messenger
+            )
+        }
+        "messenger_video" -> {
+            val messenger = customAction.messengerName ?: "Видеовызов"
+            SwipeBackgroundVisuals(
+                icon = Icons.Default.Videocam,
+                backgroundColor = Color(0xFF7360F2),
+                label = messenger
+            )
+        }
+        "email" -> {
+            SwipeBackgroundVisuals(
+                icon = Icons.Default.Email,
+                backgroundColor = Color(0xFFFFB300),
+                label = "E-mail"
+            )
+        }
+        else -> {
+            if (defaultIsRight) {
+                SwipeBackgroundVisuals(Icons.Default.Phone, SamsungGreen, "Вызов")
+            } else {
+                SwipeBackgroundVisuals(Icons.AutoMirrored.Filled.Message, SamsungSmsBlue, "SMS")
+            }
+        }
+    }
+}
+
 private data class ActionVisuals(
     val icon: ImageVector,
     val color: Color,

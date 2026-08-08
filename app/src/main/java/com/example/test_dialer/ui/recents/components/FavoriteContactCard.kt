@@ -22,7 +22,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Message
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -56,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.test_dialer.data.model.FavoriteContact
+import com.example.test_dialer.ui.recents.components.getSwipeBackgroundVisuals
 import com.example.test_dialer.ui.theme.SamsungGreen
 import com.example.test_dialer.ui.theme.SamsungSmsBlue
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -231,12 +234,16 @@ fun FavoriteContactCard(
                 }
             }
 
-            // SIDE / ADJACENT FACE (Call / SMS)
+            // SIDE / ADJACENT FACE
             if (abs(angle) > 0.5f) {
-                val isCall = angle > 0f // Swiping right -> Call face enters from left side
-                val sideAngle = if (isCall) angle - 90f else angle + 90f
+                val isRightSwipe = angle > 0f // Swiping right -> enters from left side
+                val sideAngle = if (isRightSwipe) angle - 90f else angle + 90f
                 val sideRad = Math.toRadians(sideAngle.toDouble())
                 val sideTransX = (radiusPx * Math.sin(sideRad)).toFloat()
+
+                val contactKey = if (contact.id.isNotBlank()) contact.id else contact.number.replace(Regex("[^0-9+]"), "")
+                val customAction = getCustomSwipeAction(context, contactKey, isRight = isRightSwipe, fallbackNumber = contact.number)
+                val visuals = getSwipeBackgroundVisuals(customAction, defaultIsRight = isRightSwipe)
 
                 Surface(
                     modifier = Modifier
@@ -248,7 +255,7 @@ fun FavoriteContactCard(
                             this.transformOrigin = TransformOrigin(0.5f, 0.5f)
                         },
                     shape = RoundedCornerShape(20.dp),
-                    color = if (isCall) SamsungGreen else SamsungSmsBlue
+                    color = visuals.backgroundColor
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
@@ -258,14 +265,14 @@ fun FavoriteContactCard(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Icon(
-                                imageVector = if (isCall) Icons.Default.Phone else Icons.AutoMirrored.Filled.Message,
-                                contentDescription = if (isCall) "Вызов" else "SMS",
+                                imageVector = visuals.icon,
+                                contentDescription = visuals.label,
                                 tint = Color.White,
                                 modifier = Modifier.size(32.dp)
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = if (isCall) "Вызов" else "SMS",
+                                text = visuals.label,
                                 color = Color.White,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold
