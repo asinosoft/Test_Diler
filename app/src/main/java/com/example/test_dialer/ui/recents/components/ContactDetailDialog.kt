@@ -331,15 +331,7 @@ fun ContactDetailDialog(
                                 // TAB 1: ИСТОРИЯ
                                 HistoryTabContent(
                                     isLoading = isLoadingHistory,
-                                    logs = historyLogs,
-                                    onCall = { num ->
-                                        onDismiss()
-                                        onCall(num, null)
-                                    },
-                                    onSms = { num ->
-                                        onDismiss()
-                                        onSms(num)
-                                    }
+                                    logs = historyLogs
                                 )
                             }
                             2 -> {
@@ -706,10 +698,12 @@ private fun ContactTabContent(
 @Composable
 private fun HistoryTabContent(
     isLoading: Boolean,
-    logs: List<CallLogItem>,
-    onCall: (String) -> Unit,
-    onSms: (String) -> Unit
+    logs: List<CallLogItem>
 ) {
+    val groupedLogs = remember(logs) {
+        logs.groupBy { formatDateHeader(it.timestamp) }
+    }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -748,95 +742,95 @@ private fun HistoryTabContent(
                 }
             }
         } else {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 1.dp
-            ) {
-                Column {
-                    logs.forEachIndexed { index, item ->
-                        if (index > 0) {
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                thickness = 1.dp,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
-                        }
+            groupedLogs.forEach { (dateHeader, logsInDay) ->
+                if (dateHeader.isNotEmpty()) {
+                    Text(
+                        text = dateHeader,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 4.dp, top = 12.dp, bottom = 4.dp)
+                    )
+                }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                val (icon, color, desc) = when (item.type) {
-                                    CallType.INCOMING -> Triple(Icons.AutoMirrored.Filled.CallReceived, IncomingGreen, "Входящий")
-                                    CallType.OUTGOING -> Triple(Icons.AutoMirrored.Filled.CallMade, OutgoingBlue, "Исходящий")
-                                    CallType.MISSED -> Triple(Icons.AutoMirrored.Filled.CallMissed, MissedRed, "Пропущенный")
-                                    CallType.REJECTED -> Triple(Icons.Default.CallEnd, MissedRed, "Отклоненный")
-                                }
-
-                                Icon(
-                                    imageVector = icon,
-                                    contentDescription = desc,
-                                    tint = color,
-                                    modifier = Modifier.size(20.dp)
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp
+                ) {
+                    Column {
+                        logsInDay.forEachIndexed { index, item ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                    thickness = 1.dp,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
                                 )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    val (icon, color, desc) = when (item.type) {
+                                        CallType.INCOMING -> Triple(Icons.AutoMirrored.Filled.CallReceived, IncomingGreen, "Входящий")
+                                        CallType.OUTGOING -> Triple(Icons.AutoMirrored.Filled.CallMade, OutgoingBlue, "Исходящий")
+                                        CallType.MISSED -> Triple(Icons.AutoMirrored.Filled.CallMissed, MissedRed, "Пропущенный")
+                                        CallType.REJECTED -> Triple(Icons.Default.CallEnd, MissedRed, "Отклоненный")
+                                    }
+
+                                    Icon(
+                                        imageVector = icon,
+                                        contentDescription = desc,
+                                        tint = color,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+
+                                    Spacer(modifier = Modifier.width(12.dp))
+
+                                    Column {
+                                        Text(
+                                            text = formatTimeOnly(item.timestamp),
+                                            fontSize = 15.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = if (item.type == CallType.MISSED || item.type == CallType.REJECTED) MissedRed else MaterialTheme.colorScheme.onSurface
+                                        )
+
+                                        Spacer(modifier = Modifier.height(3.dp))
+
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            SimCardBadge(simNumber = item.simNumber)
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = formatPhoneNumber(item.number),
+                                                fontSize = 13.sp,
+                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                            )
+                                        }
+                                    }
+                                }
 
                                 Spacer(modifier = Modifier.width(12.dp))
 
-                                Column {
-                                    Text(
-                                        text = formatCallDate(item.timestamp),
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.SemiBold,
-                                        color = if (item.type == CallType.MISSED || item.type == CallType.REJECTED) MissedRed else MaterialTheme.colorScheme.onSurface
-                                    )
-                                    Spacer(modifier = Modifier.height(2.dp))
-                                    Text(
-                                        text = formatCallDuration(item.duration),
-                                        fontSize = 12.sp,
-                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                    )
-                                }
-                            }
-
-                            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                                IconButton(
-                                    onClick = { onCall(item.number) },
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(SamsungGreen.copy(alpha = 0.12f))
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Phone,
-                                        contentDescription = "Вызов",
-                                        tint = SamsungGreen,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-
-                                IconButton(
-                                    onClick = { onSms(item.number) },
-                                    modifier = Modifier
-                                        .size(36.dp)
-                                        .clip(CircleShape)
-                                        .background(SamsungSmsBlue.copy(alpha = 0.12f))
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.AutoMirrored.Filled.Message,
-                                        contentDescription = "SMS",
-                                        tint = SamsungSmsBlue,
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
+                                Text(
+                                    text = formatCallDuration(item.duration),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                    textAlign = TextAlign.End
+                                )
                             }
                         }
                     }
@@ -1160,6 +1154,24 @@ private fun openSystemContact(context: Context, contactNumber: String) {
             Toast.makeText(context, "Не удалось открыть информацию о контакте", Toast.LENGTH_SHORT).show()
         }
     }
+}
+
+private fun formatDateHeader(timestamp: Long): String {
+    if (timestamp == 0L) return ""
+    if (android.text.format.DateUtils.isToday(timestamp)) return "Сегодня"
+    if (android.text.format.DateUtils.isToday(timestamp + 24 * 3600 * 1000L)) return "Вчера"
+
+    val ruLocale = Locale.forLanguageTag("ru")
+    val dateStr = SimpleDateFormat("d MMMM", ruLocale).format(Date(timestamp))
+    val dayOfWeek = SimpleDateFormat("EEEE", ruLocale).format(Date(timestamp))
+        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(ruLocale) else it.toString() }
+
+    return "$dateStr, $dayOfWeek"
+}
+
+private fun formatTimeOnly(timestamp: Long): String {
+    if (timestamp == 0L) return ""
+    return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))
 }
 
 private fun formatCallDate(timestamp: Long): String {

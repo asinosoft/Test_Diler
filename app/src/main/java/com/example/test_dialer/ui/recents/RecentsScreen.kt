@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -29,6 +30,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -55,16 +57,24 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToDown
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.LifecycleEventObserver
-import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.test_dialer.ui.recents.components.AddFavoriteDialog
+import com.example.test_dialer.ui.recents.components.AppSettingsDialog
 import com.example.test_dialer.ui.recents.components.ContactDetailDialog
 import com.example.test_dialer.ui.recents.components.FavoriteContactCard
 import com.example.test_dialer.ui.recents.components.FavoritesTopBar
@@ -92,6 +102,8 @@ fun RecentsScreen(
     val selectedFavorite by viewModel.selectedFavorite.collectAsState()
     val isTopBarVisible by viewModel.isTopBarVisible.collectAsState()
     val isAddFavoriteOpen by viewModel.isAddFavoriteOpen.collectAsState()
+    val isAppSettingsOpen by viewModel.isAppSettingsOpen.collectAsState()
+    val favoriteRowsCount by viewModel.favoriteRowsCount.collectAsState()
     val contactDetailToShow by viewModel.contactDetailToShow.collectAsState()
 
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -104,6 +116,8 @@ fun RecentsScreen(
     var dragFromIndex by remember { mutableIntStateOf(-1) }
     var dragToIndex by remember { mutableIntStateOf(-1) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
+
+    var favoritesBounds by remember { mutableStateOf(Rect.Zero) }
 
     val lifecycleOwner = LocalLifecycleOwner.current
     DisposableEffect(lifecycleOwner) {
@@ -135,9 +149,9 @@ fun RecentsScreen(
         }
     }
 
-    // Target row index for startup: 3rd row from the bottom of favorites
-    val targetFavoriteRowIndex = remember(favoriteRows) {
-        if (favoriteRows.isEmpty()) 0 else (favoriteRows.size - 3).coerceAtLeast(0)
+    // Target row index for startup: based on favoriteRowsCount
+    val targetFavoriteRowIndex = remember(favoriteRows, favoriteRowsCount) {
+        if (favoriteRows.isEmpty()) 0 else (favoriteRows.size - favoriteRowsCount).coerceAtLeast(0)
     }
 
     // LazyColumn item index corresponding to target favorite row
@@ -188,7 +202,25 @@ fun RecentsScreen(
             }
     ) {
         Scaffold(
-            containerColor = MaterialTheme.colorScheme.background
+            containerColor = MaterialTheme.colorScheme.background,
+            modifier = Modifier.then(
+                if (isTopBarVisible) {
+                    Modifier.pointerInput(favoritesBounds) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                val down = event.changes.firstOrNull { it.changedToDown() }
+                                if (down != null) {
+                                    val pos = down.position
+                                    if (favoritesBounds != Rect.Zero && !favoritesBounds.contains(pos)) {
+                                        viewModel.clearFavoriteSelection()
+                                    }
+                                }
+                            }
+                        }
+                    }
+                } else Modifier
+            )
         ) { innerPadding ->
             LazyColumn(
                 state = listState,
@@ -217,6 +249,19 @@ fun RecentsScreen(
                                 text = "Вызовы и сообщения",
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = { viewModel.openAppSettings() },
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.surface)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = "Настройки",
+                                tint = MaterialTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -407,7 +452,22 @@ fun RecentsScreen(
                         key = { index, _ -> "fav_row_$index" }
                     ) { _, rowItems ->
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .zIndex(6f)
+                                .onGloballyPositioned { coordinates ->
+                                    val rect = coordinates.boundsInWindow()
+                                    favoritesBounds = if (favoritesBounds == Rect.Zero) {
+                                        rect
+                                    } else {
+                                        Rect(
+                                            left = minOf(favoritesBounds.left, rect.left),
+                                            top = minOf(favoritesBounds.top, rect.top),
+                                            right = maxOf(favoritesBounds.right, rect.right),
+                                            bottom = maxOf(favoritesBounds.bottom, rect.bottom)
+                                        )
+                                    }
+                                },
                             horizontalArrangement = Arrangement.spacedBy(4.dp)
                         ) {
                             for (i in 0 until 3) {
@@ -424,7 +484,13 @@ fun RecentsScreen(
                                         onCall = { num -> onCall(num, null) },
                                         onSms = onSms,
                                         onSelect = { viewModel.selectFavorite(it) },
-                                        onContactClick = { viewModel.openContactDetail(it) },
+                                        onContactClick = { clickedContact ->
+                                            if (isTopBarVisible) {
+                                                viewModel.clearFavoriteSelection()
+                                            } else {
+                                                viewModel.openContactDetail(clickedContact)
+                                            }
+                                        },
                                         onDragStart = {
                                             val idx = favorites.indexOfFirst { it.id == contact.id }
                                             if (idx != -1) {
@@ -550,11 +616,23 @@ fun RecentsScreen(
             selectedContact = selectedFavorite,
             onDeleteClick = { viewModel.removeFavorite(it) },
             onAddClick = { viewModel.openAddFavoriteDialog() },
-            onSettingsClick = {
-                Toast.makeText(context, "Настройки избранного", Toast.LENGTH_SHORT).show()
-            },
-            modifier = Modifier.align(Alignment.TopCenter)
+            onSettingsClick = { viewModel.openAppSettings() },
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .zIndex(10f)
         )
+
+        // App Settings Bottom Sheet Dialog
+        if (isAppSettingsOpen) {
+            AppSettingsDialog(
+                selectedRowsCount = favoriteRowsCount,
+                maxPossibleRows = 8,
+                onRowsCountSelected = { count ->
+                    viewModel.setFavoriteRowsCount(count)
+                },
+                onDismiss = { viewModel.closeAppSettings() }
+            )
+        }
 
         // Add Favorite Contact Bottom Sheet Dialog
         if (isAddFavoriteOpen) {

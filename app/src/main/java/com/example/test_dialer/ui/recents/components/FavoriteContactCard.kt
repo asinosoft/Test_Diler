@@ -7,6 +7,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -26,6 +27,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.ui.input.pointer.positionChange
+import kotlin.math.sqrt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -112,6 +115,19 @@ fun FavoriteContactCard(
                 .aspectRatio(1f)
                 .clip(RoundedCornerShape(16.dp))
                 .pointerInput(contact.id) {
+                    detectTapGestures(
+                        onTap = {
+                            if (abs(offsetX.value) < 2f) {
+                                if (onContactClick != null) {
+                                    onContactClick(contact)
+                                } else {
+                                    onCall(contact.number)
+                                }
+                            }
+                        }
+                    )
+                }
+                .pointerInput(contact.id) {
                     detectDragGesturesAfterLongPress(
                         onDragStart = {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -127,19 +143,6 @@ fun FavoriteContactCard(
                         },
                         onDragCancel = {
                             onDragEnd?.invoke()
-                        }
-                    )
-                }
-                .pointerInput(contact.id) {
-                    detectTapGestures(
-                        onTap = {
-                            if (abs(offsetX.value) < 2f) {
-                                if (onContactClick != null) {
-                                    onContactClick(contact)
-                                } else {
-                                    onCall(contact.number)
-                                }
-                            }
                         }
                     )
                 }
@@ -165,9 +168,11 @@ fun FavoriteContactCard(
                                 }
                             },
                             onHorizontalDrag = { change, dragAmount ->
-                                change.consume()
                                 coroutineScope.launch {
                                     val newOffset = (offsetX.value + dragAmount).coerceIn(-maxDragPx, maxDragPx)
+                                    if (abs(newOffset) > 8f) {
+                                        change.consume()
+                                    }
                                     if (!hasVibratedThreshold && (newOffset > thresholdPx || newOffset < -thresholdPx)) {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                         hasVibratedThreshold = true

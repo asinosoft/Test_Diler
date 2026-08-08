@@ -1,6 +1,7 @@
 package com.example.test_dialer.ui.recents
 
 import android.app.Application
+import android.content.Context
 import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
@@ -40,6 +41,14 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     private val _isAddFavoriteOpen = MutableStateFlow(false)
     val isAddFavoriteOpen: StateFlow<Boolean> = _isAddFavoriteOpen.asStateFlow()
+
+    private val prefs = application.getSharedPreferences("dialer_settings", Context.MODE_PRIVATE)
+
+    private val _favoriteRowsCount = MutableStateFlow(prefs.getInt("favorite_rows_count", 3))
+    val favoriteRowsCount: StateFlow<Int> = _favoriteRowsCount.asStateFlow()
+
+    private val _isAppSettingsOpen = MutableStateFlow(false)
+    val isAppSettingsOpen: StateFlow<Boolean> = _isAppSettingsOpen.asStateFlow()
 
     private val _contactDetailToShow = MutableStateFlow<ContactDetailState?>(null)
     val contactDetailToShow: StateFlow<ContactDetailState?> = _contactDetailToShow.asStateFlow()
@@ -129,12 +138,8 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun selectFavorite(contact: FavoriteContact) {
-        if (_selectedFavorite.value?.id == contact.id) {
-            clearFavoriteSelection()
-        } else {
-            _selectedFavorite.value = contact
-            _isTopBarVisible.value = true
-        }
+        _selectedFavorite.value = contact
+        _isTopBarVisible.value = true
     }
 
     fun clearFavoriteSelection() {
@@ -183,6 +188,21 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     fun closeAddFavoriteDialog() {
         _isAddFavoriteOpen.value = false
+    }
+
+    fun setFavoriteRowsCount(count: Int) {
+        val validCount = count.coerceIn(1, 8)
+        _favoriteRowsCount.value = validCount
+        prefs.edit().putInt("favorite_rows_count", validCount).apply()
+    }
+
+    fun openAppSettings() {
+        clearFavoriteSelection()
+        _isAppSettingsOpen.value = true
+    }
+
+    fun closeAppSettings() {
+        _isAppSettingsOpen.value = false
     }
 
     fun openContactDetail(contact: FavoriteContact, initialTab: Int = 0) {
