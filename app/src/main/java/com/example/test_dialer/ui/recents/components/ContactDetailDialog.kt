@@ -1,14 +1,27 @@
 package com.example.test_dialer.ui.recents.components
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.ContactsContract
 import android.telephony.SubscriptionManager
 import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ExperimentalGetImage
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.core.content.ContextCompat
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.common.InputImage
 import org.json.JSONArray
 import org.json.JSONObject
 import androidx.activity.compose.BackHandler
@@ -49,6 +62,8 @@ import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Videocam
@@ -97,6 +112,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import kotlin.math.roundToInt
 import androidx.compose.ui.text.PlatformTextStyle
@@ -363,6 +380,9 @@ fun ContactDetailDialog(
                                 ContactTabContent(
                                     phoneNumbersList = phoneNumbersList,
                                     messengerAccountsList = messengerAccountsList,
+                                    onUpdateMessengerAccounts = { messengerAccountsList = it },
+                                    onUpdatePhoneNumbers = { phoneNumbersList = it },
+                                    onUpdateEmails = { emailsList = it },
                                     emailsList = emailsList,
                                     birthdayInfo = birthdayInfo,
                                     activeSimCount = activeSimCount,
@@ -387,6 +407,7 @@ fun ContactDetailDialog(
                                     contact = contact,
                                     phoneNumbersList = phoneNumbersList,
                                     messengerAccountsList = messengerAccountsList,
+                                    onUpdateMessengerAccounts = { messengerAccountsList = it },
                                     emailsList = emailsList,
                                     activeSimCount = activeSimCount,
                                     context = context,
@@ -501,6 +522,9 @@ private fun FloatingTabBar(
 private fun ContactTabContent(
     phoneNumbersList: List<ContactPhoneNumber>,
     messengerAccountsList: List<MessengerAccount>,
+    onUpdateMessengerAccounts: (List<MessengerAccount>) -> Unit = {},
+    onUpdatePhoneNumbers: (List<ContactPhoneNumber>) -> Unit = {},
+    onUpdateEmails: (List<ContactEmail>) -> Unit = {},
     emailsList: List<ContactEmail>,
     birthdayInfo: ContactBirthday?,
     activeSimCount: Int,
@@ -522,6 +546,16 @@ private fun ContactTabContent(
     var editableEmailList by remember(emailsList) { mutableStateOf(emailsList) }
     var draggingEmailIndex by remember { mutableStateOf<Int?>(null) }
     var emailDragOffsetY by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(messengerAccountsList) {
+        editableMessengerList = messengerAccountsList
+    }
+    LaunchedEffect(phoneNumbersList) {
+        editablePhoneList = phoneNumbersList
+    }
+    LaunchedEffect(emailsList) {
+        editableEmailList = emailsList
+    }
 
     var showAddCustomLinkDialog by remember { mutableStateOf(false) }
 
@@ -585,6 +619,7 @@ private fun ContactTabContent(
                                             val item = currentList.removeAt(currentIndex)
                                             currentList.add(targetIndex, item)
                                             editablePhoneList = currentList
+                                            onUpdatePhoneNumbers(currentList)
                                             savePhoneNumbersOrder(context, getContactCustomKey(contact), currentList)
                                             phoneDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
                                             draggingPhoneIndex = targetIndex
@@ -792,6 +827,7 @@ private fun ContactTabContent(
                                                 val item = currentList.removeAt(currentIndex)
                                                 currentList.add(targetIndex, item)
                                                 editableMessengerList = currentList
+                                                onUpdateMessengerAccounts(currentList)
                                                 saveMessengerAccountsOrder(context, getContactCustomKey(contact), currentList)
                                                 messengerDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
                                                 draggingMessengerIndex = targetIndex
@@ -1007,6 +1043,7 @@ private fun ContactTabContent(
                                                 val item = currentList.removeAt(currentIndex)
                                                 currentList.add(targetIndex, item)
                                                 editableEmailList = currentList
+                                                onUpdateEmails(currentList)
                                                 saveEmailOrder(context, getContactCustomKey(contact), currentList)
                                                 emailDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
                                                 draggingEmailIndex = targetIndex
@@ -1214,133 +1251,15 @@ private fun ContactTabContent(
     }
 
     if (showAddCustomLinkDialog) {
-        var selectedMessengerIndex by remember { mutableIntStateOf(0) }
-        var dropdownExpanded by remember { mutableStateOf(false) }
-        var customLinkInput by remember { mutableStateOf("") }
-
-        val installedMessengers = remember { getInstalledMessengersList(context) }
-        val activeMessenger = installedMessengers.getOrNull(selectedMessengerIndex) ?: installedMessengers.firstOrNull()
-
-        AlertDialog(
-            onDismissRequest = { showAddCustomLinkDialog = false },
-            title = {
-                Text(text = "Добавить ссылку мессенджера", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        AddCustomMessengerLinkDialog(
+            context = context,
+            onAddCustomLink = { newAccount ->
+                val updatedList = editableMessengerList + newAccount
+                editableMessengerList = updatedList
+                onUpdateMessengerAccounts(updatedList)
+                saveCustomMessengerLinks(context, getContactCustomKey(contact), updatedList)
             },
-            text = {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Text(
-                        text = "Выберите мессенджер",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-
-                    // Messenger Dropdown
-                    Box(modifier = Modifier.fillMaxWidth()) {
-                        Surface(
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clickable { dropdownExpanded = true }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (activeMessenger != null) {
-                                        MessengerBrandBadge(item = activeMessenger)
-                                        Spacer(modifier = Modifier.width(10.dp))
-                                    }
-                                    Text(
-                                        text = activeMessenger?.messengerName ?: "Мессенджер",
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.Black
-                                    )
-                                }
-                                Icon(
-                                    imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = "Выбрать",
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                        }
-
-                        DropdownMenu(
-                            expanded = dropdownExpanded,
-                            onDismissRequest = { dropdownExpanded = false }
-                        ) {
-                            installedMessengers.forEachIndexed { idx, item ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            MessengerBrandBadge(item = item)
-                                            Spacer(modifier = Modifier.width(10.dp))
-                                            Text(
-                                                text = item.messengerName,
-                                                fontWeight = if (idx == selectedMessengerIndex) FontWeight.Bold else FontWeight.Normal,
-                                                color = Color.Black
-                                            )
-                                        }
-                                    },
-                                    onClick = {
-                                        selectedMessengerIndex = idx
-                                        dropdownExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    OutlinedTextField(
-                        value = customLinkInput,
-                        onValueChange = { customLinkInput = it },
-                        label = { Text("Вставьте ссылку") },
-                        placeholder = { Text("https://t.me/username") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        val inputUrl = customLinkInput.trim()
-                        if (inputUrl.isNotBlank() && activeMessenger != null) {
-                            val formattedUrl = if (!inputUrl.startsWith("http://") && !inputUrl.startsWith("https://") && !inputUrl.startsWith("viber://") && !inputUrl.startsWith("skype:")) {
-                                "https://$inputUrl"
-                            } else inputUrl
-
-                            val newAccount = MessengerAccount(
-                                id = "custom_${System.currentTimeMillis()}",
-                                packageName = activeMessenger.packageName,
-                                messengerName = activeMessenger.messengerName,
-                                accountDetail = formattedUrl,
-                                brandColor = activeMessenger.brandColor,
-                                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse(formattedUrl)),
-                                isCustomLink = true
-                            )
-
-                            val updatedList = editableMessengerList + newAccount
-                            editableMessengerList = updatedList
-                            saveCustomMessengerLinks(context, getContactCustomKey(contact), updatedList)
-                            showAddCustomLinkDialog = false
-                        }
-                    }
-                ) {
-                    Text("Добавить", color = SamsungGreen, fontWeight = FontWeight.Bold)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showAddCustomLinkDialog = false }) {
-                    Text("Отмена")
-                }
-            }
+            onDismiss = { showAddCustomLinkDialog = false }
         )
     }
 }
@@ -1495,6 +1414,7 @@ private fun SettingsTabContent(
     contact: FavoriteContact,
     phoneNumbersList: List<ContactPhoneNumber>,
     messengerAccountsList: List<MessengerAccount>,
+    onUpdateMessengerAccounts: (List<MessengerAccount>) -> Unit = {},
     emailsList: List<ContactEmail>,
     activeSimCount: Int,
     context: Context,
@@ -1899,6 +1819,7 @@ private fun SettingsTabContent(
                 contact = contact,
                 phoneNumbersList = phoneNumbersList,
                 messengerAccountsList = messengerAccountsList,
+                onUpdateMessengerAccounts = onUpdateMessengerAccounts,
                 emailsList = emailsList,
                 activeSimCount = activeSimCount,
                 context = context,
@@ -1916,6 +1837,7 @@ private fun SettingsTabContent(
                 contact = contact,
                 phoneNumbersList = phoneNumbersList,
                 messengerAccountsList = messengerAccountsList,
+                onUpdateMessengerAccounts = onUpdateMessengerAccounts,
                 emailsList = emailsList,
                 activeSimCount = activeSimCount,
                 context = context,
@@ -3177,12 +3099,15 @@ private fun SwipeActionPickerDialog(
     contact: FavoriteContact,
     phoneNumbersList: List<ContactPhoneNumber>,
     messengerAccountsList: List<MessengerAccount>,
+    onUpdateMessengerAccounts: (List<MessengerAccount>) -> Unit = {},
     emailsList: List<ContactEmail>,
     activeSimCount: Int,
     context: Context,
     onActionSelected: (CustomSwipeAction) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var pickerMessengerList by remember(messengerAccountsList) { mutableStateOf(messengerAccountsList) }
+    var showAddCustomLinkDialogInPicker by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -3387,23 +3312,22 @@ private fun SwipeActionPickerDialog(
             }
 
             // Section 2: Мессенджеры
-            if (messengerAccountsList.isNotEmpty()) {
-                Text(
-                    text = "Мессенджеры",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
+            Text(
+                text = "Мессенджеры",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
 
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 1.dp
-                ) {
-                    Column {
-                        messengerAccountsList.forEachIndexed { index, messenger ->
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
+            ) {
+                Column {
+                    pickerMessengerList.forEachIndexed { index, messenger ->
                             if (index > 0) {
                                 HorizontalDivider(
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
@@ -3531,6 +3455,35 @@ private fun SwipeActionPickerDialog(
                                 }
                             }
                         }
+
+                        // Bottom "+" Button inside Messenger Card in Swipe Action Picker Dialog
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            thickness = 1.dp,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            IconButton(
+                                onClick = { showAddCustomLinkDialogInPicker = true },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(SamsungGreen.copy(alpha = 0.12f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = "Добавить ссылку",
+                                    tint = SamsungGreen,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
                     }
                 }
 
@@ -3618,5 +3571,420 @@ private fun SwipeActionPickerDialog(
                 }
             }
         }
+
+        if (showAddCustomLinkDialogInPicker) {
+            AddCustomMessengerLinkDialog(
+                context = context,
+                onAddCustomLink = { newAccount ->
+                    val updatedList = pickerMessengerList + newAccount
+                    pickerMessengerList = updatedList
+                    onUpdateMessengerAccounts(updatedList)
+                    saveCustomMessengerLinks(context, getContactCustomKey(contact), updatedList)
+                },
+                onDismiss = { showAddCustomLinkDialogInPicker = false }
+            )
+        }
     }
+
+@Composable
+private fun AddCustomMessengerLinkDialog(
+    context: Context,
+    onAddCustomLink: (MessengerAccount) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selectedMessengerIndex by remember { mutableIntStateOf(0) }
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    var customLinkInput by remember { mutableStateOf("") }
+    var showQrScannerDialog by remember { mutableStateOf(false) }
+
+    val installedMessengers = remember { getInstalledMessengersList(context) }
+    val activeMessenger = installedMessengers.getOrNull(selectedMessengerIndex) ?: installedMessengers.firstOrNull()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(text = "Добавить ссылку мессенджера", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Выберите мессенджер",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Messenger Dropdown
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { dropdownExpanded = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (activeMessenger != null) {
+                                    MessengerBrandBadge(item = activeMessenger)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                }
+                                Text(
+                                    text = activeMessenger?.messengerName ?: "Мессенджер",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = "Выбрать",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false }
+                    ) {
+                        installedMessengers.forEachIndexed { idx, item ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        MessengerBrandBadge(item = item)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = item.messengerName,
+                                            fontWeight = if (idx == selectedMessengerIndex) FontWeight.Bold else FontWeight.Normal,
+                                            color = Color.Black
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    selectedMessengerIndex = idx
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = customLinkInput,
+                    onValueChange = { customLinkInput = it },
+                    label = { Text("Вставьте ссылку") },
+                    placeholder = { Text("https://t.me/username") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // QR Code Button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(SamsungGreen.copy(alpha = 0.12f))
+                        .clickable { showQrScannerDialog = true }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.QrCodeScanner,
+                        contentDescription = "Сканировать QR-код",
+                        tint = SamsungGreen,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Добавить через QR-код",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SamsungGreen
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val inputUrl = customLinkInput.trim()
+                    if (inputUrl.isNotBlank() && activeMessenger != null) {
+                        val formattedUrl = if (!inputUrl.startsWith("http://") && !inputUrl.startsWith("https://") && !inputUrl.startsWith("viber://") && !inputUrl.startsWith("skype:")) {
+                            "https://$inputUrl"
+                        } else inputUrl
+
+                        val newAccount = MessengerAccount(
+                            id = "custom_${System.currentTimeMillis()}",
+                            packageName = activeMessenger.packageName,
+                            messengerName = activeMessenger.messengerName,
+                            accountDetail = formattedUrl,
+                            brandColor = activeMessenger.brandColor,
+                            chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse(formattedUrl)),
+                            isCustomLink = true
+                        )
+
+                        onAddCustomLink(newAccount)
+                        onDismiss()
+                    }
+                }
+            ) {
+                Text("Добавить", color = SamsungGreen, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена")
+            }
+        }
+    )
+
+    if (showQrScannerDialog) {
+        var qrInputText by remember { mutableStateOf("") }
+        var hasCameraPermission by remember {
+            mutableStateOf(
+                ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+            )
+        }
+
+        val permissionLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission()
+        ) { isGranted ->
+            hasCameraPermission = isGranted
+        }
+
+        val galleryLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent()
+        ) { uri: Uri? ->
+            if (uri != null) {
+                try {
+                    val image = InputImage.fromFilePath(context, uri)
+                    val scanner = BarcodeScanning.getClient()
+                    scanner.process(image)
+                        .addOnSuccessListener { barcodes ->
+                            val qrUrl = barcodes.firstOrNull()?.rawValue
+                            if (!qrUrl.isNullOrBlank()) {
+                                val formatted = if (!qrUrl.startsWith("http://") && !qrUrl.startsWith("https://") && !qrUrl.startsWith("viber://") && !qrUrl.startsWith("skype:")) {
+                                    "https://$qrUrl"
+                                } else qrUrl
+                                customLinkInput = formatted
+                                showQrScannerDialog = false
+                                Toast.makeText(context, "QR-код из галереи успешно распознан!", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Не удалось найти QR-код на изображении", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                        .addOnFailureListener {
+                            Toast.makeText(context, "Ошибка анализа изображения", Toast.LENGTH_SHORT).show()
+                        }
+                } catch (e: Exception) {
+                    Toast.makeText(context, "Не удалось загрузить фото из галереи", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { showQrScannerDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.QrCodeScanner,
+                        contentDescription = "QR-код",
+                        tint = SamsungGreen,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Сканирование QR-кода", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Camera Scanner Frame
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.Black,
+                        modifier = Modifier
+                            .size(190.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            if (hasCameraPermission) {
+                                CameraQrScannerView { scannedUrl ->
+                                    val formatted = if (!scannedUrl.startsWith("http://") && !scannedUrl.startsWith("https://") && !scannedUrl.startsWith("viber://") && !scannedUrl.startsWith("skype:")) {
+                                        "https://$scannedUrl"
+                                    } else scannedUrl
+                                    customLinkInput = formatted
+                                    showQrScannerDialog = false
+                                    Toast.makeText(context, "QR-код успешно сканирован!", Toast.LENGTH_SHORT).show()
+                                }
+                            } else {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.QrCodeScanner,
+                                        contentDescription = "Камера",
+                                        tint = SamsungGreen,
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    TextButton(
+                                        onClick = {
+                                            permissionLauncher.launch(Manifest.permission.CAMERA)
+                                        }
+                                    ) {
+                                        Text("Разрешить камеру", color = SamsungGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "Наведите камеру или введите ссылку ручным вводом",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedTextField(
+                        value = qrInputText,
+                        onValueChange = { qrInputText = it },
+                        label = { Text("Ссылка из QR-кода") },
+                        placeholder = { Text("https://t.me/username") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Button: Выбрать в галерее
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { galleryLauncher.launch("image/*") }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoLibrary,
+                            contentDescription = "Выбрать в галерее",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Выбрать в галерее",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (qrInputText.isNotBlank()) {
+                            customLinkInput = qrInputText.trim()
+                            showQrScannerDialog = false
+                        }
+                    }
+                ) {
+                    Text("Использовать", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showQrScannerDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun CameraQrScannerView(
+    onQrCodeScanned: (String) -> Unit
+) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isScanned by remember { mutableStateOf(false) }
+
+    AndroidView(
+        factory = { ctx ->
+            val previewView = PreviewView(ctx)
+            val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+
+            cameraProviderFuture.addListener({
+                val cameraProvider = cameraProviderFuture.get()
+                val preview = Preview.Builder().build().also {
+                    it.setSurfaceProvider(previewView.surfaceProvider)
+                }
+
+                val barcodeScanner = BarcodeScanning.getClient()
+                val imageAnalysis = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+
+                imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(ctx)) { imageProxy ->
+                    @Suppress("UnsafeOptInUsageError")
+                    val mediaImage = imageProxy.image
+                    if (mediaImage != null && !isScanned) {
+                        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                        barcodeScanner.process(image)
+                            .addOnSuccessListener { barcodes ->
+                                val qrUrl = barcodes.firstOrNull()?.rawValue
+                                if (!qrUrl.isNullOrBlank() && !isScanned) {
+                                    isScanned = true
+                                    onQrCodeScanned(qrUrl)
+                                }
+                            }
+                            .addOnCompleteListener {
+                                imageProxy.close()
+                            }
+                    } else {
+                        imageProxy.close()
+                    }
+                }
+
+                val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                try {
+                    cameraProvider.unbindAll()
+                    cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        cameraSelector,
+                        preview,
+                        imageAnalysis
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }, ContextCompat.getMainExecutor(ctx))
+
+            previewView
+        },
+        modifier = Modifier.fillMaxSize()
+    )
 }
