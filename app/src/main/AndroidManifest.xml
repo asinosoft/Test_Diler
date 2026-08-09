@@ -13,6 +13,7 @@
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-feature android:name="android.hardware.telephony" android:required="false" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
@@ -99,6 +100,14 @@
             android:excludeFromRecents="false"
             android:taskAffinity="com.example.test_dialer.incall"
             tools:ignore="DiscouragedOrientationUser" />
+
+        <activity
+            android:name=".ui.incall.IncomingCallPopupActivity"
+            android:exported="true"
+            android:label="Входящий вызов"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true" />
 
         <service
             android:name=".service.CallService"
