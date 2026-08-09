@@ -1326,8 +1326,10 @@ private fun ContactTabContent(
             }
         }
 
-        // CUSTOM IMPORTANT DATES CARD
-        if (importantDatesList.isNotEmpty()) {
+        // CUSTOM IMPORTANT DATES CARDS (STYLED LIKE BIRTHDAY CARD)
+        importantDatesList.forEach { dateItem ->
+            val parsedDate = remember(dateItem.dateString) { parseBirthdayString(dateItem.dateString) }
+
             Spacer(modifier = Modifier.height(16.dp))
 
             Surface(
@@ -1336,53 +1338,41 @@ private fun ContactTabContent(
                 color = MaterialTheme.colorScheme.surface,
                 tonalElevation = 1.dp
             ) {
-                Column {
-                    importantDatesList.forEachIndexed { index, dateItem ->
-                        if (index > 0) {
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                thickness = 1.dp,
-                                modifier = Modifier.padding(horizontal = 16.dp)
-                            )
-                        }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = dateItem.label,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = parsedDate.formattedDate,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
 
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 18.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                    if (!parsedDate.ageText.isNullOrBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = dateItem.label,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = dateItem.dateString,
-                                    fontSize = 16.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                            }
-
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .clip(CircleShape)
-                                    .background(SamsungGreen.copy(alpha = 0.12f)),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.Event,
-                                    contentDescription = dateItem.label,
-                                    tint = SamsungGreen,
-                                    modifier = Modifier.size(20.dp)
-                                )
-                            }
+                            Text(
+                                text = parsedDate.ageText!!,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            )
                         }
                     }
                 }
@@ -4367,6 +4357,36 @@ private fun CameraQrScannerView(
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
+private fun showCalendarDatePicker(
+    context: Context,
+    initialDateString: String,
+    onDateSelected: (formattedDate: String) -> Unit
+) {
+    val cal = java.util.Calendar.getInstance()
+    val numbers = Regex("\\d+").findAll(initialDateString).mapNotNull { it.value.toIntOrNull() }.toList()
+    if (numbers.size >= 3) {
+        val y = numbers.firstOrNull { it in 1900..2100 } ?: cal.get(java.util.Calendar.YEAR)
+        val nonYears = numbers.filter { it != y }
+        val m = if (nonYears.size >= 2 && nonYears[1] in 1..12) nonYears[1] - 1 else cal.get(java.util.Calendar.MONTH)
+        val d = if (nonYears.isNotEmpty() && nonYears[0] in 1..31) nonYears[0] else cal.get(java.util.Calendar.DAY_OF_MONTH)
+        cal.set(y, m, d)
+    }
+
+    val picker = android.app.DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            val monthNames = arrayOf("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря")
+            val mName = monthNames.getOrElse(month) { "" }
+            val formatted = "$dayOfMonth $mName $year г."
+            onDateSelected(formatted)
+        },
+        cal.get(java.util.Calendar.YEAR),
+        cal.get(java.util.Calendar.MONTH),
+        cal.get(java.util.Calendar.DAY_OF_MONTH)
+    )
+    picker.show()
+}
+
 @Composable
 private fun EditContactDialog(
     contact: FavoriteContact,
@@ -4745,6 +4765,17 @@ private fun EditContactDialog(
                             label = { Text("День рождения") },
                             placeholder = { Text("15 мая 1990 г.") },
                             singleLine = true,
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        showCalendarDatePicker(context, birthdayInput) { newDate ->
+                                            birthdayInput = newDate
+                                        }
+                                    }
+                                ) {
+                                    Icon(Icons.Default.Event, contentDescription = "Календарь", tint = SamsungGreen)
+                                }
+                            },
                             modifier = Modifier.weight(1f)
                         )
                         IconButton(
@@ -4809,6 +4840,19 @@ private fun EditContactDialog(
                             label = { Text("Дата") },
                             placeholder = { Text("15 мая 2020 г.") },
                             singleLine = true,
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        showCalendarDatePicker(context, dateItem.dateString) { newDate ->
+                                            val updated = customImportantDates.toMutableList()
+                                            updated[index] = dateItem.copy(dateString = newDate)
+                                            customImportantDates = updated
+                                        }
+                                    }
+                                ) {
+                                    Icon(Icons.Default.Event, contentDescription = "Календарь", tint = SamsungGreen)
+                                }
+                            },
                             modifier = Modifier.weight(0.55f)
                         )
 
