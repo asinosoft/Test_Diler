@@ -5,6 +5,8 @@ import android.os.Build
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.example.test_dialer.ui.theme.Test_dialerTheme
@@ -28,8 +30,19 @@ class InCallActivity : ComponentActivity() {
             )
         }
 
+        // Intercept Back button: consume back press without closing or minimizing
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                // Consume back gesture
+            }
+        })
+
         setContent {
             Test_dialerTheme {
+                BackHandler {
+                    // Consume back gesture
+                }
+
                 InCallScreen(
                     onFinish = { finish() }
                 )

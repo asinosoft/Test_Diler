@@ -7,16 +7,12 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.provider.ContactsContract
 import android.telecom.Call
+import android.telecom.CallAudioState
 import android.telephony.SubscriptionManager
+import android.widget.Toast
 import androidx.compose.foundation.Image
-import androidx.core.content.ContextCompat
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import androidx.compose.foundation.background
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -32,18 +28,35 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Bluetooth
+import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Dialpad
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -51,9 +64,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
@@ -63,13 +80,16 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
 import com.example.test_dialer.service.CallManager
 import com.example.test_dialer.ui.theme.MissedRed
 import com.example.test_dialer.ui.theme.OneUIBgDark
 import com.example.test_dialer.ui.theme.SamsungGreen
 import com.example.test_dialer.ui.theme.SamsungSmsBlue
 import com.example.test_dialer.util.formatPhoneNumber
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import java.util.Locale
 
 class SimCardShape(private val cutSizeDp: Float = 3f) : Shape {
@@ -98,9 +118,15 @@ fun InCallScreen(
     val context = LocalContext.current
     val activeCall by CallManager.currentCall.collectAsState()
 
+    val isMuted by CallManager.isMuted.collectAsState()
+    val audioRoute by CallManager.audioRoute.collectAsState()
+    val isHold by CallManager.isHold.collectAsState()
+    val isRecording by CallManager.isRecording.collectAsState()
+
     var callState by remember { mutableIntStateOf(activeCall?.state ?: Call.STATE_DISCONNECTED) }
     var durationSeconds by remember { mutableIntStateOf(0) }
     var activeSimCount by remember { mutableIntStateOf(1) }
+    var showKeypadSheet by remember { mutableStateOf(false) }
 
     val handle = activeCall?.details?.handle
     val rawNumber = handle?.schemeSpecificPart ?: ""
@@ -205,19 +231,20 @@ fun InCallScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(horizontal = 24.dp, vertical = 28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
-            // Top Section: Large Photo Avatar (180dp) & Caller Info
+            // Top Section: Avatar, Contact Name, Number, Status, SIM
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Large Avatar (170dp)
                 Surface(
                     modifier = Modifier
-                        .size(180.dp)
+                        .size(170.dp)
                         .clip(CircleShape),
                     shape = CircleShape,
                     color = Color(0xFF2B2D31)
@@ -239,7 +266,7 @@ fun InCallScreen(
                             Text(
                                 text = initial,
                                 color = Color.White,
-                                fontSize = 64.sp,
+                                fontSize = 60.sp,
                                 fontWeight = FontWeight.Bold
                             )
                         }
@@ -261,11 +288,12 @@ fun InCallScreen(
                     fontSize = 28.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
+                    maxLines = 2
                 )
 
                 if (rawNumber.isNotBlank() && (contactName != null || displayName != rawNumber)) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = formatPhoneNumber(rawNumber),
                         fontSize = 16.sp,
@@ -274,42 +302,43 @@ fun InCallScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-                // Call Status Text
-                val statusText = when (callState) {
-                    Call.STATE_RINGING -> "Входящий вызов..."
-                    Call.STATE_DIALING -> "Вызов..."
-                    Call.STATE_CONNECTING -> "Соединение..."
-                    Call.STATE_ACTIVE -> formatDuration(durationSeconds)
-                    Call.STATE_DISCONNECTING, Call.STATE_DISCONNECTED -> "Завершение вызова..."
+                // Call Status Text & Timer
+                val statusText = when {
+                    isHold -> "На удержании"
+                    callState == Call.STATE_RINGING -> "Входящий вызов..."
+                    callState == Call.STATE_DIALING -> "Вызов..."
+                    callState == Call.STATE_CONNECTING -> "Соединение..."
+                    callState == Call.STATE_ACTIVE -> formatDuration(durationSeconds)
+                    callState == Call.STATE_DISCONNECTING || callState == Call.STATE_DISCONNECTED -> "Завершение вызова..."
                     else -> "Соединение..."
                 }
 
                 Text(
                     text = statusText,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = SamsungGreen
+                    fontSize = 19.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = if (isHold) Color(0xFFFFB300) else SamsungGreen
                 )
 
                 if (activeSimCount > 1) {
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
-                    // SIM Card Indicator Chip
+                    // SIM Indicator Chip
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
                         modifier = Modifier
                             .clip(RoundedCornerShape(12.dp))
                             .background(Color.White.copy(alpha = 0.12f))
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
                         InCallSimBadge(simNumber = simNumber)
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "СИМ $simNumber",
-                            fontSize = 13.sp,
+                            fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color.White.copy(alpha = 0.85f)
                         )
@@ -317,10 +346,89 @@ fun InCallScreen(
                 }
             }
 
-            // Bottom Section: Action Buttons (Answer / End Call)
+            // Middle Section: Samsung One UI 3x2 Action Button Grid
+            if (callState == Call.STATE_ACTIVE || callState == Call.STATE_DIALING || isHold) {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
+                    // Row 1
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        // 1. Record
+                        InCallActionButton(
+                            icon = if (isRecording) Icons.Default.Pause else Icons.Default.PlayArrow,
+                            label = if (isRecording) "Запись..." else "Запись",
+                            isActive = isRecording,
+                            activeColor = MissedRed,
+                            onClick = { CallManager.toggleRecord() }
+                        )
+
+                        // 2. Add Call
+                        InCallActionButton(
+                            icon = Icons.Default.PersonAdd,
+                            label = "Добавить",
+                            isActive = false,
+                            onClick = {
+                                Toast.makeText(context, "Откройте приложение для второго звонка", Toast.LENGTH_SHORT).show()
+                            }
+                        )
+
+                        // 3. Bluetooth
+                        val isBluetoothActive = audioRoute == CallAudioState.ROUTE_BLUETOOTH
+                        InCallActionButton(
+                            icon = if (isBluetoothActive) Icons.Default.BluetoothAudio else Icons.Default.Bluetooth,
+                            label = "Bluetooth",
+                            isActive = isBluetoothActive,
+                            activeColor = SamsungSmsBlue,
+                            onClick = { CallManager.toggleBluetooth() }
+                        )
+                    }
+
+                    // Row 2
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        // 4. Speaker
+                        val isSpeakerActive = audioRoute == CallAudioState.ROUTE_SPEAKER
+                        InCallActionButton(
+                            icon = if (isSpeakerActive) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                            label = "Динамик",
+                            isActive = isSpeakerActive,
+                            activeColor = SamsungGreen,
+                            onClick = { CallManager.toggleSpeaker() }
+                        )
+
+                        // 5. Mute
+                        InCallActionButton(
+                            icon = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
+                            label = if (isMuted) "Выкл. микр." else "Микрофон",
+                            isActive = isMuted,
+                            activeColor = MissedRed,
+                            onClick = { CallManager.toggleMute() }
+                        )
+
+                        // 6. Keypad
+                        InCallActionButton(
+                            icon = Icons.Default.Dialpad,
+                            label = "Клавиатура",
+                            isActive = showKeypadSheet,
+                            activeColor = SamsungGreen,
+                            onClick = { showKeypadSheet = true }
+                        )
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.height(100.dp))
+            }
+
+            // Bottom Section: Answer / Decline / End Call Buttons
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(bottom = 32.dp)
+                modifier = Modifier.padding(bottom = 20.dp)
             ) {
                 if (callState == Call.STATE_RINGING) {
                     Row(
@@ -377,6 +485,144 @@ fun InCallScreen(
                                 contentDescription = "Завершить вызов",
                                 modifier = Modifier.size(36.dp)
                             )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // DTMF Dialpad Bottom Sheet Overlay
+    if (showKeypadSheet) {
+        InCallKeypadSheet(
+            onDigitClick = { digit ->
+                CallManager.playDtmf(digit)
+            },
+            onDismiss = { showKeypadSheet = false }
+        )
+    }
+}
+
+@Composable
+private fun InCallActionButton(
+    icon: ImageVector,
+    label: String,
+    isActive: Boolean = false,
+    activeColor: Color = SamsungGreen,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .width(80.dp)
+            .clickable { onClick() }
+    ) {
+        Surface(
+            modifier = Modifier.size(60.dp),
+            shape = CircleShape,
+            color = if (isActive) activeColor else Color.White.copy(alpha = 0.15f)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = Color.White,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = if (isActive) activeColor else Color.White.copy(alpha = 0.85f),
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun InCallKeypadSheet(
+    onDigitClick: (Char) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = OneUIBgDark,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Клавиатура тонального набора",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color.White
+                )
+
+                IconButton(onClick = onDismiss) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = "Закрыть",
+                        tint = Color.White.copy(alpha = 0.7f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // DTMF Dialpad Grid (3x4)
+            val digits = listOf(
+                listOf('1', '2', '3'),
+                listOf('4', '5', '6'),
+                listOf('7', '8', '9'),
+                listOf('*', '0', '#')
+            )
+
+            digits.forEach { row ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    row.forEach { char ->
+                        Surface(
+                            modifier = Modifier
+                                .size(64.dp)
+                                .clip(CircleShape)
+                                .clickable {
+                                    onDigitClick(char)
+                                },
+                            shape = CircleShape,
+                            color = Color.White.copy(alpha = 0.15f)
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                Text(
+                                    text = "$char",
+                                    fontSize = 24.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
                         }
                     }
                 }
