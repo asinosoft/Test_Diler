@@ -57,16 +57,24 @@ import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -187,6 +195,7 @@ fun ContactDetailDialog(
     var messengerAccountsList by remember(contact) { mutableStateOf<List<MessengerAccount>>(emptyList()) }
     var emailsList by remember(contact) { mutableStateOf<List<ContactEmail>>(emptyList()) }
     var birthdayInfo by remember(contact) { mutableStateOf<ContactBirthday?>(null) }
+    var importantDatesList by remember(contact) { mutableStateOf<List<ContactImportantDate>>(emptyList()) }
 
     LaunchedEffect(contact) {
         withContext(Dispatchers.IO) {
@@ -219,6 +228,9 @@ fun ContactDetailDialog(
 
             // Load birthday for this contact
             birthdayInfo = loadContactBirthday(context, contact)
+
+            // Load custom important dates
+            importantDatesList = getImportantDates(context, getContactCustomKey(contact), contact.number)
         }
     }
 
@@ -385,6 +397,7 @@ fun ContactDetailDialog(
                                     onUpdateEmails = { emailsList = it },
                                     emailsList = emailsList,
                                     birthdayInfo = birthdayInfo,
+                                    importantDatesList = importantDatesList,
                                     activeSimCount = activeSimCount,
                                     contact = contact,
                                     context = context,
@@ -425,11 +438,13 @@ fun ContactDetailDialog(
                 }
             }
 
-            // TOP FLOATING TOOLBAR OVER PHOTO (Back Button & Shadow Gradient)
+            var showEditContactDialog by remember { mutableStateOf(false) }
+
+            // TOP FLOATING TOOLBAR OVER PHOTO (Back Button & Three Dots Menu)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(80.dp)
+                    .height(100.dp)
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
@@ -438,23 +453,159 @@ fun ContactDetailDialog(
                             )
                         )
                     )
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                contentAlignment = Alignment.CenterStart
+                    .padding(start = 12.dp, end = 12.dp, top = 38.dp, bottom = 8.dp)
             ) {
-                IconButton(
-                    onClick = onDismiss,
+                Row(
                     modifier = Modifier
-                        .size(42.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.35f))
+                        .fillMaxWidth()
+                        .align(Alignment.Center),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Назад",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
+                    // Back Button
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.35f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Назад",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    // Three Dots Menu
+                    Box {
+                        var topMenuExpanded by remember { mutableStateOf(false) }
+
+                        IconButton(
+                            onClick = { topMenuExpanded = true },
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.35f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = "Еще",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        DropdownMenu(
+                            expanded = topMenuExpanded,
+                            onDismissRequest = { topMenuExpanded = false }
+                        ) {
+                            // 1. Поделиться
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Share,
+                                            contentDescription = "Поделиться",
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text("Поделиться", fontSize = 14.sp)
+                                    }
+                                },
+                                onClick = {
+                                    topMenuExpanded = false
+                                    try {
+                                        val shareText = "${contact.name}\n${contact.number}"
+                                        val sendIntent = Intent().apply {
+                                            action = Intent.ACTION_SEND
+                                            putExtra(Intent.EXTRA_TEXT, shareText)
+                                            type = "text/plain"
+                                        }
+                                        context.startActivity(Intent.createChooser(sendIntent, "Поделиться контактом"))
+                                    } catch (e: Exception) {
+                                        Toast.makeText(context, "Не удалось поделиться контактом", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            )
+
+                            // 2. Изменить
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Изменить",
+                                            tint = MaterialTheme.colorScheme.onSurface,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text("Изменить", fontSize = 14.sp)
+                                    }
+                                },
+                                onClick = {
+                                    topMenuExpanded = false
+                                    showEditContactDialog = true
+                                }
+                            )
+
+                            HorizontalDivider()
+
+                            // 3. Удалить
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Удалить",
+                                            tint = MaterialTheme.colorScheme.error,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text("Удалить", fontSize = 14.sp, color = MaterialTheme.colorScheme.error)
+                                    }
+                                },
+                                onClick = {
+                                    topMenuExpanded = false
+                                    onDismiss()
+                                    onRemoveFavorite(contact)
+                                }
+                            )
+                        }
+                    }
                 }
+            }
+
+            if (showEditContactDialog) {
+                EditContactDialog(
+                    contact = contact,
+                    phoneNumbersList = phoneNumbersList,
+                    emailsList = emailsList,
+                    birthdayInfo = birthdayInfo,
+                    importantDatesList = importantDatesList,
+                    messengerAccountsList = messengerAccountsList,
+                    avatarBitmap = avatarBitmap,
+                    context = context,
+                    onSave = { newName, newPhones, newEmails, newBirthday, newImportantDates, updatedMessengers, hiddenSet, newBitmap ->
+                        val updatedContact = contact.copy(name = newName, number = newPhones.firstOrNull()?.number ?: contact.number)
+                        onUpdateContact(updatedContact)
+                        phoneNumbersList = newPhones
+                        emailsList = newEmails
+                        birthdayInfo = newBirthday
+                        importantDatesList = newImportantDates
+                        messengerAccountsList = updatedMessengers
+                        if (newBitmap != null) {
+                            avatarBitmap = newBitmap
+                        }
+                        saveHiddenMessengers(context, getContactCustomKey(contact), hiddenSet)
+                        saveCustomMessengerLinks(context, getContactCustomKey(contact), updatedMessengers)
+                        saveImportantDates(context, getContactCustomKey(contact), contact.number, newImportantDates)
+                        showEditContactDialog = false
+                    },
+                    onDismiss = { showEditContactDialog = false }
+                )
             }
         }
     }
@@ -527,6 +678,7 @@ private fun ContactTabContent(
     onUpdateEmails: (List<ContactEmail>) -> Unit = {},
     emailsList: List<ContactEmail>,
     birthdayInfo: ContactBirthday?,
+    importantDatesList: List<ContactImportantDate> = emptyList(),
     activeSimCount: Int,
     contact: FavoriteContact,
     context: Context,
@@ -774,7 +926,13 @@ private fun ContactTabContent(
         }
 
         // MESSENGER ACCOUNTS CARD
-        if (editableMessengerList.isNotEmpty()) {
+        val hiddenSet = remember(messengerAccountsList) { getHiddenMessengers(context, getContactCustomKey(contact)) }
+        val visibleMessengerList = editableMessengerList.filter { messenger ->
+            val key = if (messenger.isCustomLink) messenger.id else messenger.packageName
+            !hiddenSet.contains(key)
+        }
+
+        if (visibleMessengerList.isNotEmpty()) {
             Spacer(modifier = Modifier.height(16.dp))
 
             Surface(
@@ -784,7 +942,7 @@ private fun ContactTabContent(
                 tonalElevation = 1.dp
             ) {
                 Column {
-                    editableMessengerList.forEachIndexed { index, messenger ->
+                    visibleMessengerList.forEachIndexed { index, messenger ->
                         if (index > 0) {
                             HorizontalDivider(
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
@@ -1162,6 +1320,69 @@ private fun ContactTabContent(
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
                             )
+                        }
+                    }
+                }
+            }
+        }
+
+        // CUSTOM IMPORTANT DATES CARD
+        if (importantDatesList.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
+            ) {
+                Column {
+                    importantDatesList.forEachIndexed { index, dateItem ->
+                        if (index > 0) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                thickness = 1.dp,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 18.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = dateItem.label,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = dateItem.dateString,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(SamsungGreen.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Event,
+                                    contentDescription = dateItem.label,
+                                    tint = SamsungGreen,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
                         }
                     }
                 }
@@ -2399,6 +2620,115 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
     return list
 }
 
+data class ContactImportantDate(
+    val id: String = "date_${System.currentTimeMillis()}",
+    val label: String,
+    val dateString: String
+)
+
+private fun saveImportantDates(context: Context, contactKey: String, contactNumber: String, dates: List<ContactImportantDate>) {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val cleanNum = contactNumber.replace(Regex("[^0-9+]"), "")
+
+        val array = JSONArray()
+        dates.filter { it.label.isNotBlank() || it.dateString.isNotBlank() }.forEach { item ->
+            val obj = JSONObject().apply {
+                put("id", item.id)
+                put("label", item.label)
+                put("dateString", item.dateString)
+            }
+            array.put(obj)
+        }
+
+        val editor = prefs.edit()
+        editor.putString("important_dates_$contactKey", array.toString())
+        if (cleanNum.isNotBlank()) {
+            editor.putString("important_dates_$cleanNum", array.toString())
+        }
+        editor.apply()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private fun getImportantDates(context: Context, contactKey: String, fallbackNumber: String? = null): List<ContactImportantDate> {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+
+        // 1. Try with contactKey
+        var jsonString = prefs.getString("important_dates_$contactKey", null)
+
+        // 2. Try with clean fallbackNumber
+        if (jsonString.isNullOrEmpty() && !fallbackNumber.isNullOrBlank()) {
+            val cleanNum = fallbackNumber.replace(Regex("[^0-9+]"), "")
+            if (cleanNum.isNotBlank()) {
+                jsonString = prefs.getString("important_dates_$cleanNum", null)
+            }
+        }
+
+        // 3. Fallback: match by last 7 digits across all saved keys
+        if (jsonString.isNullOrEmpty()) {
+            val searchNum = (if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey).replace(Regex("[^0-9]"), "")
+            if (searchNum.length >= 7) {
+                val last7 = searchNum.takeLast(7)
+                val allKeys = prefs.all.keys.filter { it.startsWith("important_dates_") }
+                for (k in allKeys) {
+                    val cleanKeyDigits = k.replace(Regex("[^0-9]"), "")
+                    if (cleanKeyDigits.length >= 7 && cleanKeyDigits.takeLast(7) == last7) {
+                        jsonString = prefs.getString(k, null)
+                        if (!jsonString.isNullOrEmpty()) break
+                    }
+                }
+            }
+        }
+
+        if (jsonString.isNullOrEmpty()) return emptyList()
+
+        val array = JSONArray(jsonString)
+        val list = mutableListOf<ContactImportantDate>()
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            list.add(
+                ContactImportantDate(
+                    id = if (obj.has("id")) obj.getString("id") else "date_$i",
+                    label = obj.getString("label"),
+                    dateString = obj.getString("dateString")
+                )
+            )
+        }
+        return list
+    } catch (e: Exception) {
+        return emptyList()
+    }
+}
+
+private fun saveHiddenMessengers(context: Context, contactKey: String, hiddenIds: Set<String>) {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val array = JSONArray()
+        hiddenIds.forEach { array.put(it) }
+        prefs.edit().putString("hidden_messengers_$contactKey", array.toString()).apply()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private fun getHiddenMessengers(context: Context, contactKey: String): Set<String> {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val jsonString = prefs.getString("hidden_messengers_$contactKey", null) ?: return emptySet()
+        val array = JSONArray(jsonString)
+        val set = mutableSetOf<String>()
+        for (i in 0 until array.length()) {
+            set.add(array.getString(i))
+        }
+        return set
+    } catch (e: Exception) {
+        return emptySet()
+    }
+}
+
 private fun saveCustomMessengerLinks(context: Context, contactKey: String, links: List<MessengerAccount>) {
     try {
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
@@ -2775,41 +3105,80 @@ private fun formatAgeRu(age: Int): String {
 
 private fun parseBirthdayString(rawDate: String): ContactBirthday {
     val cleanDate = rawDate.trim()
-    return try {
+    if (cleanDate.isBlank()) return ContactBirthday("", "", null)
+
+    try {
+        val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        val currentMonth = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH) + 1
+        val currentDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH)
+
+        val monthNames = arrayOf("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря")
+
         if (cleanDate.startsWith("--") || cleanDate.length == 5) {
-            val mm = cleanDate.takeLast(5).substring(0, 2).toInt()
-            val dd = cleanDate.takeLast(2).toInt()
-            val monthNames = arrayOf("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря")
+            val mm = cleanDate.takeLast(5).substring(0, 2).toIntOrNull() ?: 1
+            val dd = cleanDate.takeLast(2).toIntOrNull() ?: 1
             val mName = if (mm in 1..12) monthNames[mm - 1] else ""
-            ContactBirthday(cleanDate, "$dd $mName", null)
-        } else {
-            val digits = cleanDate.replace(Regex("[^0-9]"), "")
-            if (digits.length >= 8) {
-                val year = digits.substring(0, 4).toInt()
-                val month = digits.substring(4, 6).toInt()
-                val day = digits.substring(6, 8).toInt()
+            return ContactBirthday(cleanDate, "$dd $mName", null)
+        }
 
-                val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
-                val currentMonth = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH) + 1
-                val currentDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH)
+        // Search for 4-digit year e.g. 1990 or 2005
+        val yearMatch = Regex("\\b(19\\d{2}|20\\d{2})\\b").find(cleanDate)
+        var birthYear: Int? = yearMatch?.value?.toIntOrNull()
 
-                var age = currentYear - year
-                if (currentMonth < month || (currentMonth == month && currentDay < day)) {
-                    age--
-                }
+        var birthDay: Int? = null
+        var birthMonth: Int? = null
 
-                val monthNames = arrayOf("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря")
-                val mName = if (month in 1..12) monthNames[month - 1] else ""
-                val formatted = "$day $mName $year г."
-                val ageText = if (age in 0..120) formatAgeRu(age) else null
-
-                ContactBirthday(cleanDate, formatted, ageText)
-            } else {
-                ContactBirthday(cleanDate, cleanDate, null)
+        val lowerDate = cleanDate.lowercase()
+        for (i in monthNames.indices) {
+            if (lowerDate.contains(monthNames[i])) {
+                birthMonth = i + 1
+                break
             }
         }
+
+        val numbers = Regex("\\d+").findAll(cleanDate).mapNotNull { it.value.toIntOrNull() }.toList()
+
+        if (birthYear != null) {
+            val nonYearNumbers = numbers.filter { it != birthYear }
+            if (birthMonth == null && nonYearNumbers.size >= 2) {
+                if (nonYearNumbers[0] in 1..31 && nonYearNumbers[1] in 1..12) {
+                    birthDay = nonYearNumbers[0]
+                    birthMonth = nonYearNumbers[1]
+                } else if (nonYearNumbers[0] in 1..12 && nonYearNumbers[1] in 1..31) {
+                    birthMonth = nonYearNumbers[0]
+                    birthDay = nonYearNumbers[1]
+                }
+            } else if (nonYearNumbers.isNotEmpty()) {
+                birthDay = nonYearNumbers.firstOrNull { it in 1..31 }
+            }
+        } else if (numbers.size >= 3) {
+            val digits = cleanDate.replace(Regex("[^0-9]"), "")
+            if (digits.length >= 8) {
+                birthYear = digits.substring(0, 4).toIntOrNull()
+                birthMonth = digits.substring(4, 6).toIntOrNull()
+                birthDay = digits.substring(6, 8).toIntOrNull()
+            }
+        }
+
+        if (birthYear != null && birthYear in 1900..currentYear) {
+            var age = currentYear - birthYear
+            if (birthMonth != null && birthDay != null) {
+                if (currentMonth < birthMonth || (currentMonth == birthMonth && currentDay < birthDay)) {
+                    age--
+                }
+            }
+            val ageText = if (age in 0..120) formatAgeRu(age) else null
+
+            val formatted = if (birthDay != null && birthMonth != null && birthMonth in 1..12) {
+                "$birthDay ${monthNames[birthMonth - 1]} $birthYear г."
+            } else cleanDate
+
+            return ContactBirthday(cleanDate, formatted, ageText)
+        }
+
+        return ContactBirthday(cleanDate, cleanDate, null)
     } catch (e: Exception) {
-        ContactBirthday(cleanDate, cleanDate, null)
+        return ContactBirthday(cleanDate, cleanDate, null)
     }
 }
 
@@ -3312,22 +3681,29 @@ private fun SwipeActionPickerDialog(
             }
 
             // Section 2: Мессенджеры
-            Text(
-                text = "Мессенджеры",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
+            val hiddenSetInPicker = remember(pickerMessengerList) { getHiddenMessengers(context, getContactCustomKey(contact)) }
+            val visiblePickerMessengers = pickerMessengerList.filter { messenger ->
+                val key = if (messenger.isCustomLink) messenger.id else messenger.packageName
+                !hiddenSetInPicker.contains(key)
+            }
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 1.dp
-            ) {
-                Column {
-                    pickerMessengerList.forEachIndexed { index, messenger ->
+            if (visiblePickerMessengers.isNotEmpty()) {
+                Text(
+                    text = "Мессенджеры",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp
+                ) {
+                    Column {
+                        visiblePickerMessengers.forEachIndexed { index, messenger ->
                             if (index > 0) {
                                 HorizontalDivider(
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
@@ -3585,6 +3961,7 @@ private fun SwipeActionPickerDialog(
             )
         }
     }
+}
 
 @Composable
 private fun AddCustomMessengerLinkDialog(
@@ -3986,5 +4363,676 @@ private fun CameraQrScannerView(
             previewView
         },
         modifier = Modifier.fillMaxSize()
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun EditContactDialog(
+    contact: FavoriteContact,
+    phoneNumbersList: List<ContactPhoneNumber>,
+    emailsList: List<ContactEmail>,
+    birthdayInfo: ContactBirthday?,
+    importantDatesList: List<ContactImportantDate> = emptyList(),
+    messengerAccountsList: List<MessengerAccount>,
+    avatarBitmap: ImageBitmap?,
+    context: Context,
+    onSave: (
+        newName: String,
+        newPhones: List<ContactPhoneNumber>,
+        newEmails: List<ContactEmail>,
+        newBirthday: ContactBirthday?,
+        newImportantDates: List<ContactImportantDate>,
+        updatedMessengers: List<MessengerAccount>,
+        hiddenSet: Set<String>,
+        newAvatarBitmap: ImageBitmap?
+    ) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var nameInput by remember { mutableStateOf(contact.name) }
+    var editablePhones by remember { mutableStateOf(phoneNumbersList.toMutableList()) }
+    var editableEmails by remember { mutableStateOf(emailsList.toMutableList()) }
+    var editableBirthday by remember { mutableStateOf(birthdayInfo) }
+    var birthdayInput by remember { mutableStateOf(birthdayInfo?.formattedDate ?: "") }
+    var isEditingBirthday by remember { mutableStateOf(birthdayInfo != null) }
+
+    var customImportantDates by remember { mutableStateOf(importantDatesList.toMutableList()) }
+    var currentAvatarBitmap by remember { mutableStateOf(avatarBitmap) }
+
+    var editableMessengers by remember { mutableStateOf(messengerAccountsList.toMutableList()) }
+
+    val contactKey = remember(contact) { getContactCustomKey(contact) }
+    var hiddenSet by remember { mutableStateOf(getHiddenMessengers(context, contactKey).toMutableSet()) }
+
+    var showAddMessengerDialogInEdit by remember { mutableStateOf(false) }
+    var customLinkToEditIndex by remember { mutableStateOf<Int?>(null) }
+
+    val galleryAvatarLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val bitmap = BitmapFactory.decodeStream(stream)
+                    if (bitmap != null) {
+                        currentAvatarBitmap = bitmap.asImageBitmap()
+                        Toast.makeText(context, "Фото контакта обновлено", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Toast.makeText(context, "Не удалось загрузить фото", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Редактирование контакта", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // 1. ROUND AVATAR WITH CAMERA BADGE
+                Box(
+                    modifier = Modifier
+                        .size(86.dp)
+                        .clip(CircleShape)
+                        .clickable { galleryAvatarLauncher.launch("image/*") }
+                ) {
+                    val bitmap = currentAvatarBitmap
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap,
+                            contentDescription = "Аватар контакта",
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        val avatarBgColor = remember(contact.name) {
+                            val colors = listOf(
+                                Color(0xFFE57373), Color(0xFFF06292), Color(0xFFBA68C8),
+                                Color(0xFF9575CD), Color(0xFF7986CB), Color(0xFF64B5F6)
+                            )
+                            val index = (contact.name.hashCode() and Int.MAX_VALUE) % colors.size
+                            colors[index]
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(avatarBgColor),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = contact.name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 36.sp
+                            )
+                        }
+                    }
+
+                    // Camera Badge Overlay
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .align(Alignment.BottomEnd)
+                            .clip(CircleShape)
+                            .background(SamsungGreen),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoCamera,
+                            contentDescription = "Изменить фото",
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Name Field
+                Text(
+                    text = "Имя контакта",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = nameInput,
+                    onValueChange = { nameInput = it },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 2. PHONE NUMBERS SECTION
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Телефоны", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    IconButton(
+                        onClick = {
+                            editablePhones = (editablePhones + ContactPhoneNumber("", "Мобильный")).toMutableList()
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Добавить номер", tint = SamsungGreen, modifier = Modifier.size(20.dp))
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+
+                editablePhones.forEachIndexed { index, phoneItem ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = phoneItem.number,
+                            onValueChange = { newNum ->
+                                val updated = editablePhones.toMutableList()
+                                updated[index] = phoneItem.copy(number = newNum)
+                                editablePhones = updated
+                            },
+                            label = { Text(phoneItem.label) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (editablePhones.size > 1) {
+                            IconButton(
+                                onClick = {
+                                    val updated = editablePhones.toMutableList()
+                                    updated.removeAt(index)
+                                    editablePhones = updated
+                                }
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Удалить номер", tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 3. MESSENGERS SECTION
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Мессенджеры (видимость)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    IconButton(
+                        onClick = { showAddMessengerDialogInEdit = true },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Добавить мессенджер", tint = SamsungGreen, modifier = Modifier.size(20.dp))
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        editableMessengers.forEachIndexed { index, messenger ->
+                            val messengerKey = if (messenger.isCustomLink) messenger.id else messenger.packageName
+                            val isHidden = hiddenSet.contains(messengerKey)
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    MessengerBrandBadge(
+                                        item = InstalledMessengerItem(
+                                            packageName = messenger.packageName,
+                                            messengerName = messenger.messengerName,
+                                            brandColor = messenger.brandColor
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = messenger.messengerName,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isHidden) Color.Gray else messenger.brandColor
+                                        )
+                                        Text(
+                                            text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(messenger.accountDetail),
+                                            fontSize = 11.sp,
+                                            color = if (isHidden) Color.Gray.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (messenger.isCustomLink) {
+                                        // Edit Custom Link Button
+                                        IconButton(
+                                            onClick = { customLinkToEditIndex = index },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Edit, contentDescription = "Изменить ссылку", tint = SamsungGreen, modifier = Modifier.size(18.dp))
+                                        }
+
+                                        // Delete Custom Link Button
+                                        IconButton(
+                                            onClick = {
+                                                val updated = editableMessengers.toMutableList()
+                                                updated.removeAt(index)
+                                                editableMessengers = updated
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(Icons.Default.Delete, contentDescription = "Удалить ссылку", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                        }
+                                    } else {
+                                        // Visibility Toggle Button for Standard Messengers
+                                        IconButton(
+                                            onClick = {
+                                                val newSet = hiddenSet.toMutableSet()
+                                                if (isHidden) newSet.remove(messengerKey) else newSet.add(messengerKey)
+                                                hiddenSet = newSet
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isHidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                                contentDescription = if (isHidden) "Показать" else "Скрыть",
+                                                tint = if (isHidden) Color.Gray else SamsungGreen,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 4. E-MAIL SECTION
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("E-mail адреса", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    IconButton(
+                        onClick = {
+                            editableEmails = (editableEmails + ContactEmail("", "Личный")).toMutableList()
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(Icons.Default.Add, contentDescription = "Добавить email", tint = SamsungGreen, modifier = Modifier.size(20.dp))
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+
+                if (editableEmails.isEmpty()) {
+                    Text("E-mail адреса не заданы", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth())
+                } else {
+                    editableEmails.forEachIndexed { index, emailItem ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = emailItem.email,
+                                onValueChange = { newEmail ->
+                                    val updated = editableEmails.toMutableList()
+                                    updated[index] = emailItem.copy(email = newEmail)
+                                    editableEmails = updated
+                                },
+                                label = { Text(emailItem.label) },
+                                placeholder = { Text("example@mail.ru") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = {
+                                    val updated = editableEmails.toMutableList()
+                                    updated.removeAt(index)
+                                    editableEmails = updated
+                                }
+                            ) {
+                                Icon(Icons.Default.Delete, contentDescription = "Удалить email", tint = MaterialTheme.colorScheme.error)
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 5. BIRTHDAY & IMPORTANT DATES SECTION
+                Text("Важные даты", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.fillMaxWidth())
+                Spacer(modifier = Modifier.height(6.dp))
+
+                if (isEditingBirthday) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = birthdayInput,
+                            onValueChange = { birthdayInput = it },
+                            label = { Text("День рождения") },
+                            placeholder = { Text("15 мая 1990 г.") },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = {
+                                isEditingBirthday = false
+                                birthdayInput = ""
+                                editableBirthday = null
+                            }
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Удалить день рождения", tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                            .clickable {
+                                isEditingBirthday = true
+                                birthdayInput = "15 мая 1990 г."
+                            }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.Cake, contentDescription = "День рождения", tint = SamsungGreen, modifier = Modifier.size(20.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("+ Добавить день рождения", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SamsungGreen)
+                    }
+                }
+
+                // Custom Important Dates
+                customImportantDates.forEachIndexed { index, dateItem ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = dateItem.label,
+                            onValueChange = { newLabel ->
+                                val updated = customImportantDates.toMutableList()
+                                updated[index] = dateItem.copy(label = newLabel)
+                                customImportantDates = updated
+                            },
+                            label = { Text("Название даты") },
+                            placeholder = { Text("Годовщина") },
+                            singleLine = true,
+                            modifier = Modifier.weight(0.45f)
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        OutlinedTextField(
+                            value = dateItem.dateString,
+                            onValueChange = { newDate ->
+                                val updated = customImportantDates.toMutableList()
+                                updated[index] = dateItem.copy(dateString = newDate)
+                                customImportantDates = updated
+                            },
+                            label = { Text("Дата") },
+                            placeholder = { Text("15 мая 2020 г.") },
+                            singleLine = true,
+                            modifier = Modifier.weight(0.55f)
+                        )
+
+                        IconButton(
+                            onClick = {
+                                val updated = customImportantDates.toMutableList()
+                                updated.removeAt(index)
+                                customImportantDates = updated
+                            }
+                        ) {
+                            Icon(Icons.Default.Delete, contentDescription = "Удалить дату", tint = MaterialTheme.colorScheme.error)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        .clickable {
+                            val labels = listOf("Годовщина", "Юбилей", "Именины", "Памятная дата", "Свадьба")
+                            val nextLabel = labels.getOrElse(customImportantDates.size % labels.size) { "Важная дата" }
+                            customImportantDates = (customImportantDates + ContactImportantDate(label = nextLabel, dateString = "")).toMutableList()
+                        }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.Event, contentDescription = "Важная дата", tint = SamsungGreen, modifier = Modifier.size(20.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("+ Добавить другую важную дату", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SamsungGreen)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val cleanPhones = editablePhones.filter { it.number.isNotBlank() }
+                    val cleanEmails = editableEmails.filter { it.email.isNotBlank() }
+                    val newBday = if (isEditingBirthday && birthdayInput.isNotBlank()) {
+                        parseBirthdayString(birthdayInput.trim())
+                    } else null
+
+                    onSave(
+                        nameInput.trim(),
+                        if (cleanPhones.isNotEmpty()) cleanPhones else phoneNumbersList,
+                        cleanEmails,
+                        newBday,
+                        customImportantDates,
+                        editableMessengers,
+                        hiddenSet,
+                        currentAvatarBitmap
+                    )
+                }
+            ) {
+                Text("Сохранить", color = SamsungGreen, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена")
+            }
+        }
+    )
+
+    if (showAddMessengerDialogInEdit) {
+        AddCustomMessengerLinkDialog(
+            context = context,
+            onAddCustomLink = { newAccount ->
+                editableMessengers = (editableMessengers + newAccount).toMutableList()
+            },
+            onDismiss = { showAddMessengerDialogInEdit = false }
+        )
+    }
+
+    val editingIndex = customLinkToEditIndex
+    if (editingIndex != null && editingIndex in editableMessengers.indices) {
+        val targetMessenger = editableMessengers[editingIndex]
+        EditCustomMessengerLinkDialog(
+            initialMessenger = targetMessenger,
+            context = context,
+            onSaveCustomLink = { updatedMessenger ->
+                val updated = editableMessengers.toMutableList()
+                updated[editingIndex] = updatedMessenger
+                editableMessengers = updated
+                customLinkToEditIndex = null
+            },
+            onDismiss = { customLinkToEditIndex = null }
+        )
+    }
+}
+
+@Composable
+private fun EditCustomMessengerLinkDialog(
+    initialMessenger: MessengerAccount,
+    context: Context,
+    onSaveCustomLink: (MessengerAccount) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val installedMessengers = remember { getInstalledMessengersList(context) }
+    var selectedMessengerIndex by remember {
+        mutableIntStateOf(
+            installedMessengers.indexOfFirst { it.messengerName.equals(initialMessenger.messengerName, true) }.coerceAtLeast(0)
+        )
+    }
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    var customLinkInput by remember { mutableStateOf(initialMessenger.accountDetail) }
+
+    val activeMessenger = installedMessengers.getOrNull(selectedMessengerIndex) ?: installedMessengers.firstOrNull()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(text = "Редактировать ссылку", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = "Выберите мессенджер",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { dropdownExpanded = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (activeMessenger != null) {
+                                    MessengerBrandBadge(item = activeMessenger)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                }
+                                Text(
+                                    text = activeMessenger?.messengerName ?: "Мессенджер",
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = "Выбрать",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false }
+                    ) {
+                        installedMessengers.forEachIndexed { idx, item ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        MessengerBrandBadge(item = item)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = item.messengerName,
+                                            fontWeight = if (idx == selectedMessengerIndex) FontWeight.Bold else FontWeight.Normal,
+                                            color = Color.Black
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    selectedMessengerIndex = idx
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = customLinkInput,
+                    onValueChange = { customLinkInput = it },
+                    label = { Text("Вставьте ссылку") },
+                    placeholder = { Text("https://t.me/username") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val inputUrl = customLinkInput.trim()
+                    if (inputUrl.isNotBlank() && activeMessenger != null) {
+                        val formattedUrl = if (!inputUrl.startsWith("http://") && !inputUrl.startsWith("https://") && !inputUrl.startsWith("viber://") && !inputUrl.startsWith("skype:")) {
+                            "https://$inputUrl"
+                        } else inputUrl
+
+                        val updatedAccount = initialMessenger.copy(
+                            packageName = activeMessenger.packageName,
+                            messengerName = activeMessenger.messengerName,
+                            accountDetail = formattedUrl,
+                            brandColor = activeMessenger.brandColor,
+                            chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse(formattedUrl))
+                        )
+
+                        onSaveCustomLink(updatedAccount)
+                        onDismiss()
+                    }
+                }
+            ) {
+                Text("Сохранить", color = SamsungGreen, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена")
+            }
+        }
     )
 }
