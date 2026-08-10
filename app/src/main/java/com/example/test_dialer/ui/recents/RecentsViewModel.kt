@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
 data class ContactDetailState(
@@ -33,6 +34,7 @@ data class SearchDialerItem(
     val photoUri: String? = null,
     val timestamp: Long = 0L,
     val simSlot: Int? = null,
+    val callType: CallType? = null,
     val isFavorite: Boolean = false
 )
 
@@ -106,13 +108,15 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     photoUri = log.photoUri,
                     timestamp = log.timestamp,
                     simSlot = log.simNumber,
+                    callType = log.type,
                     isFavorite = favs.any { it.number == log.number }
                 )
             }.distinctBy { it.number }
         } else {
             val matchedFavs = favs.filter { fav ->
                 fav.name.lowercase().contains(cleanQuery) ||
-                fav.number.contains(cleanQuery)
+                fav.number.contains(cleanQuery) ||
+                fav.name.toT9Digits().contains(cleanQuery)
             }.map { fav ->
                 SearchDialerItem(
                     id = "fav_${fav.id}",
@@ -121,13 +125,15 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     photoUri = fav.photoUri,
                     timestamp = 0L,
                     simSlot = null,
+                    callType = null,
                     isFavorite = true
                 )
             }
 
             val matchedLogs = logs.filter { log ->
                 (log.name?.lowercase()?.contains(cleanQuery) == true) ||
-                log.number.contains(cleanQuery)
+                log.number.contains(cleanQuery) ||
+                (log.name != null && log.name.toT9Digits().contains(cleanQuery))
             }.map { log ->
                 SearchDialerItem(
                     id = "log_${log.id}",
@@ -136,6 +142,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     photoUri = log.photoUri,
                     timestamp = log.timestamp,
                     simSlot = log.simNumber,
+                    callType = log.type,
                     isFavorite = favs.any { it.number == log.number }
                 )
             }
@@ -164,13 +171,11 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun appendDialerDigit(digit: String) {
-        _dialerQuery.value = _dialerQuery.value + digit
+        _dialerQuery.update { it + digit }
     }
 
     fun deleteDialerDigit() {
-        if (_dialerQuery.value.isNotEmpty()) {
-            _dialerQuery.value = _dialerQuery.value.dropLast(1)
-        }
+        _dialerQuery.update { if (it.isNotEmpty()) it.dropLast(1) else "" }
     }
 
     fun clearDialerQuery() {
@@ -415,4 +420,23 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     fun setShowOnlyMissed(missedOnly: Boolean) {
         _showOnlyMissed.value = missedOnly
     }
+}
+
+private fun String.toT9Digits(): String {
+    val sb = StringBuilder()
+    for (ch in this.lowercase()) {
+        val digit = when (ch) {
+            'a', 'b', 'c', 'а', 'б', 'в', 'г' -> '2'
+            'd', 'e', 'f', 'д', 'е', 'ж', 'з' -> '3'
+            'g', 'h', 'i', 'и', 'й', 'к', 'л' -> '4'
+            'j', 'k', 'l', 'м', 'н', 'о', 'п', 'р' -> '5'
+            'm', 'n', 'o', 'с', 'т', 'у', 'ф' -> '6'
+            'p', 'q', 'r', 's', 'х', 'ц', 'ч', 'ш' -> '7'
+            't', 'u', 'v', 'щ', 'ъ', 'ы', 'ь' -> '8'
+            'w', 'x', 'y', 'z', 'э', 'ю', 'я' -> '9'
+            else -> if (ch.isDigit()) ch else null
+        }
+        if (digit != null) sb.append(digit)
+    }
+    return sb.toString()
 }
