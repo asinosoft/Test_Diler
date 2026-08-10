@@ -16,7 +16,6 @@ import android.telecom.CallAudioState
 import android.telecom.InCallService
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
-import androidx.core.graphics.drawable.IconCompat
 import com.example.test_dialer.MainActivity
 import com.example.test_dialer.R
 import com.example.test_dialer.ui.incall.InCallActivity
@@ -33,6 +32,8 @@ class CallService : InCallService() {
         const val CHANNEL_ID = "incall_service_channel"
         const val MISSED_CHANNEL_ID = "missed_call_channel"
         const val NOTIFICATION_ID = 1001
+
+        const val ACTION_ANSWER = "com.example.test_dialer.ACTION_ANSWER"
         const val ACTION_DISCONNECT = "com.example.test_dialer.ACTION_DISCONNECT"
     }
 
@@ -45,8 +46,9 @@ class CallService : InCallService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_DISCONNECT) {
-            CallManager.disconnect()
+        when (intent?.action) {
+            ACTION_ANSWER -> CallManager.answer()
+            ACTION_DISCONNECT -> CallManager.disconnect()
         }
         return super.onStartCommand(intent, flags, startId)
     }
@@ -121,16 +123,26 @@ class CallService : InCallService() {
             val displayName = call.details?.callerDisplayName ?: rawNumber
 
             var contactName: String? = null
+            var contactBitmap: Bitmap? = null
 
             if (rawNumber.isNotBlank()) {
                 withContext(Dispatchers.IO) {
                     try {
                         val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(rawNumber))
-                        val cursor = contentResolver.query(uri, arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null)
+                        val cursor = contentResolver.query(uri, arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME, ContactsContract.PhoneLookup.PHOTO_URI), null, null, null)
                         cursor?.use { c ->
                             if (c.moveToFirst()) {
                                 val nameIdx = c.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                                val photoIdx = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
                                 if (nameIdx != -1) contactName = c.getString(nameIdx)
+                                if (photoIdx != -1) {
+                                    val photoUriStr = c.getString(photoIdx)
+                                    if (!photoUriStr.isNullOrBlank()) {
+                                        contentResolver.openInputStream(Uri.parse(photoUriStr))?.use { stream ->
+                                            contactBitmap = BitmapFactory.decodeStream(stream)
+                                        }
+                                    }
+                                }
                             }
                         }
                     } catch (e: Exception) {
@@ -157,41 +169,88 @@ class CallService : InCallService() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val disconnectIntent = Intent(this@CallService, CallService::class.java).apply {
-                action = ACTION_DISCONNECT
-            }
-            val disconnectPendingIntent = PendingIntent.getService(
-                this@CallService,
-                1,
-                disconnectIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val answerIntent = Intent(this@CallService, CallService::class.java).apply { action = ACTION_ANSWER }
+            val answerPendingIntent = PendingIntent.getService(this@CallService, 10, answerIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+            val disconnectIntent = Intent(this@CallService, CallService::class.java).apply { action = ACTION_DISCONNECT }
+            val disconnectPendingIntent = PendingIntent.getService(this@CallService, 11, disconnectIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
             val connectTime = call.details?.connectTimeMillis ?: System.currentTimeMillis()
+            val isRinging = call.state == Call.STATE_RINGING
             val isCallActive = call.state == Call.STATE_ACTIVE
 
-            val callStyle = NotificationCompat.CallStyle.forOngoingCall(
-                callerPerson,
-                disconnectPendingIntent
-            )
+            val circularAvatar: Bitmap? = if (contactBitmap != null) {
+                getCircularBitmap(contactBitmap)
+            } else {
+                createRoundAvatarBitmap(title)
+            }
 
-            val notificationBuilder = NotificationCompat.Builder(this@CallService, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_phone_white)
-                .setContentTitle(title)
-                .setContentText(formattedNumber)
-                .setContentIntent(openPendingIntent)
-                .setStyle(callStyle)
-                .setOngoing(true)
-                .setAutoCancel(false)
-                .setUsesChronometer(isCallActive)
-                .setWhen(if (isCallActive && connectTime > 0) connectTime else System.currentTimeMillis())
-                .setShowWhen(true)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setCategory(NotificationCompat.CATEGORY_CALL)
-                .setSound(null)
+            if (isRinging) {
+                val collapsedView = android.widget.RemoteViews(packageName, R.layout.notification_incoming_call_collapsed).apply {
+                    setTextViewText(R.id.notification_title, title)
+                    setTextViewText(R.id.notification_subtitle, "Входящий вызов")
+                    if (circularAvatar != null) {
+                        setImageViewBitmap(R.id.notification_avatar, circularAvatar)
+                    }
+                    setOnClickPendingIntent(R.id.btn_answer, answerPendingIntent)
+                    setOnClickPendingIntent(R.id.btn_decline, disconnectPendingIntent)
+                }
 
-            val notification = notificationBuilder.build()
-            startForeground(NOTIFICATION_ID, notification)
+                val expandedView = android.widget.RemoteViews(packageName, R.layout.notification_incoming_call_expanded).apply {
+                    setTextViewText(R.id.notification_title, "Входящий вызов")
+                    setTextViewText(R.id.notification_subtitle, title)
+                    setTextViewText(R.id.notification_number, formattedNumber)
+                    if (circularAvatar != null) {
+                        setImageViewBitmap(R.id.notification_avatar, circularAvatar)
+                    }
+                    setOnClickPendingIntent(R.id.btn_answer, answerPendingIntent)
+                    setOnClickPendingIntent(R.id.btn_decline, disconnectPendingIntent)
+                }
+
+                val notificationBuilder = NotificationCompat.Builder(this@CallService, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_phone_white)
+                    .setCustomContentView(collapsedView)
+                    .setCustomBigContentView(expandedView)
+                    .setStyle(NotificationCompat.DecoratedCustomViewStyle())
+                    .setContentIntent(openPendingIntent)
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .setShowWhen(false)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setCategory(NotificationCompat.CATEGORY_CALL)
+                    .setSound(null)
+
+                val notification = notificationBuilder.build()
+                startForeground(NOTIFICATION_ID, notification)
+            } else {
+                val ongoingStyle = NotificationCompat.CallStyle.forOngoingCall(
+                    callerPerson,
+                    disconnectPendingIntent
+                )
+
+                val notificationBuilder = NotificationCompat.Builder(this@CallService, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_phone_white)
+                    .setContentTitle(title)
+                    .setContentText(formattedNumber)
+                    .setStyle(NotificationCompat.BigTextStyle().bigText(formattedNumber))
+                    .setContentIntent(openPendingIntent)
+                    .setStyle(ongoingStyle)
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .setUsesChronometer(isCallActive)
+                    .setWhen(if (isCallActive && connectTime > 0) connectTime else System.currentTimeMillis())
+                    .setShowWhen(false)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setCategory(NotificationCompat.CATEGORY_CALL)
+                    .setSound(null)
+
+                if (circularAvatar != null) {
+                    notificationBuilder.setLargeIcon(circularAvatar)
+                }
+
+                val notification = notificationBuilder.build()
+                startForeground(NOTIFICATION_ID, notification)
+            }
         }
     }
 
@@ -390,6 +449,59 @@ class CallService : InCallService() {
             return true // Screen is unlocked -> Floating Call Pop-Up
         } catch (e: Exception) {
             return true
+        }
+    }
+
+    private fun getCircularBitmap(bitmap: Bitmap): Bitmap {
+        val size = Math.min(bitmap.width, bitmap.height)
+        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(output)
+
+        val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+        val rect = android.graphics.Rect(0, 0, size, size)
+
+        canvas.drawARGB(0, 0, 0, 0)
+        canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+        paint.xfermode = android.graphics.PorterDuffXfermode(android.graphics.PorterDuff.Mode.SRC_IN)
+        canvas.drawBitmap(bitmap, null, rect, paint)
+
+        return output
+    }
+
+    private fun createRoundAvatarBitmap(name: String): Bitmap? {
+        try {
+            val size = 128
+            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bitmap)
+
+            val avatarBgColor = run {
+                val colors = intArrayOf(
+                    0xFFE57373.toInt(), 0xFFF06292.toInt(), 0xFFBA68C8.toInt(),
+                    0xFF9575CD.toInt(), 0xFF7986CB.toInt(), 0xFF64B5F6.toInt()
+                )
+                val index = (name.hashCode() and Int.MAX_VALUE) % colors.size
+                colors[index]
+            }
+
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                color = avatarBgColor
+                style = android.graphics.Paint.Style.FILL
+            }
+            canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
+
+            val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                textSize = 54f
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                textAlign = android.graphics.Paint.Align.CENTER
+            }
+            val initial = name.trim().firstOrNull { it.isLetterOrDigit() }?.uppercaseChar()?.toString() ?: "?"
+            val yPos = (size / 2f) - ((textPaint.descent() + textPaint.ascent()) / 2f)
+            canvas.drawText(initial, size / 2f, yPos, textPaint)
+
+            return bitmap
+        } catch (e: Exception) {
+            return null
         }
     }
 }
