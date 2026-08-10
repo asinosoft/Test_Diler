@@ -16,7 +16,6 @@ import android.telecom.CallAudioState
 import android.telecom.InCallService
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
-import androidx.core.graphics.drawable.IconCompat
 import com.example.test_dialer.MainActivity
 import com.example.test_dialer.R
 import com.example.test_dialer.ui.incall.InCallActivity
@@ -33,6 +32,8 @@ class CallService : InCallService() {
         const val CHANNEL_ID = "incall_service_channel"
         const val MISSED_CHANNEL_ID = "missed_call_channel"
         const val NOTIFICATION_ID = 1001
+
+        const val ACTION_ANSWER = "com.example.test_dialer.ACTION_ANSWER"
         const val ACTION_DISCONNECT = "com.example.test_dialer.ACTION_DISCONNECT"
     }
 
@@ -45,8 +46,9 @@ class CallService : InCallService() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (intent?.action == ACTION_DISCONNECT) {
-            CallManager.disconnect()
+        when (intent?.action) {
+            ACTION_ANSWER -> CallManager.answer()
+            ACTION_DISCONNECT -> CallManager.disconnect()
         }
         return super.onStartCommand(intent, flags, startId)
     }
@@ -121,16 +123,26 @@ class CallService : InCallService() {
             val displayName = call.details?.callerDisplayName ?: rawNumber
 
             var contactName: String? = null
+            var contactBitmap: Bitmap? = null
 
             if (rawNumber.isNotBlank()) {
                 withContext(Dispatchers.IO) {
                     try {
                         val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(rawNumber))
-                        val cursor = contentResolver.query(uri, arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null)
+                        val cursor = contentResolver.query(uri, arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME, ContactsContract.PhoneLookup.PHOTO_URI), null, null, null)
                         cursor?.use { c ->
                             if (c.moveToFirst()) {
                                 val nameIdx = c.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                                val photoIdx = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
                                 if (nameIdx != -1) contactName = c.getString(nameIdx)
+                                if (photoIdx != -1) {
+                                    val photoUriStr = c.getString(photoIdx)
+                                    if (!photoUriStr.isNullOrBlank()) {
+                                        contentResolver.openInputStream(Uri.parse(photoUriStr))?.use { stream ->
+                                            contactBitmap = BitmapFactory.decodeStream(stream)
+                                        }
+                                    }
+                                }
                             }
                         }
                     } catch (e: Exception) {
@@ -157,41 +169,73 @@ class CallService : InCallService() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val disconnectIntent = Intent(this@CallService, CallService::class.java).apply {
-                action = ACTION_DISCONNECT
-            }
-            val disconnectPendingIntent = PendingIntent.getService(
-                this@CallService,
-                1,
-                disconnectIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val answerIntent = Intent(this@CallService, CallService::class.java).apply { action = ACTION_ANSWER }
+            val answerPendingIntent = PendingIntent.getService(this@CallService, 10, answerIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+            val disconnectIntent = Intent(this@CallService, CallService::class.java).apply { action = ACTION_DISCONNECT }
+            val disconnectPendingIntent = PendingIntent.getService(this@CallService, 11, disconnectIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 
             val connectTime = call.details?.connectTimeMillis ?: System.currentTimeMillis()
+            val isRinging = call.state == Call.STATE_RINGING
             val isCallActive = call.state == Call.STATE_ACTIVE
 
-            val callStyle = NotificationCompat.CallStyle.forOngoingCall(
-                callerPerson,
-                disconnectPendingIntent
-            )
+            if (isRinging) {
+                val notificationBuilder = NotificationCompat.Builder(this@CallService, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_phone_white)
+                    .setContentTitle("Входящий вызов")
+                    .setContentText(title)
+                    .setSubText("Входящий вызов")
+                    .setStyle(NotificationCompat.BigTextStyle()
+                        .setBigContentTitle("Входящий вызов")
+                        .setSummaryText("Входящий вызов")
+                        .bigText(formattedNumber))
+                    .setContentIntent(openPendingIntent)
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .setShowWhen(false)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
+                    .setCategory(NotificationCompat.CATEGORY_CALL)
+                    .setSound(null)
 
-            val notificationBuilder = NotificationCompat.Builder(this@CallService, CHANNEL_ID)
-                .setSmallIcon(R.drawable.ic_phone_white)
-                .setContentTitle(title)
-                .setContentText(formattedNumber)
-                .setContentIntent(openPendingIntent)
-                .setStyle(callStyle)
-                .setOngoing(true)
-                .setAutoCancel(false)
-                .setUsesChronometer(isCallActive)
-                .setWhen(if (isCallActive && connectTime > 0) connectTime else System.currentTimeMillis())
-                .setShowWhen(true)
-                .setPriority(NotificationCompat.PRIORITY_LOW)
-                .setCategory(NotificationCompat.CATEGORY_CALL)
-                .setSound(null)
+                // Action 1 (Left): Green Answer
+                notificationBuilder.addAction(android.R.drawable.ic_menu_call, "Ответить", answerPendingIntent)
+                // Action 2 (Right): Red Decline
+                notificationBuilder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Отклонить", disconnectPendingIntent)
 
-            val notification = notificationBuilder.build()
-            startForeground(NOTIFICATION_ID, notification)
+                if (contactBitmap != null) {
+                    notificationBuilder.setLargeIcon(contactBitmap)
+                }
+
+                val notification = notificationBuilder.build()
+                startForeground(NOTIFICATION_ID, notification)
+            } else {
+                val ongoingStyle = NotificationCompat.CallStyle.forOngoingCall(
+                    callerPerson,
+                    disconnectPendingIntent
+                )
+
+                val notificationBuilder = NotificationCompat.Builder(this@CallService, CHANNEL_ID)
+                    .setSmallIcon(R.drawable.ic_phone_white)
+                    .setContentTitle(title)
+                    .setContentText(formattedNumber)
+                    .setContentIntent(openPendingIntent)
+                    .setStyle(ongoingStyle)
+                    .setOngoing(true)
+                    .setAutoCancel(false)
+                    .setUsesChronometer(isCallActive)
+                    .setWhen(if (isCallActive && connectTime > 0) connectTime else System.currentTimeMillis())
+                    .setShowWhen(false)
+                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setCategory(NotificationCompat.CATEGORY_CALL)
+                    .setSound(null)
+
+                if (contactBitmap != null) {
+                    notificationBuilder.setLargeIcon(contactBitmap)
+                }
+
+                val notification = notificationBuilder.build()
+                startForeground(NOTIFICATION_ID, notification)
+            }
         }
     }
 
