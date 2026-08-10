@@ -768,22 +768,24 @@ fun RecentsScreen(
             }
         }
 
-        // Floating Dialpad Button
-        FloatingActionButton(
-            onClick = { viewModel.openSearchDialer() },
-            containerColor = SamsungGreen,
-            contentColor = Color.White,
-            shape = CircleShape,
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 24.dp, end = 20.dp)
-                .zIndex(8f)
-        ) {
-            Icon(
-                imageVector = Icons.Default.Dialpad,
-                contentDescription = "Номеронабиратель",
-                modifier = Modifier.size(28.dp)
-            )
+        // Floating Dialpad Button (Only show on main screen when search dialer is closed)
+        if (!isSearchDialerOpen) {
+            FloatingActionButton(
+                onClick = { viewModel.openSearchDialer() },
+                containerColor = SamsungGreen,
+                contentColor = Color.White,
+                shape = CircleShape,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(bottom = 24.dp, end = 20.dp)
+                    .zIndex(8f)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Dialpad,
+                    contentDescription = "Номеронабиратель",
+                    modifier = Modifier.size(28.dp)
+                )
+            }
         }
 
         // Search & Dialpad Screen Overlay

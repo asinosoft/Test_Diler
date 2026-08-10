@@ -57,6 +57,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import android.telephony.SubscriptionManager
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
@@ -85,8 +88,32 @@ fun SearchDialerScreen(
     val dialerQuery by viewModel.dialerQuery.collectAsState()
     val results by viewModel.filteredDialerResults.collectAsState()
 
-    var selectedSimSlot by remember { mutableIntStateOf(1) } // 1 or 2
+    val defaultSimSlot = remember(context) {
+        try {
+            val subManager = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+            val defaultSubId = SubscriptionManager.getDefaultVoiceSubscriptionId()
+            if (subManager != null && defaultSubId != SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+                @Suppress("MissingPermission")
+                val activeList = subManager.activeSubscriptionInfoList
+                val matchedInfo = activeList?.find { it.subscriptionId == defaultSubId }
+                if (matchedInfo != null) {
+                    matchedInfo.simSlotIndex + 1
+                } else 1
+            } else 1
+        } catch (e: Exception) {
+            1
+        }
+    }
+
+    var selectedSimSlot by remember { mutableIntStateOf(defaultSimSlot) }
     var isDialpadVisible by remember { mutableStateOf(true) }
+
+    val targetSimBgColor = if (selectedSimSlot == 1) SamsungSmsBlue else SamsungGreen
+    val animatedSimBgColor by animateColorAsState(
+        targetValue = targetSimBgColor,
+        animationSpec = tween(durationMillis = 200),
+        label = "simBgColor"
+    )
 
     BackHandler {
         onClose()
@@ -290,49 +317,34 @@ fun SearchDialerScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(14.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
-                        // Bottom Actions Row: SIM Selector | Green Call FAB | Backspace Delete
+                        // Bottom Actions Row: Equal Distance Spacing + Lifted Above System Gesture Bar
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // SIM 1 / SIM 2 Toggle Chips
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            // Single Animated SIM Selector Toggle Button
+                            Surface(
+                                shape = RoundedCornerShape(10.dp),
+                                color = animatedSimBgColor,
+                                modifier = Modifier.clickable {
+                                    selectedSimSlot = if (selectedSimSlot == 1) 2 else 1
+                                }
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (selectedSimSlot == 1) SamsungSmsBlue else MaterialTheme.colorScheme.background,
-                                    modifier = Modifier.clickable { selectedSimSlot = 1 }
-                                ) {
-                                    Text(
-                                        text = "СИМ 1",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (selectedSimSlot == 1) Color.White else MaterialTheme.colorScheme.onBackground,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                    )
-                                }
-
-                                Surface(
-                                    shape = RoundedCornerShape(12.dp),
-                                    color = if (selectedSimSlot == 2) SamsungGreen else MaterialTheme.colorScheme.background,
-                                    modifier = Modifier.clickable { selectedSimSlot = 2 }
-                                ) {
-                                    Text(
-                                        text = "СИМ 2",
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = if (selectedSimSlot == 2) Color.White else MaterialTheme.colorScheme.onBackground,
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                                    )
-                                }
+                                Text(
+                                    text = "SIM $selectedSimSlot",
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White,
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                )
                             }
 
-                            // Green Call FAB
+                            // Center: Green Call FAB Button
                             FloatingActionButton(
                                 onClick = {
                                     if (dialerQuery.isNotBlank()) {
