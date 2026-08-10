@@ -26,6 +26,16 @@ data class ContactDetailState(
     val initialTab: Int = 0
 )
 
+data class SearchDialerItem(
+    val id: String,
+    val name: String,
+    val number: String,
+    val photoUri: String? = null,
+    val timestamp: Long = 0L,
+    val simSlot: Int? = null,
+    val isFavorite: Boolean = false
+)
+
 class RecentsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = CallLogRepository(application)
@@ -74,6 +84,93 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _isSearchDialerOpen = MutableStateFlow(false)
+    val isSearchDialerOpen: StateFlow<Boolean> = _isSearchDialerOpen.asStateFlow()
+
+    private val _dialerQuery = MutableStateFlow("")
+    val dialerQuery: StateFlow<String> = _dialerQuery.asStateFlow()
+
+    val filteredDialerResults: StateFlow<List<SearchDialerItem>> = combine(
+        _rawCallLogs,
+        _favorites,
+        _dialerQuery
+    ) { logs, favs, query ->
+        val cleanQuery = query.lowercase().trim()
+        if (cleanQuery.isBlank()) {
+            logs.map { log ->
+                SearchDialerItem(
+                    id = "log_${log.id}",
+                    name = log.name ?: log.number,
+                    number = log.number,
+                    photoUri = log.photoUri,
+                    timestamp = log.timestamp,
+                    simSlot = log.simNumber,
+                    isFavorite = favs.any { it.number == log.number }
+                )
+            }.distinctBy { it.number }
+        } else {
+            val matchedFavs = favs.filter { fav ->
+                fav.name.lowercase().contains(cleanQuery) ||
+                fav.number.contains(cleanQuery)
+            }.map { fav ->
+                SearchDialerItem(
+                    id = "fav_${fav.id}",
+                    name = fav.name,
+                    number = fav.number,
+                    photoUri = fav.photoUri,
+                    timestamp = 0L,
+                    simSlot = null,
+                    isFavorite = true
+                )
+            }
+
+            val matchedLogs = logs.filter { log ->
+                (log.name?.lowercase()?.contains(cleanQuery) == true) ||
+                log.number.contains(cleanQuery)
+            }.map { log ->
+                SearchDialerItem(
+                    id = "log_${log.id}",
+                    name = log.name ?: log.number,
+                    number = log.number,
+                    photoUri = log.photoUri,
+                    timestamp = log.timestamp,
+                    simSlot = log.simNumber,
+                    isFavorite = favs.any { it.number == log.number }
+                )
+            }
+
+            (matchedFavs + matchedLogs).distinctBy { it.number }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun openSearchDialer(initialQuery: String = "") {
+        _dialerQuery.value = initialQuery
+        _isSearchDialerOpen.value = true
+    }
+
+    fun closeSearchDialer() {
+        _isSearchDialerOpen.value = false
+        _dialerQuery.value = ""
+    }
+
+    fun onDialerQueryChange(newQuery: String) {
+        _dialerQuery.value = newQuery
+    }
+
+    fun appendDialerDigit(digit: String) {
+        _dialerQuery.value = _dialerQuery.value + digit
+    }
+
+    fun deleteDialerDigit() {
+        if (_dialerQuery.value.isNotEmpty()) {
+            _dialerQuery.value = _dialerQuery.value.dropLast(1)
+        }
+    }
+
+    fun clearDialerQuery() {
+        _dialerQuery.value = ""
+    }
 
     private var callLogObserver: ContentObserver? = null
 

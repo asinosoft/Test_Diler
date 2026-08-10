@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -36,6 +37,7 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -76,6 +78,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.test_dialer.data.model.FavoriteTab
+import com.example.test_dialer.ui.dialer.SearchDialerScreen
 import com.example.test_dialer.ui.recents.components.AddFavoriteDialog
 import com.example.test_dialer.ui.recents.components.AppSettingsDialog
 import com.example.test_dialer.ui.recents.components.ContactDetailDialog
@@ -292,14 +295,19 @@ fun RecentsScreen(
 
                     // One UI Search Bar
                     Surface(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { viewModel.openSearchDialer(searchQuery) },
                         shape = RoundedCornerShape(24.dp),
                         color = MaterialTheme.colorScheme.surface,
                         tonalElevation = 2.dp
                     ) {
                         TextField(
                             value = searchQuery,
-                            onValueChange = { viewModel.onSearchQueryChange(it) },
+                            onValueChange = {
+                                viewModel.onSearchQueryChange(it)
+                                viewModel.openSearchDialer(it)
+                            },
                             placeholder = {
                                 Text(
                                     text = "Поиск по имени или номеру",
@@ -731,6 +739,35 @@ fun RecentsScreen(
                     viewModel.addTab(name)
                     viewModel.tabs.value.lastOrNull() ?: FavoriteTab("default", name)
                 }
+            )
+        }
+
+        // Floating Dialpad Button
+        FloatingActionButton(
+            onClick = { viewModel.openSearchDialer() },
+            containerColor = SamsungGreen,
+            contentColor = Color.White,
+            shape = CircleShape,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(bottom = 24.dp, end = 20.dp)
+                .zIndex(8f)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Dialpad,
+                contentDescription = "Номеронабиратель",
+                modifier = Modifier.size(28.dp)
+            )
+        }
+
+        // Search & Dialpad Screen Overlay
+        val isSearchDialerOpen by viewModel.isSearchDialerOpen.collectAsState()
+        if (isSearchDialerOpen) {
+            SearchDialerScreen(
+                viewModel = viewModel,
+                onCall = onCall,
+                onSms = onSms,
+                onClose = { viewModel.closeSearchDialer() }
             )
         }
     }
