@@ -213,14 +213,35 @@ fun RecentsScreen(
         callLogs.groupBy { formatDateHeader(it.timestamp) }
     }
 
+    var lastTapTimestamp by remember { mutableStateOf(0L) }
+    var lastTapPosition by remember { mutableStateOf(Offset.Zero) }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        val down = event.changes.firstOrNull { it.changedToDown() }
+                        if (down != null) {
+                            val now = System.currentTimeMillis()
+                            val pos = down.position
+                            if (now - lastTapTimestamp < 380L && (pos - lastTapPosition).getDistance() < 120f) {
+                                viewModel.openSearchDialer()
+                                lastTapTimestamp = 0L
+                            } else {
+                                lastTapTimestamp = now
+                                lastTapPosition = pos
+                            }
+                        }
+                    }
+                }
+            }
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
             ) {
-                // Tap outside floating top bar dismisses selection
                 if (isTopBarVisible) {
                     viewModel.clearFavoriteSelection()
                 }
@@ -724,22 +745,27 @@ fun RecentsScreen(
             )
         }
 
-        // Contact Detail Bottom Sheet Dialog
-        contactDetailToShow?.let { detailState ->
-            ContactDetailDialog(
-                contact = detailState.contact,
-                initialTab = detailState.initialTab,
-                tabs = tabs,
-                onDismiss = { viewModel.closeContactDetail() },
-                onCall = onCall,
-                onSms = onSms,
-                onRemoveFavorite = { viewModel.removeFavorite(it) },
-                onUpdateContact = { viewModel.updateFavorite(it) },
-                onAddTab = { name ->
-                    viewModel.addTab(name)
-                    viewModel.tabs.value.lastOrNull() ?: FavoriteTab("default", name)
-                }
-            )
+        // Search & Dialpad Screen Overlay
+        val isSearchDialerOpen by viewModel.isSearchDialerOpen.collectAsState()
+
+        // Contact Detail Bottom Sheet Dialog (only render if search dialer is closed)
+        if (!isSearchDialerOpen) {
+            contactDetailToShow?.let { detailState ->
+                ContactDetailDialog(
+                    contact = detailState.contact,
+                    initialTab = detailState.initialTab,
+                    tabs = tabs,
+                    onDismiss = { viewModel.closeContactDetail() },
+                    onCall = onCall,
+                    onSms = onSms,
+                    onRemoveFavorite = { viewModel.removeFavorite(it) },
+                    onUpdateContact = { viewModel.updateFavorite(it) },
+                    onAddTab = { name ->
+                        viewModel.addTab(name)
+                        viewModel.tabs.value.lastOrNull() ?: FavoriteTab("default", name)
+                    }
+                )
+            }
         }
 
         // Floating Dialpad Button
@@ -761,7 +787,6 @@ fun RecentsScreen(
         }
 
         // Search & Dialpad Screen Overlay
-        val isSearchDialerOpen by viewModel.isSearchDialerOpen.collectAsState()
         if (isSearchDialerOpen) {
             SearchDialerScreen(
                 viewModel = viewModel,

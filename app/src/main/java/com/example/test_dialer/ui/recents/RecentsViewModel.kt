@@ -144,7 +144,12 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    private var openContactDetailJob: kotlinx.coroutines.Job? = null
+
     fun openSearchDialer(initialQuery: String = "") {
+        openContactDetailJob?.cancel()
+        _contactDetailToShow.value = null
+        clearFavoriteSelection()
         _dialerQuery.value = initialQuery
         _isSearchDialerOpen.value = true
     }
@@ -371,7 +376,14 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun openContactDetail(contact: FavoriteContact, initialTab: Int = 0) {
-        _contactDetailToShow.value = ContactDetailState(contact, initialTab)
+        if (_isSearchDialerOpen.value) return
+        openContactDetailJob?.cancel()
+        openContactDetailJob = viewModelScope.launch {
+            kotlinx.coroutines.delay(200)
+            if (!_isSearchDialerOpen.value) {
+                _contactDetailToShow.value = ContactDetailState(contact, initialTab)
+            }
+        }
     }
 
     fun openContactDetailFromCallLog(item: CallLogItem) {
@@ -392,6 +404,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun closeContactDetail() {
+        openContactDetailJob?.cancel()
         _contactDetailToShow.value = null
     }
 
