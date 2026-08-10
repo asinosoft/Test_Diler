@@ -123,16 +123,26 @@ class CallService : InCallService() {
             val displayName = call.details?.callerDisplayName ?: rawNumber
 
             var contactName: String? = null
+            var contactBitmap: Bitmap? = null
 
             if (rawNumber.isNotBlank()) {
                 withContext(Dispatchers.IO) {
                     try {
                         val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(rawNumber))
-                        val cursor = contentResolver.query(uri, arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME), null, null, null)
+                        val cursor = contentResolver.query(uri, arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME, ContactsContract.PhoneLookup.PHOTO_URI), null, null, null)
                         cursor?.use { c ->
                             if (c.moveToFirst()) {
                                 val nameIdx = c.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                                val photoIdx = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
                                 if (nameIdx != -1) contactName = c.getString(nameIdx)
+                                if (photoIdx != -1) {
+                                    val photoUriStr = c.getString(photoIdx)
+                                    if (!photoUriStr.isNullOrBlank()) {
+                                        contentResolver.openInputStream(Uri.parse(photoUriStr))?.use { stream ->
+                                            contactBitmap = BitmapFactory.decodeStream(stream)
+                                        }
+                                    }
+                                }
                             }
                         }
                     } catch (e: Exception) {
@@ -172,8 +182,8 @@ class CallService : InCallService() {
             val callStyle = if (isRinging) {
                 NotificationCompat.CallStyle.forIncomingCall(
                     callerPerson,
-                    disconnectPendingIntent,
-                    answerPendingIntent
+                    answerPendingIntent,
+                    disconnectPendingIntent
                 )
             } else {
                 NotificationCompat.CallStyle.forOngoingCall(
@@ -196,6 +206,10 @@ class CallService : InCallService() {
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_CALL)
                 .setSound(null)
+
+            if (contactBitmap != null) {
+                notificationBuilder.setLargeIcon(contactBitmap)
+            }
 
             val notification = notificationBuilder.build()
             startForeground(NOTIFICATION_ID, notification)
