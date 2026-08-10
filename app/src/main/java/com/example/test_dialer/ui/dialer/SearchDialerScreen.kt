@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -49,12 +50,16 @@ import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Voicemail
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToDown
 import com.example.test_dialer.data.model.CallType
 import com.example.test_dialer.ui.theme.IncomingGreen
 import com.example.test_dialer.ui.theme.MissedRed
 import com.example.test_dialer.ui.theme.OutgoingBlue
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -136,6 +141,14 @@ fun SearchDialerScreen(
     var selectedSimSlot by remember { mutableIntStateOf(defaultSimSlot) }
     var isDialpadVisible by remember { mutableStateOf(true) }
 
+    val listState = rememberLazyListState()
+
+    LaunchedEffect(dialerQuery) {
+        if (results.isNotEmpty()) {
+            listState.scrollToItem(0)
+        }
+    }
+
     val targetSimBgColor = if (selectedSimSlot == 1) SamsungSmsBlue else SamsungGreen
     val animatedSimBgColor by animateColorAsState(
         targetValue = targetSimBgColor,
@@ -178,7 +191,7 @@ fun SearchDialerScreen(
                     onValueChange = { viewModel.onDialerQueryChange(it) },
                     placeholder = {
                         Text(
-                            text = "Поиск по имени или номеру...",
+                            text = "Поиск...",
                             fontSize = 15.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
@@ -191,25 +204,17 @@ fun SearchDialerScreen(
                         )
                     },
                     trailingIcon = {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (dialerQuery.isNotEmpty()) {
-                                IconButton(onClick = { viewModel.clearDialerQuery() }) {
-                                    Icon(
-                                        imageVector = Icons.Default.Clear,
-                                        contentDescription = "Очистить"
-                                    )
-                                }
-                            }
-                            IconButton(onClick = { isDialpadVisible = !isDialpadVisible }) {
+                        if (dialerQuery.isNotEmpty()) {
+                            IconButton(onClick = { viewModel.clearDialerQuery() }) {
                                 Icon(
-                                    imageVector = if (isDialpadVisible) Icons.Default.KeyboardArrowDown else Icons.Default.KeyboardArrowUp,
-                                    contentDescription = if (isDialpadVisible) "Скрыть клавиатуру" else "Показать клавиатуру",
-                                    tint = SamsungGreen
+                                    imageVector = Icons.Default.Clear,
+                                    contentDescription = "Очистить"
                                 )
                             }
                         }
                     },
-                    singleLine = true,
+                    singleLine = false,
+                    maxLines = 3,
                     shape = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = SamsungGreen,
@@ -250,6 +255,7 @@ fun SearchDialerScreen(
                     }
                 } else {
                     LazyColumn(
+                        state = listState,
                         modifier = Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -261,6 +267,7 @@ fun SearchDialerScreen(
                             SwipeableSearchDialerCard(
                                 item = item,
                                 context = context,
+                                query = dialerQuery,
                                 selectedSimSlot = selectedSimSlot,
                                 onCall = onCall,
                                 onSms = onSms
@@ -354,6 +361,8 @@ fun SearchDialerScreen(
                                                         onLongPress = {
                                                             if (digit == "0") {
                                                                 viewModel.appendDialerDigit("+")
+                                                            } else if (digit == "1") {
+                                                                onCall("121", selectedSimSlot)
                                                             }
                                                         }
                                                     )
@@ -368,17 +377,40 @@ fun SearchDialerScreen(
                                             ) {
                                                 Text(
                                                     text = digit,
-                                                    fontSize = 22.sp,
+                                                    fontSize = 20.sp,
                                                     fontWeight = FontWeight.Bold,
                                                     color = MaterialTheme.colorScheme.onBackground
                                                 )
-                                                if (lettersEn.isNotEmpty() || lettersRu.isNotEmpty()) {
-                                                    Text(
-                                                        text = "$lettersEn $lettersRu".trim(),
-                                                        fontSize = 9.sp,
-                                                        fontWeight = FontWeight.Medium,
-                                                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                                                if (digit == "1") {
+                                                    Icon(
+                                                        imageVector = Icons.Default.Voicemail,
+                                                        contentDescription = "Голосовая почта",
+                                                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                                                        modifier = Modifier.size(13.dp)
                                                     )
+                                                } else if (lettersEn.isNotEmpty() || lettersRu.isNotEmpty()) {
+                                                    Column(
+                                                        horizontalAlignment = Alignment.CenterHorizontally
+                                                    ) {
+                                                        if (lettersEn.isNotEmpty()) {
+                                                            Text(
+                                                                text = lettersEn,
+                                                                fontSize = 8.sp,
+                                                                fontWeight = FontWeight.Normal,
+                                                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                                                                lineHeight = 9.sp
+                                                            )
+                                                        }
+                                                        if (lettersRu.isNotEmpty()) {
+                                                            Text(
+                                                                text = lettersRu,
+                                                                fontSize = 9.sp,
+                                                                fontWeight = FontWeight.Bold,
+                                                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.75f),
+                                                                lineHeight = 10.sp
+                                                            )
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
@@ -465,6 +497,7 @@ fun SearchDialerScreen(
 private fun SwipeableSearchDialerCard(
     item: SearchDialerItem,
     context: Context,
+    query: String,
     selectedSimSlot: Int,
     onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit
@@ -688,7 +721,7 @@ private fun SwipeableSearchDialerCard(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
-                            text = item.name,
+                            text = buildHighlightedText(text = item.name, query = query, highlightColor = SamsungGreen),
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface,
@@ -725,7 +758,7 @@ private fun SwipeableSearchDialerCard(
                         }
 
                         Text(
-                            text = formatPhoneNumber(item.number),
+                            text = buildHighlightedText(text = formatPhoneNumber(item.number), query = query, highlightColor = SamsungGreen),
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                             maxLines = 1,
@@ -736,6 +769,66 @@ private fun SwipeableSearchDialerCard(
             }
         }
     }
+}
+
+@Composable
+private fun buildHighlightedText(
+    text: String,
+    query: String,
+    highlightColor: Color = SamsungGreen
+): AnnotatedString {
+    if (query.isBlank()) return AnnotatedString(text)
+
+    val cleanQuery = query.lowercase().trim()
+    val lowerText = text.lowercase()
+
+    // 1. Direct text substring match
+    val directIndex = lowerText.indexOf(cleanQuery)
+    if (directIndex != -1) {
+        return buildAnnotatedString {
+            append(text)
+            addStyle(
+                style = SpanStyle(color = highlightColor, fontWeight = FontWeight.Bold),
+                start = directIndex,
+                end = directIndex + cleanQuery.length
+            )
+        }
+    }
+
+    // 2. T9 digit sequence match
+    val t9Digits = text.toT9Digits()
+    val t9Index = t9Digits.indexOf(cleanQuery)
+    if (t9Index != -1 && t9Index + cleanQuery.length <= text.length) {
+        return buildAnnotatedString {
+            append(text)
+            addStyle(
+                style = SpanStyle(color = highlightColor, fontWeight = FontWeight.Bold),
+                start = t9Index,
+                end = t9Index + cleanQuery.length
+            )
+        }
+    }
+
+    return AnnotatedString(text)
+}
+
+private fun String.toT9Digits(): String {
+    val sb = StringBuilder()
+    for (ch in this.lowercase()) {
+        val digit = when (ch) {
+            'a', 'b', 'c', 'а', 'б', 'в', 'г' -> '2'
+            'd', 'e', 'f', 'д', 'е', 'ж', 'з' -> '3'
+            'g', 'h', 'i', 'и', 'й', 'к', 'л' -> '4'
+            'j', 'k', 'l', 'м', 'н', 'о', 'п', 'р' -> '5'
+            'm', 'n', 'o', 'с', 'т', 'у', 'ф' -> '6'
+            'p', 'q', 'r', 's', 'х', 'ц', 'ч', 'ш' -> '7'
+            't', 'u', 'v', 'щ', 'ъ', 'ы', 'ь' -> '8'
+            'w', 'x', 'y', 'z', 'э', 'ю', 'я' -> '9'
+            else -> if (ch.isDigit()) ch else null
+        }
+        if (digit != null) sb.append(digit)
+    }
+    return sb.toString()
 }
 
 @Composable
