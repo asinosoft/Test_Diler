@@ -43,12 +43,6 @@ class FavoritesRepository(private val context: Context) {
             }
         }
 
-        if (combined.isEmpty()) {
-            val defaults = getDefaultFavorites()
-            saveFavorites(defaults)
-            return defaults
-        }
-
         return combined
     }
 
@@ -246,13 +240,5 @@ class FavoritesRepository(private val context: Context) {
         val current = getFavorites().filter { it.id != id }
         saveFavorites(current)
         return current
-    }
-
-    private fun getDefaultFavorites(): List<FavoriteContact> {
-        return listOf(
-            FavoriteContact("fav_1", "Мама", "+7 (999) 123-45-67", order = 0),
-            FavoriteContact("fav_2", "Алексей Смирнов", "+7 (921) 987-65-43", order = 1),
-            FavoriteContact("fav_3", "Елена Работа", "+7 (911) 444-22-11", order = 2)
-        )
     }
 }

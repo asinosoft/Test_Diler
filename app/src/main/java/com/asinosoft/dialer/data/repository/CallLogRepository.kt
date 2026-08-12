@@ -101,11 +101,7 @@ class CallLogRepository(private val context: Context) {
             e.printStackTrace()
         }
 
-        if (rawCallLogs.isEmpty()) {
-            groupConsecutiveCallLogs(getMockCallLogs())
-        } else {
-            groupConsecutiveCallLogs(rawCallLogs)
-        }
+        groupConsecutiveCallLogs(rawCallLogs)
     }
 
     private fun groupConsecutiveCallLogs(logs: List<CallLogItem>): List<CallLogItem> {
@@ -244,92 +240,4 @@ class CallLogRepository(private val context: Context) {
         }
     }
 
-    private fun getMockCallLogs(): List<CallLogItem> {
-        val now = System.currentTimeMillis()
-        val hour = 3600_000L
-        val day = 24 * hour
-
-        return listOf(
-            CallLogItem(
-                "1",
-                "+7 (999) 123-45-67",
-                "Мама",
-                null,
-                CallType.INCOMING,
-                now - (15 * 60_000L),
-                184,
-                simNumber = 1
-            ),
-            CallLogItem(
-                "2",
-                "+7 (999) 123-45-67",
-                "Мама",
-                null,
-                CallType.INCOMING,
-                now - (20 * 60_000L),
-                120,
-                simNumber = 1
-            ),
-            CallLogItem(
-                "3",
-                "+7 (921) 987-65-43",
-                "Алексей Смирнов",
-                null,
-                CallType.MISSED,
-                now - (2 * hour),
-                0,
-                simNumber = 2
-            ),
-            CallLogItem(
-                "4",
-                "+7 (800) 555-35-35",
-                "Банк Поддержка",
-                null,
-                CallType.OUTGOING,
-                now - (5 * hour),
-                45,
-                simNumber = 1
-            ),
-            CallLogItem(
-                "5",
-                "+7 (911) 444-22-11",
-                "Елена Работа",
-                null,
-                CallType.MISSED,
-                now - (1 * day),
-                0,
-                simNumber = 2
-            ),
-            CallLogItem(
-                "6",
-                "+7 (911) 444-22-11",
-                "Елена Работа",
-                null,
-                CallType.MISSED,
-                now - (1 * day + 10 * 60_000L),
-                0,
-                simNumber = 2
-            ),
-            CallLogItem(
-                "7",
-                "+7 (911) 444-22-11",
-                "Елена Работа",
-                null,
-                CallType.MISSED,
-                now - (1 * day + 20 * 60_000L),
-                0,
-                simNumber = 2
-            ),
-            CallLogItem(
-                "8",
-                "+7 (905) 333-22-11",
-                "Доставка Озон",
-                null,
-                CallType.INCOMING,
-                now - (1 * day + 3 * hour),
-                62,
-                simNumber = 1
-            )
-        )
-    }
 }
