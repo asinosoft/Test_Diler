@@ -97,7 +97,7 @@
             android:theme="@style/Theme.Test_dialer"
             android:launchMode="singleInstance"
             android:excludeFromRecents="false"
-            android:taskAffinity="com.example.test_dialer.incall"
+            android:taskAffinity="com.asinosoft.dialer.incall"
             tools:ignore="DiscouragedOrientationUser" />
 
         <activity

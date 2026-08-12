@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.test_dialer"
+    namespace = "com.asinosoft.dialer"
     compileSdk = 37
 
     defaultConfig {
