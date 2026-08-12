@@ -466,7 +466,7 @@ fun RecentsScreen(
                 // Favorites Grid Rows (Each row is a separate item)
                 if (favoriteRows.size < maxRowsAcrossAllTabs) {
                     val extraSpacers = maxRowsAcrossAllTabs - favoriteRows.size
-                    items(extraSpacers, key = { index -> "fav_extra_spacer_$index" }) {
+                    items(extraSpacers) {
                         Spacer(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -475,10 +475,7 @@ fun RecentsScreen(
                     }
                 }
 
-                itemsIndexed(
-                    items = favoriteRows,
-                    key = { index, _ -> "fav_row_$index" }
-                ) { _, rowItems ->
+                itemsIndexed(items = favoriteRows) { _, rowItems ->
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
