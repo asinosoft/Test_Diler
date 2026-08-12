@@ -8,9 +8,6 @@ object AppLifecycleTracker : Application.ActivityLifecycleCallbacks {
 
     private var resumedActivityCount = 0
 
-    val isAppInForeground: Boolean
-        get() = resumedActivityCount > 0
-
     fun init(application: Application) {
         application.registerActivityLifecycleCallbacks(this)
     }

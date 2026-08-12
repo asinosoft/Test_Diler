@@ -1,7 +1,6 @@
 package com.example.test_dialer.ui.recents.components
 
 import android.graphics.BitmapFactory
-import android.net.Uri
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
@@ -20,17 +19,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Message
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.ui.input.pointer.positionChange
-import kotlin.math.sqrt
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,6 +33,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
@@ -57,17 +50,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.test_dialer.data.model.FavoriteContact
-import com.example.test_dialer.ui.recents.components.getSwipeBackgroundVisuals
-import com.example.test_dialer.ui.theme.SamsungGreen
-import com.example.test_dialer.ui.theme.SamsungSmsBlue
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.zIndex
+import androidx.core.net.toUri
+import com.example.test_dialer.data.model.FavoriteContact
+import com.example.test_dialer.ui.theme.SamsungGreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.abs
+import kotlin.math.sin
 
 @Composable
 fun FavoriteContactCard(
@@ -156,18 +147,44 @@ fun FavoriteContactCard(
                             onDragEnd = {
                                 coroutineScope.launch {
                                     val finalOffset = offsetX.value
-                                    val contactKey = if (contact.id.isNotBlank()) contact.id else contact.number.replace(Regex("[^0-9+]"), "")
+                                    val contactKey =
+                                        contact.id.ifBlank {
+                                            contact.number.replace(
+                                                Regex("[^0-9+]"),
+                                                ""
+                                            )
+                                        }
                                     if (finalOffset > thresholdPx) {
-                                        val customAction = getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = contact.number)
+                                        val customAction = getCustomSwipeAction(
+                                            context,
+                                            contactKey,
+                                            isRight = true,
+                                            fallbackNumber = contact.number
+                                        )
                                         if (customAction != null) {
-                                            executeCustomSwipeAction(context, customAction, { num, sim -> onCall(num, sim) }, onSms)
+                                            executeCustomSwipeAction(
+                                                context,
+                                                customAction,
+                                                { num, sim -> onCall(num, sim) },
+                                                onSms
+                                            )
                                         } else {
                                             onCall(contact.number, null)
                                         }
                                     } else if (finalOffset < -thresholdPx) {
-                                        val customAction = getCustomSwipeAction(context, contactKey, isRight = false, fallbackNumber = contact.number)
+                                        val customAction = getCustomSwipeAction(
+                                            context,
+                                            contactKey,
+                                            isRight = false,
+                                            fallbackNumber = contact.number
+                                        )
                                         if (customAction != null) {
-                                            executeCustomSwipeAction(context, customAction, { num, sim -> onCall(num, sim) }, onSms)
+                                            executeCustomSwipeAction(
+                                                context,
+                                                customAction,
+                                                { num, sim -> onCall(num, sim) },
+                                                onSms
+                                            )
                                         } else {
                                             onSms(contact.number)
                                         }
@@ -184,7 +201,8 @@ fun FavoriteContactCard(
                             },
                             onHorizontalDrag = { change, dragAmount ->
                                 coroutineScope.launch {
-                                    val newOffset = (offsetX.value + dragAmount).coerceIn(-maxDragPx, maxDragPx)
+                                    val newOffset =
+                                        (offsetX.value + dragAmount).coerceIn(-maxDragPx, maxDragPx)
                                     if (abs(newOffset) > 8f) {
                                         change.consume()
                                     }
@@ -207,7 +225,7 @@ fun FavoriteContactCard(
             // FRONT FACE (Contact Photo / Avatar)
             if (abs(angle) < 89.9f) {
                 val rad = Math.toRadians(angle.toDouble())
-                val transX = (radiusPx * Math.sin(rad)).toFloat()
+                val transX = (radiusPx * sin(rad)).toFloat()
 
                 Surface(
                     modifier = Modifier
@@ -239,10 +257,21 @@ fun FavoriteContactCard(
                 val isRightSwipe = angle > 0f // Swiping right -> enters from left side
                 val sideAngle = if (isRightSwipe) angle - 90f else angle + 90f
                 val sideRad = Math.toRadians(sideAngle.toDouble())
-                val sideTransX = (radiusPx * Math.sin(sideRad)).toFloat()
+                val sideTransX = (radiusPx * sin(sideRad)).toFloat()
 
-                val contactKey = if (contact.id.isNotBlank()) contact.id else contact.number.replace(Regex("[^0-9+]"), "")
-                val customAction = getCustomSwipeAction(context, contactKey, isRight = isRightSwipe, fallbackNumber = contact.number)
+                val contactKey =
+                    contact.id.ifBlank {
+                        contact.number.replace(
+                            Regex("[^0-9+]"),
+                            ""
+                        )
+                    }
+                val customAction = getCustomSwipeAction(
+                    context,
+                    contactKey,
+                    isRight = isRightSwipe,
+                    fallbackNumber = contact.number
+                )
                 val visuals = getSwipeBackgroundVisuals(customAction, defaultIsRight = isRightSwipe)
 
                 Surface(
@@ -311,12 +340,12 @@ private fun FavoriteAvatar(
         if (!photoUri.isNullOrEmpty()) {
             withContext(Dispatchers.IO) {
                 try {
-                    val uri = Uri.parse(photoUri)
+                    val uri = photoUri.toUri()
                     context.contentResolver.openInputStream(uri)?.use { stream ->
                         val bitmap = BitmapFactory.decodeStream(stream)
                         avatarBitmap = bitmap?.asImageBitmap()
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     avatarBitmap = null
                 }
             }

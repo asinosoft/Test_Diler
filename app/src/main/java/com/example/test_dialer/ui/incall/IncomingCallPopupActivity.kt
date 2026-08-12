@@ -72,6 +72,7 @@ import com.example.test_dialer.ui.theme.Test_dialerTheme
 import com.example.test_dialer.util.formatPhoneNumber
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.core.net.toUri
 
 class IncomingCallPopupActivity : ComponentActivity() {
 
@@ -143,7 +144,7 @@ class IncomingCallPopupActivity : ComponentActivity() {
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
             )
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // ignore
         }
     }
@@ -181,12 +182,12 @@ private fun IncomingCallPopupScreen(
 
                 if (!result.photoUri.isNullOrEmpty()) {
                     try {
-                        val uri = Uri.parse(result.photoUri)
+                        val uri = result.photoUri.toUri()
                         context.contentResolver.openInputStream(uri)?.use { stream ->
                             val bitmap = BitmapFactory.decodeStream(stream)
                             contactPhotoBitmap = bitmap?.asImageBitmap()
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         contactPhotoBitmap = null
                     }
                 } else {
@@ -344,11 +345,12 @@ private fun IncomingCallPopupScreen(
                             .clip(RoundedCornerShape(20.dp))
                             .clickable {
                                 try {
-                                    val smsIntent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${Uri.encode(rawNumber)}")).apply {
+                                    val smsIntent = Intent(Intent.ACTION_SENDTO,
+                                        "smsto:${Uri.encode(rawNumber)}".toUri()).apply {
                                         flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                     }
                                     context.startActivity(smsIntent)
-                                } catch (e: Exception) {
+                                } catch (_: Exception) {
                                     Toast.makeText(context, "Не удалось открыть отправку сообщений", Toast.LENGTH_SHORT).show()
                                 }
                             }
@@ -435,7 +437,7 @@ private fun getSimNumberFromCall(call: Call?, context: Context): Int {
                 }
             }
         }
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         // ignore
     }
 
@@ -481,7 +483,7 @@ private suspend fun lookupContactInfo(context: Context, phoneNumber: String): Po
             }
         }
         PopupContactLookupResult(contactName, contactPhotoUri)
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         PopupContactLookupResult(null, null)
     }
 }

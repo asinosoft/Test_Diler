@@ -6,6 +6,7 @@ import com.example.test_dialer.data.model.FavoriteContact
 import com.example.test_dialer.data.model.FavoriteTab
 import org.json.JSONArray
 import org.json.JSONObject
+import androidx.core.content.edit
 
 class FavoritesRepository(private val context: Context) {
 
@@ -71,7 +72,7 @@ class FavoritesRepository(private val context: Context) {
                 )
             }
             list.sortedBy { it.order }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             emptyList()
         }
     }
@@ -107,7 +108,7 @@ class FavoritesRepository(private val context: Context) {
                     val number = if (numberIndex != -1) c.getString(numberIndex) else ""
                     val photoUri = if (photoIndex != -1) c.getString(photoIndex) else null
 
-                    val key = if (id.isNotBlank()) id else name.trim().lowercase()
+                    val key = id.ifBlank { name.trim().lowercase() }
 
                     if (!addedContactKeys.contains(key)) {
                         addedContactKeys.add(key)
@@ -141,7 +142,7 @@ class FavoritesRepository(private val context: Context) {
             }
             array.put(obj)
         }
-        prefs.edit().putString("favorites_list", array.toString()).apply()
+        prefs.edit { putString("favorites_list", array.toString()) }
     }
 
     fun getTabs(): List<FavoriteTab> {
@@ -172,7 +173,7 @@ class FavoritesRepository(private val context: Context) {
             } else {
                 list.sortedBy { it.order }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             listOf(FavoriteTab("default", "Основные", 0))
         }
     }
@@ -187,7 +188,7 @@ class FavoritesRepository(private val context: Context) {
             }
             array.put(obj)
         }
-        prefs.edit().putString("favorites_tabs", array.toString()).apply()
+        prefs.edit { putString("favorites_tabs", array.toString()) }
     }
 
     fun addTab(name: String): List<FavoriteTab> {

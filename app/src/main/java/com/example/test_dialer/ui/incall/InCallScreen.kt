@@ -28,7 +28,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material.icons.filled.Call
@@ -91,6 +90,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import androidx.core.net.toUri
+import kotlin.time.Duration.Companion.milliseconds
 
 class SimCardShape(private val cutSizeDp: Float = 3f) : Shape {
     override fun createOutline(
@@ -145,12 +146,12 @@ fun InCallScreen(
 
                 if (!result.photoUri.isNullOrEmpty()) {
                     try {
-                        val uri = Uri.parse(result.photoUri)
+                        val uri = result.photoUri.toUri()
                         context.contentResolver.openInputStream(uri)?.use { stream ->
                             val bitmap = BitmapFactory.decodeStream(stream)
                             contactPhotoBitmap = bitmap?.asImageBitmap()
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         contactPhotoBitmap = null
                     }
                 } else {
@@ -176,7 +177,7 @@ fun InCallScreen(
                 } else {
                     activeSimCount = 1
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 activeSimCount = 1
             }
         }
@@ -211,7 +212,7 @@ fun InCallScreen(
     LaunchedEffect(callState) {
         if (callState == Call.STATE_ACTIVE) {
             while (true) {
-                delay(1000L)
+                delay(1000L.milliseconds)
                 durationSeconds++
             }
         }
@@ -261,7 +262,7 @@ fun InCallScreen(
                                 modifier = Modifier.fillMaxSize()
                             )
                         } else {
-                            val titleForInitial = contactName ?: (if (displayName.isBlank()) rawNumber else displayName)
+                            val titleForInitial = contactName ?: (displayName.ifBlank { rawNumber })
                             val initial = titleForInitial.trim().firstOrNull { it.isLetterOrDigit() }?.uppercaseChar()?.toString() ?: "?"
                             Text(
                                 text = initial,
@@ -702,7 +703,7 @@ private fun getSimNumberFromCall(call: Call?, context: Context): Int {
                 }
             }
         }
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         // ignore
     }
 
@@ -760,7 +761,7 @@ private suspend fun lookupContactInfo(context: Context, phoneNumber: String): Co
             }
         }
         ContactLookupResult(contactName, contactPhotoUri)
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         ContactLookupResult(null, null)
     }
 }

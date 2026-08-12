@@ -1,11 +1,9 @@
 package com.example.test_dialer.ui.recents
 
 import android.text.format.DateUtils
-import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,7 +14,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,7 +28,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -53,6 +49,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -68,7 +65,6 @@ import androidx.compose.ui.input.pointer.changedToDown
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -100,7 +96,6 @@ fun RecentsScreen(
     onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit
 ) {
-    val context = LocalContext.current
     val density = LocalDensity.current
     val coroutineScope = rememberCoroutineScope()
     val callLogs by viewModel.filteredCallLogs.collectAsState(initial = emptyList())
@@ -167,14 +162,6 @@ fun RecentsScreen(
         maxOf(maxFromTabs, favoriteRowsCount)
     }
 
-    val actualRowCount = remember(favoriteRows, maxRowsAcrossAllTabs) {
-        if (favoriteRows.isEmpty()) maxRowsAcrossAllTabs else maxOf(favoriteRows.size, maxRowsAcrossAllTabs)
-    }
-
-    val fixedFavoritesHeight = remember(actualRowCount) {
-        110.dp * actualRowCount
-    }
-
     val targetGridRowIndex = remember(maxRowsAcrossAllTabs, favoriteRowsCount) {
         (maxRowsAcrossAllTabs - favoriteRowsCount).coerceAtLeast(0)
     }
@@ -213,7 +200,7 @@ fun RecentsScreen(
         callLogs.groupBy { formatDateHeader(it.timestamp) }
     }
 
-    var lastTapTimestamp by remember { mutableStateOf(0L) }
+    var lastTapTimestamp by remember { mutableLongStateOf(0L) }
     var lastTapPosition by remember { mutableStateOf(Offset.Zero) }
 
     Box(
@@ -258,7 +245,10 @@ fun RecentsScreen(
                                 val down = event.changes.firstOrNull { it.changedToDown() }
                                 if (down != null) {
                                     val pos = down.position
-                                    if (favoritesBounds != Rect.Zero && !favoritesBounds.contains(pos)) {
+                                    if (favoritesBounds != Rect.Zero && !favoritesBounds.contains(
+                                            pos
+                                        )
+                                    ) {
                                         viewModel.clearFavoriteSelection()
                                     }
                                 }
@@ -474,9 +464,10 @@ fun RecentsScreen(
 
                 // Favorites Grid Rows (Each row is a separate item)
                 if (favoriteRows.isEmpty()) {
-                    val neededSpacers = maxRowsAcrossAllTabs
-                    items(neededSpacers, key = { index -> "empty_fav_spacer_$index" }) { spacerIndex ->
-                        if (spacerIndex == neededSpacers - 1) {
+                    items(
+                        maxRowsAcrossAllTabs,
+                        key = { index -> "empty_fav_spacer_$index" }) { spacerIndex ->
+                        if (spacerIndex == maxRowsAcrossAllTabs - 1) {
                             Surface(
                                 shape = RoundedCornerShape(16.dp),
                                 color = MaterialTheme.colorScheme.surface,
@@ -498,14 +489,18 @@ fun RecentsScreen(
                                 }
                             }
                         } else {
-                            Spacer(modifier = Modifier.fillMaxWidth().height(110.dp))
+                            Spacer(modifier = Modifier
+                                .fillMaxWidth()
+                                .height(110.dp))
                         }
                     }
                 } else {
                     if (favoriteRows.size < maxRowsAcrossAllTabs) {
                         val extraSpacers = maxRowsAcrossAllTabs - favoriteRows.size
                         items(extraSpacers, key = { index -> "fav_extra_spacer_$index" }) {
-                            Spacer(modifier = Modifier.fillMaxWidth().height(110.dp))
+                            Spacer(modifier = Modifier
+                                .fillMaxWidth()
+                                .height(110.dp))
                         }
                     }
 
@@ -535,8 +530,10 @@ fun RecentsScreen(
                             for (i in 0 until 3) {
                                 if (i < rowItems.size) {
                                     val contact = rowItems[i]
-                                    val contactIndex = favorites.indexOfFirst { it.id == contact.id }
-                                    val isTargetSlot = draggingContactId != null && dragToIndex == contactIndex && draggingContactId != contact.id
+                                    val contactIndex =
+                                        favorites.indexOfFirst { it.id == contact.id }
+                                    val isTargetSlot =
+                                        draggingContactId != null && dragToIndex == contactIndex && draggingContactId != contact.id
 
                                     FavoriteContactCard(
                                         contact = contact,
@@ -580,26 +577,34 @@ fun RecentsScreen(
                                                         startRow = 0
                                                         startCol = dragFromIndex
                                                     } else {
-                                                        startRow = 1 + (dragFromIndex - remainder) / 3
+                                                        startRow =
+                                                            1 + (dragFromIndex - remainder) / 3
                                                         startCol = (dragFromIndex - remainder) % 3
                                                     }
                                                 }
 
-                                                val colShift = (dragOffset.x / cellWidthPx).roundToInt()
-                                                val rowShift = (dragOffset.y / cellHeightPx).roundToInt()
+                                                val colShift =
+                                                    (dragOffset.x / cellWidthPx).roundToInt()
+                                                val rowShift =
+                                                    (dragOffset.y / cellHeightPx).roundToInt()
 
                                                 val totalRows = favoriteRows.size
-                                                val targetRow = (startRow + rowShift).coerceIn(0, totalRows - 1)
+                                                val targetRow =
+                                                    (startRow + rowShift).coerceIn(0, totalRows - 1)
                                                 val targetCol = (startCol + colShift).coerceIn(0, 2)
-
-                                                val newTargetIndex: Int
-                                                if (remainder == 0) {
-                                                    newTargetIndex = (targetRow * 3 + targetCol).coerceIn(0, favorites.size - 1)
+                                                val newTargetIndex: Int = if (remainder == 0) {
+                                                    (targetRow * 3 + targetCol).coerceIn(
+                                                        0,
+                                                        favorites.size - 1
+                                                    )
                                                 } else {
                                                     if (targetRow == 0) {
-                                                        newTargetIndex = targetCol.coerceIn(0, remainder - 1)
+                                                        targetCol.coerceIn(0, remainder - 1)
                                                     } else {
-                                                        newTargetIndex = (remainder + (targetRow - 1) * 3 + targetCol).coerceIn(0, favorites.size - 1)
+                                                        (remainder + (targetRow - 1) * 3 + targetCol).coerceIn(
+                                                            0,
+                                                            favorites.size - 1
+                                                        )
                                                     }
                                                 }
 
@@ -610,7 +615,10 @@ fun RecentsScreen(
                                         },
                                         onDragEnd = {
                                             if (dragFromIndex in favorites.indices && dragToIndex in favorites.indices && dragFromIndex != dragToIndex) {
-                                                viewModel.reorderFavorites(dragFromIndex, dragToIndex)
+                                                viewModel.reorderFavorites(
+                                                    dragFromIndex,
+                                                    dragToIndex
+                                                )
                                             }
                                             draggingContactId = null
                                             dragFromIndex = -1
@@ -653,8 +661,13 @@ fun RecentsScreen(
                                         text = tab.name,
                                         fontSize = 11.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f),
-                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp)
+                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface.copy(
+                                            alpha = 0.8f
+                                        ),
+                                        modifier = Modifier.padding(
+                                            horizontal = 10.dp,
+                                            vertical = 3.dp
+                                        )
                                     )
                                 }
                             }
@@ -686,7 +699,11 @@ fun RecentsScreen(
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                                    modifier = Modifier.padding(start = 4.dp, top = 0.dp, bottom = 2.dp)
+                                    modifier = Modifier.padding(
+                                        start = 4.dp,
+                                        top = 0.dp,
+                                        bottom = 2.dp
+                                    )
                                 )
                             }
                         }

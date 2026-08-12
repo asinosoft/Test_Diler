@@ -21,6 +21,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import androidx.core.content.edit
+import kotlin.time.Duration.Companion.milliseconds
 
 data class ContactDetailState(
     val contact: FavoriteContact,
@@ -182,7 +184,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         _dialerQuery.value = ""
     }
 
-    private var callLogObserver: ContentObserver? = null
+    private lateinit var callLogObserver: ContentObserver
 
     init {
         loadTabs()
@@ -190,8 +192,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         startObservingCallLogs()
     }
 
-    fun startObservingCallLogs() {
-        if (callLogObserver != null) return
+    private fun startObservingCallLogs() {
         callLogObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
                 super.onChange(selfChange)
@@ -202,7 +203,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             getApplication<Application>().contentResolver.registerContentObserver(
                 android.provider.CallLog.Calls.CONTENT_URI,
                 true,
-                callLogObserver!!
+                callLogObserver
             )
         } catch (e: Exception) {
             e.printStackTrace()
@@ -210,13 +211,10 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     override fun onCleared() {
-        super.onCleared()
-        callLogObserver?.let {
-            try {
-                getApplication<Application>().contentResolver.unregisterContentObserver(it)
-            } catch (e: Exception) {
-                // ignore
-            }
+        try {
+            getApplication<Application>().contentResolver.unregisterContentObserver(callLogObserver)
+        } catch (_: Exception) {
+            // ignore
         }
     }
 
@@ -252,13 +250,13 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun loadFavorites() {
+    private fun loadFavorites() {
         viewModelScope.launch {
             _favorites.value = favoritesRepository.getFavorites()
         }
     }
 
-    fun loadTabs() {
+    private fun loadTabs() {
         viewModelScope.launch {
             _tabs.value = favoritesRepository.getTabs()
             if (_tabs.value.none { it.id == _activeTabId.value } && _tabs.value.isNotEmpty()) {
@@ -348,15 +346,6 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun swapFavorites(contact1Id: String, contact2Id: String) {
-        val list = _favorites.value.toMutableList()
-        val idx1 = list.indexOfFirst { it.id == contact1Id }
-        val idx2 = list.indexOfFirst { it.id == contact2Id }
-        if (idx1 != -1 && idx2 != -1 && idx1 != idx2) {
-            reorderFavorites(idx1, idx2)
-        }
-    }
-
     fun openAddFavoriteDialog() {
         _isAddFavoriteOpen.value = true
     }
@@ -368,7 +357,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     fun setFavoriteRowsCount(count: Int) {
         val validCount = count.coerceIn(1, 8)
         _favoriteRowsCount.value = validCount
-        prefs.edit().putInt("favorite_rows_count", validCount).apply()
+        prefs.edit { putInt("favorite_rows_count", validCount) }
     }
 
     fun openAppSettings() {
@@ -384,7 +373,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         if (_isSearchDialerOpen.value) return
         openContactDetailJob?.cancel()
         openContactDetailJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(200)
+            kotlinx.coroutines.delay(200.milliseconds)
             if (!_isSearchDialerOpen.value) {
                 _contactDetailToShow.value = ContactDetailState(contact, initialTab)
             }
@@ -400,7 +389,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
 
         val contact = existingFav ?: FavoriteContact(
-            id = if (cleanCallNum.isNotBlank()) cleanCallNum else "call_log_${item.id}",
+            id = cleanCallNum.ifBlank { "call_log_${item.id}" },
             name = item.name ?: item.number,
             number = item.number,
             photoUri = item.photoUri

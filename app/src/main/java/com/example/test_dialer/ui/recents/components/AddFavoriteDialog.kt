@@ -261,7 +261,7 @@ private fun loadDeviceContacts(context: Context): List<FavoriteContact> {
                 val number = if (numberIndex != -1) c.getString(numberIndex) else ""
                 val photoUri = if (photoIndex != -1) c.getString(photoIndex) else null
 
-                val key = if (id.isNotBlank()) id else name.trim().lowercase()
+                val key = id.ifBlank { name.trim().lowercase() }
 
                 if (!addedContactKeys.contains(key)) {
                     addedContactKeys.add(key)

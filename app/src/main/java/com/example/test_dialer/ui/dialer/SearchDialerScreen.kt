@@ -2,9 +2,8 @@ package com.example.test_dialer.ui.dialer
 
 import android.content.Context
 import android.graphics.BitmapFactory
-import android.net.Uri
-import androidx.activity.compose.BackHandler
 import android.telephony.SubscriptionManager
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -47,22 +46,8 @@ import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Dialpad
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Voicemail
-import androidx.compose.ui.input.pointer.PointerEventPass
-import androidx.compose.ui.input.pointer.changedToDown
-import com.example.test_dialer.data.model.CallType
-import com.example.test_dialer.ui.theme.IncomingGreen
-import com.example.test_dialer.ui.theme.MissedRed
-import com.example.test_dialer.ui.theme.OutgoingBlue
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -87,27 +72,40 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.changedToDown
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
+import com.example.test_dialer.data.model.CallType
 import com.example.test_dialer.ui.recents.RecentsViewModel
 import com.example.test_dialer.ui.recents.SearchDialerItem
 import com.example.test_dialer.ui.recents.components.executeCustomSwipeAction
 import com.example.test_dialer.ui.recents.components.getCustomSwipeAction
 import com.example.test_dialer.ui.recents.components.getSwipeBackgroundVisuals
+import com.example.test_dialer.ui.theme.IncomingGreen
+import com.example.test_dialer.ui.theme.MissedRed
+import com.example.test_dialer.ui.theme.OutgoingBlue
 import com.example.test_dialer.ui.theme.SamsungGreen
 import com.example.test_dialer.ui.theme.SamsungSmsBlue
 import com.example.test_dialer.util.formatPhoneNumber
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
@@ -133,7 +131,7 @@ fun SearchDialerScreen(
                     matchedInfo.simSlotIndex + 1
                 } else 1
             } else 1
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             1
         }
     }
@@ -513,18 +511,18 @@ private fun SwipeableSearchDialerCard(
     var hasVibratedRight by remember { mutableStateOf(false) }
     var hasVibratedLeft by remember { mutableStateOf(false) }
 
-    val contactKey = if (item.id.isNotBlank()) item.id else item.number.replace(Regex("[^0-9+]"), "")
+    val contactKey = item.id.ifBlank { item.number.replace(Regex("[^0-9+]"), "") }
 
     LaunchedEffect(item.photoUri) {
         if (!item.photoUri.isNullOrEmpty()) {
             withContext(Dispatchers.IO) {
                 try {
-                    val uri = Uri.parse(item.photoUri)
+                    val uri = item.photoUri.toUri()
                     context.contentResolver.openInputStream(uri)?.use { stream ->
                         val bitmap = BitmapFactory.decodeStream(stream)
                         photoBitmap = bitmap?.asImageBitmap()
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     photoBitmap = null
                 }
             }

@@ -2,11 +2,9 @@ package com.example.test_dialer
 
 import android.Manifest
 import android.app.role.RoleManager
-import android.content.Context
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.telecom.PhoneAccountHandle
@@ -49,6 +47,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.test_dialer.ui.recents.RecentsScreen
 import com.example.test_dialer.ui.recents.RecentsViewModel
@@ -85,7 +84,10 @@ class MainActivity : ComponentActivity() {
                     contract = ActivityResultContracts.RequestMultiplePermissions()
                 ) { permissions ->
                     val allGranted = requiredPermissions.all { perm ->
-                        permissions[perm] == true || ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED
+                        permissions[perm] == true || ContextCompat.checkSelfPermission(
+                            this,
+                            perm
+                        ) == PackageManager.PERMISSION_GRANTED
                     }
                     isPermissionsGranted = allGranted
                     if (allGranted) {
@@ -96,7 +98,10 @@ class MainActivity : ComponentActivity() {
 
                 LaunchedEffect(Unit) {
                     val allGranted = requiredPermissions.all { perm ->
-                        ContextCompat.checkSelfPermission(this@MainActivity, perm) == PackageManager.PERMISSION_GRANTED
+                        ContextCompat.checkSelfPermission(
+                            this@MainActivity,
+                            perm
+                        ) == PackageManager.PERMISSION_GRANTED
                     }
                     if (allGranted) {
                         isPermissionsGranted = true
@@ -126,7 +131,10 @@ class MainActivity : ComponentActivity() {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val roleManager = getSystemService(RoleManager::class.java)
-                if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER) && !roleManager.isRoleHeld(RoleManager.ROLE_DIALER)) {
+                if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER) && !roleManager.isRoleHeld(
+                        RoleManager.ROLE_DIALER
+                    )
+                ) {
                     val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
                     launcher.launch(intent)
                 }
@@ -134,7 +142,10 @@ class MainActivity : ComponentActivity() {
                 val telecomManager = getSystemService(TELECOM_SERVICE) as? TelecomManager
                 if (telecomManager != null && packageName != telecomManager.defaultDialerPackage) {
                     val intent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER).apply {
-                        putExtra(TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME, packageName)
+                        putExtra(
+                            TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
+                            packageName
+                        )
                     }
                     launcher.launch(intent)
                 }
@@ -148,7 +159,7 @@ class MainActivity : ComponentActivity() {
         if (phoneNumber.isBlank()) return
 
         val cleanNumber = phoneNumber.replace(Regex("[^0-9+]"), "")
-        val uri = Uri.parse("tel:$cleanNumber")
+        val uri = "tel:$cleanNumber".toUri()
 
         val hasCallPermission = ContextCompat.checkSelfPermission(
             this,
@@ -158,7 +169,8 @@ class MainActivity : ComponentActivity() {
         if (hasCallPermission) {
             try {
                 val telecomManager = getSystemService(TELECOM_SERVICE) as? TelecomManager
-                val subscriptionManager = getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+                val subscriptionManager =
+                    getSystemService(TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
 
                 val extras = Bundle()
                 if (telecomManager != null && subscriptionManager != null && simSlot != null) {
@@ -166,12 +178,13 @@ class MainActivity : ComponentActivity() {
                         val targetSlotIndex = simSlot - 1 // 0 for SIM1, 1 for SIM2
                         val activeSubscriptions = try {
                             subscriptionManager.activeSubscriptionInfoList
-                        } catch (e: SecurityException) {
+                        } catch (_: SecurityException) {
                             null
                         }
 
-                        val targetSub = activeSubscriptions?.find { it.simSlotIndex == targetSlotIndex }
-                            ?: activeSubscriptions?.getOrNull(targetSlotIndex)
+                        val targetSub =
+                            activeSubscriptions?.find { it.simSlotIndex == targetSlotIndex }
+                                ?: activeSubscriptions?.getOrNull(targetSlotIndex)
 
                         val phoneAccountHandles = telecomManager.callCapablePhoneAccounts
 
@@ -183,13 +196,14 @@ class MainActivity : ComponentActivity() {
 
                             for (handle in phoneAccountHandles) {
                                 val hId = handle.id
-                                if ((subIdStr != null && subIdStr.isNotBlank() && hId == subIdStr) ||
+                                if ((!subIdStr.isNullOrBlank() && hId == subIdStr) ||
                                     (iccIdStr.isNotBlank() && hId.contains(iccIdStr)) ||
                                     hId == targetSlotIndex.toString() ||
                                     hId.endsWith(":$targetSlotIndex") ||
                                     hId.endsWith("_$targetSlotIndex") ||
                                     hId.contains("slot$targetSlotIndex", ignoreCase = true) ||
-                                    hId.contains("sim${targetSlotIndex + 1}", ignoreCase = true)) {
+                                    hId.contains("sim${targetSlotIndex + 1}", ignoreCase = true)
+                                ) {
                                     targetHandle = handle
                                     break
                                 }
@@ -210,7 +224,10 @@ class MainActivity : ComponentActivity() {
                             }
 
                             if (targetHandle != null) {
-                                extras.putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, targetHandle)
+                                extras.putParcelable(
+                                    TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE,
+                                    targetHandle
+                                )
                             }
                         }
 
@@ -233,9 +250,9 @@ class MainActivity : ComponentActivity() {
                     telecomManager.placeCall(uri, extras)
                     return
                 }
-            } catch (e: SecurityException) {
+            } catch (_: SecurityException) {
                 // Fallback
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // Fallback
             }
         }
@@ -256,7 +273,7 @@ class MainActivity : ComponentActivity() {
 
         try {
             startActivity(intent)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Toast.makeText(this, "Не удалось совершить вызов", Toast.LENGTH_SHORT).show()
         }
     }
@@ -265,12 +282,12 @@ class MainActivity : ComponentActivity() {
         if (phoneNumber.isBlank()) return
 
         val cleanNumber = phoneNumber.replace(Regex("[^0-9+]"), "")
-        val uri = Uri.parse("smsto:$cleanNumber")
+        val uri = "smsto:$cleanNumber".toUri()
         val intent = Intent(Intent.ACTION_SENDTO, uri)
 
         try {
             startActivity(intent)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             Toast.makeText(this, "Не удалось открыть SMS", Toast.LENGTH_SHORT).show()
         }
     }

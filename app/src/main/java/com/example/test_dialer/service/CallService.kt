@@ -12,7 +12,6 @@ import android.net.Uri
 import android.os.Build
 import android.provider.ContactsContract
 import android.telecom.Call
-import android.telecom.CallAudioState
 import android.telecom.InCallService
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
@@ -25,6 +24,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.core.net.toUri
+import androidx.core.graphics.createBitmap
 
 class CallService : InCallService() {
 
@@ -105,10 +106,6 @@ class CallService : InCallService() {
         }
     }
 
-    override fun onCallAudioStateChanged(audioState: CallAudioState?) {
-        super.onCallAudioStateChanged(audioState)
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         if (CallManager.inCallService == this) {
@@ -138,20 +135,20 @@ class CallService : InCallService() {
                                 if (photoIdx != -1) {
                                     val photoUriStr = c.getString(photoIdx)
                                     if (!photoUriStr.isNullOrBlank()) {
-                                        contentResolver.openInputStream(Uri.parse(photoUriStr))?.use { stream ->
+                                        contentResolver.openInputStream(photoUriStr.toUri())?.use { stream ->
                                             contactBitmap = BitmapFactory.decodeStream(stream)
                                         }
                                     }
                                 }
                             }
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         // ignore
                     }
                 }
             }
 
-            val title = contactName ?: if (displayName.isNotBlank()) displayName else formatPhoneNumber(rawNumber)
+            val title = contactName ?: displayName.ifBlank { formatPhoneNumber(rawNumber) }
             val formattedNumber = formatPhoneNumber(rawNumber)
 
             val callerPerson = Person.Builder()
@@ -234,20 +231,20 @@ class CallService : InCallService() {
                                 if (photoIdx != -1) {
                                     val photoUriStr = c.getString(photoIdx)
                                     if (!photoUriStr.isNullOrBlank()) {
-                                        contentResolver.openInputStream(Uri.parse(photoUriStr))?.use { stream ->
+                                        contentResolver.openInputStream(photoUriStr.toUri())?.use { stream ->
                                             contactBitmap = BitmapFactory.decodeStream(stream)
                                         }
                                     }
                                 }
                             }
                         }
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         // ignore
                     }
                 }
             }
 
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = NotificationChannel(
@@ -276,7 +273,7 @@ class CallService : InCallService() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val callBackIntent = Intent(Intent.ACTION_CALL, Uri.parse("tel:${Uri.encode(rawNumber)}")).apply {
+            val callBackIntent = Intent(Intent.ACTION_CALL, "tel:${Uri.encode(rawNumber)}".toUri()).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             val callBackPendingIntent = PendingIntent.getActivity(
@@ -286,7 +283,7 @@ class CallService : InCallService() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
 
-            val smsIntent = Intent(Intent.ACTION_SENDTO, Uri.parse("smsto:${Uri.encode(rawNumber)}")).apply {
+            val smsIntent = Intent(Intent.ACTION_SENDTO, "smsto:${Uri.encode(rawNumber)}".toUri()).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
             }
             val smsPendingIntent = PendingIntent.getActivity(
@@ -335,7 +332,7 @@ class CallService : InCallService() {
     private fun createRedMissedCallBitmap(context: Context): Bitmap? {
         try {
             val size = 128
-            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val bitmap = createBitmap(size, size)
             val canvas = android.graphics.Canvas(bitmap)
 
             val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
@@ -353,7 +350,7 @@ class CallService : InCallService() {
                 drawable.draw(canvas)
             }
             return bitmap
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             return null
         }
     }
@@ -361,11 +358,11 @@ class CallService : InCallService() {
     private fun suppressSystemMissedCallNotification(rawNumber: String) {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val telecomManager = getSystemService(Context.TELECOM_SERVICE) as? android.telecom.TelecomManager
+                val telecomManager = getSystemService(TELECOM_SERVICE) as? android.telecom.TelecomManager
                 @Suppress("MissingPermission")
                 telecomManager?.cancelMissedCallsNotification()
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // ignore
         }
 
@@ -380,7 +377,7 @@ class CallService : InCallService() {
                 }
                 contentResolver.insert(android.provider.CallLog.Calls.CONTENT_URI, values)
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // ignore
         }
     }
@@ -397,19 +394,19 @@ class CallService : InCallService() {
                 enableVibration(false)
                 setShowBadge(false)
             }
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
             manager.createNotificationChannel(channel)
         }
     }
 
     private fun shouldShowFloatingPopup(context: Context): Boolean {
         try {
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as? KeyguardManager
+            val keyguardManager = context.getSystemService(KEYGUARD_SERVICE) as? KeyguardManager
             if (keyguardManager != null && keyguardManager.isKeyguardLocked) {
                 return false // Screen is locked -> Full Screen InCallActivity
             }
             return true // Screen is unlocked -> Floating Call Pop-Up
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             return true
         }
     }

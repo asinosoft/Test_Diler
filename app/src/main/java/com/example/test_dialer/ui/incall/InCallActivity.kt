@@ -63,7 +63,7 @@ class InCallActivity : ComponentActivity() {
                 WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
             )
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             // ignore
         }
     }

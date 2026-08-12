@@ -11,23 +11,18 @@ import android.net.Uri
 import android.provider.ContactsContract
 import android.telephony.SubscriptionManager
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.ExperimentalGetImage
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
-import androidx.core.content.ContextCompat
-import com.google.mlkit.vision.barcode.BarcodeScanning
-import com.google.mlkit.vision.common.InputImage
-import org.json.JSONArray
-import org.json.JSONObject
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -68,7 +63,6 @@ import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCodeScanner
-import androidx.compose.material.icons.filled.RemoveCircleOutline
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
@@ -86,13 +80,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
-import com.example.test_dialer.data.model.FavoriteTab
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -120,10 +112,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.zIndex
-import kotlin.math.roundToInt
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -133,11 +121,19 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
+import androidx.core.content.ContextCompat
+import androidx.core.content.edit
+import androidx.core.graphics.createBitmap
+import androidx.core.net.toUri
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.example.test_dialer.data.model.CallLogItem
 import com.example.test_dialer.data.model.CallType
 import com.example.test_dialer.data.model.FavoriteContact
+import com.example.test_dialer.data.model.FavoriteTab
 import com.example.test_dialer.data.repository.CallLogRepository
 import com.example.test_dialer.ui.theme.IncomingGreen
 import com.example.test_dialer.ui.theme.MissedRed
@@ -145,11 +141,16 @@ import com.example.test_dialer.ui.theme.OutgoingBlue
 import com.example.test_dialer.ui.theme.SamsungGreen
 import com.example.test_dialer.ui.theme.SamsungSmsBlue
 import com.example.test_dialer.util.formatPhoneNumber
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 data class ContactPhoneNumber(
     val number: String,
@@ -182,32 +183,43 @@ fun ContactDetailDialog(
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
             try {
-                val sm = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+                val sm =
+                    context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+
                 @Suppress("MissingPermission")
                 val count = sm?.activeSubscriptionInfoCount ?: 1
                 activeSimCount = if (count > 1) count else 1
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 activeSimCount = 1
             }
         }
     }
 
-    var messengerAccountsList by remember(contact) { mutableStateOf<List<MessengerAccount>>(emptyList()) }
+    var messengerAccountsList by remember(contact) {
+        mutableStateOf<List<MessengerAccount>>(
+            emptyList()
+        )
+    }
     var emailsList by remember(contact) { mutableStateOf<List<ContactEmail>>(emptyList()) }
     var birthdayInfo by remember(contact) { mutableStateOf<ContactBirthday?>(null) }
-    var importantDatesList by remember(contact) { mutableStateOf<List<ContactImportantDate>>(emptyList()) }
+    var importantDatesList by remember(contact) {
+        mutableStateOf<List<ContactImportantDate>>(
+            emptyList()
+        )
+    }
 
     LaunchedEffect(contact) {
         withContext(Dispatchers.IO) {
-            val highResPhotoUri = getHighResContactPhotoUri(context, contact.number) ?: contact.photoUri
+            val highResPhotoUri =
+                getHighResContactPhotoUri(context, contact.number) ?: contact.photoUri
             if (!highResPhotoUri.isNullOrEmpty()) {
                 try {
-                    val uri = Uri.parse(highResPhotoUri)
+                    val uri = highResPhotoUri.toUri()
                     context.contentResolver.openInputStream(uri)?.use { stream ->
                         val bitmap = BitmapFactory.decodeStream(stream)
                         avatarBitmap = bitmap?.asImageBitmap()
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     avatarBitmap = null
                 }
             } else {
@@ -230,7 +242,8 @@ fun ContactDetailDialog(
             birthdayInfo = loadContactBirthday(context, contact)
 
             // Load custom important dates
-            importantDatesList = getImportantDates(context, getContactCustomKey(contact), contact.number)
+            importantDatesList =
+                getImportantDates(context, getContactCustomKey(contact), contact.number)
         }
     }
 
@@ -246,10 +259,15 @@ fun ContactDetailDialog(
 
                     historyLogs = allLogs.filter { log ->
                         val cleanLogNum = log.number.replace(Regex("[^0-9+]"), "")
-                        (cleanContactNum.isNotBlank() && cleanLogNum.takeLast(7) == cleanContactNum.takeLast(7)) ||
-                                (!log.name.isNullOrBlank() && log.name.equals(contact.name, ignoreCase = true))
+                        (cleanContactNum.isNotBlank() && cleanLogNum.takeLast(7) == cleanContactNum.takeLast(
+                            7
+                        )) ||
+                                (!log.name.isNullOrBlank() && log.name.equals(
+                                    contact.name,
+                                    ignoreCase = true
+                                ))
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     historyLogs = emptyList()
                 }
             }
@@ -322,7 +340,9 @@ fun ContactDetailDialog(
                                 ),
                             contentAlignment = Alignment.Center
                         ) {
-                            val initial = contact.name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+                            val initial =
+                                contact.name.trim().firstOrNull()?.uppercaseChar()?.toString()
+                                    ?: "?"
                             Text(
                                 text = initial,
                                 color = Color.White,
@@ -407,6 +427,7 @@ fun ContactDetailDialog(
                                     onRemoveFavorite = onRemoveFavorite
                                 )
                             }
+
                             1 -> {
                                 // TAB 1: ИСТОРИЯ
                                 HistoryTabContent(
@@ -414,6 +435,7 @@ fun ContactDetailDialog(
                                     logs = historyLogs
                                 )
                             }
+
                             2 -> {
                                 // TAB 2: НАСТРОЙКИ
                                 SettingsTabContent(
@@ -524,9 +546,18 @@ fun ContactDetailDialog(
                                             putExtra(Intent.EXTRA_TEXT, shareText)
                                             type = "text/plain"
                                         }
-                                        context.startActivity(Intent.createChooser(sendIntent, "Поделиться контактом"))
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Не удалось поделиться контактом", Toast.LENGTH_SHORT).show()
+                                        context.startActivity(
+                                            Intent.createChooser(
+                                                sendIntent,
+                                                "Поделиться контактом"
+                                            )
+                                        )
+                                    } catch (_: Exception) {
+                                        Toast.makeText(
+                                            context,
+                                            "Не удалось поделиться контактом",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     }
                                 }
                             )
@@ -564,7 +595,11 @@ fun ContactDetailDialog(
                                             modifier = Modifier.size(20.dp)
                                         )
                                         Spacer(modifier = Modifier.width(12.dp))
-                                        Text("Удалить", fontSize = 14.sp, color = MaterialTheme.colorScheme.error)
+                                        Text(
+                                            "Удалить",
+                                            fontSize = 14.sp,
+                                            color = MaterialTheme.colorScheme.error
+                                        )
                                     }
                                 },
                                 onClick = {
@@ -589,7 +624,10 @@ fun ContactDetailDialog(
                     avatarBitmap = avatarBitmap,
                     context = context,
                     onSave = { newName, newPhones, newEmails, newBirthday, newImportantDates, updatedMessengers, hiddenSet, newBitmap ->
-                        val updatedContact = contact.copy(name = newName, number = newPhones.firstOrNull()?.number ?: contact.number)
+                        val updatedContact = contact.copy(
+                            name = newName,
+                            number = newPhones.firstOrNull()?.number ?: contact.number
+                        )
                         onUpdateContact(updatedContact)
                         phoneNumbersList = newPhones
                         emailsList = newEmails
@@ -600,8 +638,17 @@ fun ContactDetailDialog(
                             avatarBitmap = newBitmap
                         }
                         saveHiddenMessengers(context, getContactCustomKey(contact), hiddenSet)
-                        saveCustomMessengerLinks(context, getContactCustomKey(contact), updatedMessengers)
-                        saveImportantDates(context, getContactCustomKey(contact), contact.number, newImportantDates)
+                        saveCustomMessengerLinks(
+                            context,
+                            getContactCustomKey(contact),
+                            updatedMessengers
+                        )
+                        saveImportantDates(
+                            context,
+                            getContactCustomKey(contact),
+                            contact.number,
+                            newImportantDates
+                        )
                         showEditContactDialog = false
                     },
                     onDismiss = { showEditContactDialog = false }
@@ -691,7 +738,11 @@ private fun ContactTabContent(
     var draggingPhoneIndex by remember { mutableStateOf<Int?>(null) }
     var phoneDragOffsetY by remember { mutableFloatStateOf(0f) }
 
-    var editableMessengerList by remember(messengerAccountsList) { mutableStateOf(messengerAccountsList) }
+    var editableMessengerList by remember(messengerAccountsList) {
+        mutableStateOf(
+            messengerAccountsList
+        )
+    }
     var draggingMessengerIndex by remember { mutableStateOf<Int?>(null) }
     var messengerDragOffsetY by remember { mutableFloatStateOf(0f) }
 
@@ -765,14 +816,19 @@ private fun ContactTabContent(
                                         val currentIndex = draggingPhoneIndex ?: index
                                         val rowHeightPx = with(density) { 62.dp.toPx() }
                                         val shift = (phoneDragOffsetY / rowHeightPx).roundToInt()
-                                        val targetIndex = (currentIndex + shift).coerceIn(0, currentList.size - 1)
+                                        val targetIndex =
+                                            (currentIndex + shift).coerceIn(0, currentList.size - 1)
 
                                         if (targetIndex != currentIndex) {
                                             val item = currentList.removeAt(currentIndex)
                                             currentList.add(targetIndex, item)
                                             editablePhoneList = currentList
                                             onUpdatePhoneNumbers(currentList)
-                                            savePhoneNumbersOrder(context, getContactCustomKey(contact), currentList)
+                                            savePhoneNumbersOrder(
+                                                context,
+                                                getContactCustomKey(contact),
+                                                currentList
+                                            )
                                             phoneDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
                                             draggingPhoneIndex = targetIndex
                                         }
@@ -926,7 +982,12 @@ private fun ContactTabContent(
         }
 
         // MESSENGER ACCOUNTS CARD
-        val hiddenSet = remember(messengerAccountsList) { getHiddenMessengers(context, getContactCustomKey(contact)) }
+        val hiddenSet = remember(messengerAccountsList) {
+            getHiddenMessengers(
+                context,
+                getContactCustomKey(contact)
+            )
+        }
         val visibleMessengerList = editableMessengerList.filter { messenger ->
             val key = if (messenger.isCustomLink) messenger.id else messenger.packageName
             !hiddenSet.contains(key)
@@ -978,15 +1039,23 @@ private fun ContactTabContent(
                                             val currentList = editableMessengerList.toMutableList()
                                             val currentIndex = draggingMessengerIndex ?: index
                                             val rowHeightPx = with(density) { 62.dp.toPx() }
-                                            val shift = (messengerDragOffsetY / rowHeightPx).roundToInt()
-                                            val targetIndex = (currentIndex + shift).coerceIn(0, currentList.size - 1)
+                                            val shift =
+                                                (messengerDragOffsetY / rowHeightPx).roundToInt()
+                                            val targetIndex = (currentIndex + shift).coerceIn(
+                                                0,
+                                                currentList.size - 1
+                                            )
 
                                             if (targetIndex != currentIndex) {
                                                 val item = currentList.removeAt(currentIndex)
                                                 currentList.add(targetIndex, item)
                                                 editableMessengerList = currentList
                                                 onUpdateMessengerAccounts(currentList)
-                                                saveMessengerAccountsOrder(context, getContactCustomKey(contact), currentList)
+                                                saveMessengerAccountsOrder(
+                                                    context,
+                                                    getContactCustomKey(contact),
+                                                    currentList
+                                                )
                                                 messengerDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
                                                 draggingMessengerIndex = targetIndex
                                             }
@@ -1009,7 +1078,11 @@ private fun ContactTabContent(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clickable {
-                                        copyToClipboard(context, "Messenger Account", messenger.accountDetail)
+                                        copyToClipboard(
+                                            context,
+                                            "Messenger Account",
+                                            messenger.accountDetail
+                                        )
                                     }
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1030,7 +1103,9 @@ private fun ContactTabContent(
                                 }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(messenger.accountDetail),
+                                    text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(
+                                        messenger.accountDetail
+                                    ),
                                     fontSize = 15.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface,
@@ -1046,8 +1121,12 @@ private fun ContactTabContent(
                                         onClick = {
                                             try {
                                                 context.startActivity(messenger.chatIntent)
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, "Не удалось открыть ссылку ${messenger.messengerName}", Toast.LENGTH_SHORT).show()
+                                            } catch (_: Exception) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Не удалось открыть ссылку ${messenger.messengerName}",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
                                             }
                                         },
                                         modifier = Modifier
@@ -1070,8 +1149,12 @@ private fun ContactTabContent(
                                         onClick = {
                                             try {
                                                 context.startActivity(messenger.audioCallIntent)
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, "Не удалось совершить звонок в ${messenger.messengerName}", Toast.LENGTH_SHORT).show()
+                                            } catch (_: Exception) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Не удалось совершить звонок в ${messenger.messengerName}",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
                                             }
                                         },
                                         modifier = Modifier
@@ -1094,8 +1177,12 @@ private fun ContactTabContent(
                                         onClick = {
                                             try {
                                                 context.startActivity(messenger.videoCallIntent)
-                                            } catch (e: Exception) {
-                                                Toast.makeText(context, "Не удалось начать видеовызов в ${messenger.messengerName}", Toast.LENGTH_SHORT).show()
+                                            } catch (_: Exception) {
+                                                Toast.makeText(
+                                                    context,
+                                                    "Не удалось начать видеовызов в ${messenger.messengerName}",
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
                                             }
                                         },
                                         modifier = Modifier
@@ -1194,15 +1281,23 @@ private fun ContactTabContent(
                                             val currentList = editableEmailList.toMutableList()
                                             val currentIndex = draggingEmailIndex ?: index
                                             val rowHeightPx = with(density) { 62.dp.toPx() }
-                                            val shift = (emailDragOffsetY / rowHeightPx).roundToInt()
-                                            val targetIndex = (currentIndex + shift).coerceIn(0, currentList.size - 1)
+                                            val shift =
+                                                (emailDragOffsetY / rowHeightPx).roundToInt()
+                                            val targetIndex = (currentIndex + shift).coerceIn(
+                                                0,
+                                                currentList.size - 1
+                                            )
 
                                             if (targetIndex != currentIndex) {
                                                 val item = currentList.removeAt(currentIndex)
                                                 currentList.add(targetIndex, item)
                                                 editableEmailList = currentList
                                                 onUpdateEmails(currentList)
-                                                saveEmailOrder(context, getContactCustomKey(contact), currentList)
+                                                saveEmailOrder(
+                                                    context,
+                                                    getContactCustomKey(contact),
+                                                    currentList
+                                                )
                                                 emailDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
                                                 draggingEmailIndex = targetIndex
                                             }
@@ -1251,10 +1346,17 @@ private fun ContactTabContent(
                             IconButton(
                                 onClick = {
                                     try {
-                                        val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${emailItem.email}"))
+                                        val intent = Intent(
+                                            Intent.ACTION_SENDTO,
+                                            "mailto:${emailItem.email}".toUri()
+                                        )
                                         context.startActivity(intent)
-                                    } catch (e: Exception) {
-                                        Toast.makeText(context, "Не удалось открыть почту", Toast.LENGTH_SHORT).show()
+                                    } catch (_: Exception) {
+                                        Toast.makeText(
+                                            context,
+                                            "Не удалось открыть почту",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                     }
                                 },
                                 modifier = Modifier
@@ -1314,7 +1416,7 @@ private fun ContactTabContent(
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
                         ) {
                             Text(
-                                text = birthdayInfo.ageText!!,
+                                text = birthdayInfo.ageText,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -1328,7 +1430,8 @@ private fun ContactTabContent(
 
         // CUSTOM IMPORTANT DATES CARDS (STYLED LIKE BIRTHDAY CARD)
         importantDatesList.forEach { dateItem ->
-            val parsedDate = remember(dateItem.dateString) { parseBirthdayString(dateItem.dateString) }
+            val parsedDate =
+                remember(dateItem.dateString) { parseBirthdayString(dateItem.dateString) }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -1367,7 +1470,7 @@ private fun ContactTabContent(
                             color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
                         ) {
                             Text(
-                                text = parsedDate.ageText!!,
+                                text = parsedDate.ageText,
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer,
@@ -1393,7 +1496,8 @@ private fun ContactTabContent(
                     icon = Icons.Default.ContentCopy,
                     label = "Скопировать номер",
                     onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clipboard =
+                            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         val clip = ClipData.newPlainText("Phone Number", primaryNumber)
                         clipboard.setPrimaryClip(clip)
                         Toast.makeText(context, "Номер скопирован", Toast.LENGTH_SHORT).show()
@@ -1563,10 +1667,29 @@ private fun HistoryTabContent(
                                     modifier = Modifier.weight(1f)
                                 ) {
                                     val (icon, color, desc) = when (item.type) {
-                                        CallType.INCOMING -> Triple(Icons.AutoMirrored.Filled.CallReceived, IncomingGreen, "Входящий")
-                                        CallType.OUTGOING -> Triple(Icons.AutoMirrored.Filled.CallMade, OutgoingBlue, "Исходящий")
-                                        CallType.MISSED -> Triple(Icons.AutoMirrored.Filled.CallMissed, MissedRed, "Пропущенный")
-                                        CallType.REJECTED -> Triple(Icons.Default.CallEnd, MissedRed, "Отклоненный")
+                                        CallType.INCOMING -> Triple(
+                                            Icons.AutoMirrored.Filled.CallReceived,
+                                            IncomingGreen,
+                                            "Входящий"
+                                        )
+
+                                        CallType.OUTGOING -> Triple(
+                                            Icons.AutoMirrored.Filled.CallMade,
+                                            OutgoingBlue,
+                                            "Исходящий"
+                                        )
+
+                                        CallType.MISSED -> Triple(
+                                            Icons.AutoMirrored.Filled.CallMissed,
+                                            MissedRed,
+                                            "Пропущенный"
+                                        )
+
+                                        CallType.REJECTED -> Triple(
+                                            Icons.Default.CallEnd,
+                                            MissedRed,
+                                            "Отклоненный"
+                                        )
                                     }
 
                                     Icon(
@@ -1596,7 +1719,9 @@ private fun HistoryTabContent(
                                             Text(
                                                 text = formatPhoneNumber(item.number),
                                                 fontSize = 13.sp,
-                                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                                color = MaterialTheme.colorScheme.onSurface.copy(
+                                                    alpha = 0.6f
+                                                )
                                             )
                                         }
                                     }
@@ -1797,7 +1922,12 @@ private fun SettingsTabContent(
                     if (showCreateTabDialog) {
                         AlertDialog(
                             onDismissRequest = { showCreateTabDialog = false },
-                            title = { Text("Новая вкладка избранного", fontWeight = FontWeight.Bold) },
+                            title = {
+                                Text(
+                                    "Новая вкладка избранного",
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
                             text = {
                                 OutlinedTextField(
                                     value = newTabNameInput,
@@ -1818,7 +1948,11 @@ private fun SettingsTabContent(
                                         }
                                     }
                                 ) {
-                                    Text("Создать", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                                    Text(
+                                        "Создать",
+                                        color = SamsungGreen,
+                                        fontWeight = FontWeight.Bold
+                                    )
                                 }
                             },
                             dismissButton = {
@@ -1839,8 +1973,24 @@ private fun SettingsTabContent(
         var showPickerForLeft by remember { mutableStateOf(false) }
 
         val contactKey = remember(contact) { getContactCustomKey(contact) }
-        var swipeRightAction by remember(contact) { mutableStateOf(getCustomSwipeAction(context, contactKey, isRight = true)) }
-        var swipeLeftAction by remember(contact) { mutableStateOf(getCustomSwipeAction(context, contactKey, isRight = false)) }
+        var swipeRightAction by remember(contact) {
+            mutableStateOf(
+                getCustomSwipeAction(
+                    context,
+                    contactKey,
+                    isRight = true
+                )
+            )
+        }
+        var swipeLeftAction by remember(contact) {
+            mutableStateOf(
+                getCustomSwipeAction(
+                    context,
+                    contactKey,
+                    isRight = false
+                )
+            )
+        }
 
         Surface(
             modifier = Modifier.fillMaxWidth(),
@@ -1870,7 +2020,12 @@ private fun SettingsTabContent(
                 )
 
                 // Row 1: Свайп вправо
-                val rightVisuals = remember(swipeRightAction) { getActionVisuals(swipeRightAction, defaultIsRight = true) }
+                val rightVisuals = remember(swipeRightAction) {
+                    getActionVisuals(
+                        swipeRightAction,
+                        defaultIsRight = true
+                    )
+                }
 
                 Row(
                     modifier = Modifier
@@ -1950,7 +2105,12 @@ private fun SettingsTabContent(
                 )
 
                 // Row 2: Свайп влево
-                val leftVisuals = remember(swipeLeftAction) { getActionVisuals(swipeLeftAction, defaultIsRight = false) }
+                val leftVisuals = remember(swipeLeftAction) {
+                    getActionVisuals(
+                        swipeLeftAction,
+                        defaultIsRight = false
+                    )
+                }
 
                 Row(
                     modifier = Modifier
@@ -2036,7 +2196,13 @@ private fun SettingsTabContent(
                 context = context,
                 onActionSelected = { action ->
                     swipeRightAction = action
-                    saveCustomSwipeAction(context, contactKey, contact.number, isRight = true, action = action)
+                    saveCustomSwipeAction(
+                        context,
+                        contactKey,
+                        contact.number,
+                        isRight = true,
+                        action = action
+                    )
                     showPickerForRight = false
                 },
                 onDismiss = { showPickerForRight = false }
@@ -2054,7 +2220,13 @@ private fun SettingsTabContent(
                 context = context,
                 onActionSelected = { action ->
                     swipeLeftAction = action
-                    saveCustomSwipeAction(context, contactKey, contact.number, isRight = false, action = action)
+                    saveCustomSwipeAction(
+                        context,
+                        contactKey,
+                        contact.number,
+                        isRight = false,
+                        action = action
+                    )
                     showPickerForLeft = false
                 },
                 onDismiss = { showPickerForLeft = false }
@@ -2075,8 +2247,12 @@ private fun SettingsTabContent(
                     icon = Icons.Default.ContentCopy,
                     label = "Скопировать данные контакта",
                     onClick = {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("Contact Info", "${contact.name}: ${contact.number}")
+                        val clipboard =
+                            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText(
+                            "Contact Info",
+                            "${contact.name}: ${contact.number}"
+                        )
                         clipboard.setPrimaryClip(clip)
                         Toast.makeText(context, "Данные скопированы", Toast.LENGTH_SHORT).show()
                     }
@@ -2215,7 +2391,8 @@ private suspend fun loadContactPhoneNumbers(
 
             while (c.moveToNext()) {
                 val num = if (numberIdx != -1) c.getString(numberIdx) else ""
-                val type = if (typeIdx != -1) c.getInt(typeIdx) else ContactsContract.CommonDataKinds.Phone.TYPE_OTHER
+                val type =
+                    if (typeIdx != -1) c.getInt(typeIdx) else ContactsContract.CommonDataKinds.Phone.TYPE_OTHER
                 val customLabel = if (labelIdx != -1) c.getString(labelIdx) else null
 
                 val cleanNum = num.replace(Regex("[^0-9+]"), "")
@@ -2313,17 +2490,21 @@ private fun SimCardBadge(simNumber: Int) {
 
 private fun openSystemContact(context: Context, contactNumber: String) {
     try {
-        val uri = Uri.withAppendedPath(ContactsContract.PhoneLookup.CONTENT_FILTER_URI, Uri.encode(contactNumber))
+        val uri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(contactNumber)
+        )
         val intent = Intent(Intent.ACTION_VIEW, uri)
         context.startActivity(intent)
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         try {
             val intent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_APP_CONTACTS)
             }
             context.startActivity(intent)
-        } catch (ex: Exception) {
-            Toast.makeText(context, "Не удалось открыть информацию о контакте", Toast.LENGTH_SHORT).show()
+        } catch (_: Exception) {
+            Toast.makeText(context, "Не удалось открыть информацию о контакте", Toast.LENGTH_SHORT)
+                .show()
         }
     }
 }
@@ -2344,12 +2525,6 @@ private fun formatDateHeader(timestamp: Long): String {
 private fun formatTimeOnly(timestamp: Long): String {
     if (timestamp == 0L) return ""
     return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))
-}
-
-private fun formatCallDate(timestamp: Long): String {
-    if (timestamp == 0L) return ""
-    val ruLocale = Locale.forLanguageTag("ru")
-    return SimpleDateFormat("d MMMM, HH:mm", ruLocale).format(Date(timestamp))
 }
 
 private fun getHighResContactPhotoUri(context: Context, contactNumber: String): String? {
@@ -2376,7 +2551,7 @@ private fun getHighResContactPhotoUri(context: Context, contactNumber: String): 
             }
         }
         photoUri
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     }
 }
@@ -2415,30 +2590,45 @@ private fun isPackageInstalled(context: Context, packageName: String): Boolean {
     return try {
         context.packageManager.getPackageInfo(packageName, 0)
         true
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         try {
             val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
             launchIntent != null
-        } catch (ex: Exception) {
+        } catch (_: Exception) {
             false
         }
     }
 }
 
-private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): List<MessengerAccount> {
+private fun loadMessengerAccounts(
+    context: Context,
+    contact: FavoriteContact
+): List<MessengerAccount> {
     val list = mutableListOf<MessengerAccount>()
     val number = contact.number
     if (number.isBlank()) return list
     val cleanDigits = number.replace(Regex("[^0-9]"), "")
     if (cleanDigits.isBlank()) return list
 
-    val installedWhatsApp = isPackageInstalled(context, "com.whatsapp") || isPackageInstalled(context, "com.whatsapp.w4b")
+    val installedWhatsApp = isPackageInstalled(context, "com.whatsapp") || isPackageInstalled(
+        context,
+        "com.whatsapp.w4b"
+    )
     val installedTelegram = isPackageInstalled(context, "org.telegram.messenger")
     val installedViber = isPackageInstalled(context, "com.viber.voip")
     val installedSignal = isPackageInstalled(context, "org.thoughtcrime.securesms")
-    val installedSkype = isPackageInstalled(context, "com.skype.raider") || isPackageInstalled(context, "com.skype.android")
-    val installedVK = isPackageInstalled(context, "com.vk.im") || isPackageInstalled(context, "com.vkontakte.android")
-    val installedMAX = isPackageInstalled(context, "ru.oneme.app") || isPackageInstalled(context, "ru.max.messenger") || isPackageInstalled(context, "com.max.app") || isPackageInstalled(context, "ru.vk.max")
+    val installedSkype = isPackageInstalled(context, "com.skype.raider") || isPackageInstalled(
+        context,
+        "com.skype.android"
+    )
+    val installedVK = isPackageInstalled(context, "com.vk.im") || isPackageInstalled(
+        context,
+        "com.vkontakte.android"
+    )
+    val installedMAX = isPackageInstalled(context, "ru.oneme.app") || isPackageInstalled(
+        context,
+        "ru.max.messenger"
+    ) || isPackageInstalled(context, "com.max.app") || isPackageInstalled(context, "ru.vk.max")
     val installedMessenger = isPackageInstalled(context, "com.facebook.orca")
     val installedSnapchat = isPackageInstalled(context, "com.snapchat.android")
     val installedWeChat = isPackageInstalled(context, "com.tencent.mm")
@@ -2451,9 +2641,9 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
                 messengerName = "WhatsApp",
                 accountDetail = number,
                 brandColor = Color(0xFF25D366),
-                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$cleanDigits")),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$cleanDigits")),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$cleanDigits"))
+                chatIntent = Intent(Intent.ACTION_VIEW, "https://wa.me/$cleanDigits".toUri()),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, "https://wa.me/$cleanDigits".toUri()),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, "https://wa.me/$cleanDigits".toUri())
             )
         )
     }
@@ -2466,9 +2656,9 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
                 messengerName = "Telegram",
                 accountDetail = number,
                 brandColor = Color(0xFF24A1DE),
-                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/+$cleanDigits")),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/+$cleanDigits")),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/+$cleanDigits"))
+                chatIntent = Intent(Intent.ACTION_VIEW, "https://t.me/+$cleanDigits".toUri()),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, "https://t.me/+$cleanDigits".toUri()),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, "https://t.me/+$cleanDigits".toUri())
             )
         )
     }
@@ -2481,9 +2671,18 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
                 messengerName = "Viber",
                 accountDetail = number,
                 brandColor = Color(0xFF7360F2),
-                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("viber://chat?number=+$cleanDigits")),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("viber://calls?number=+$cleanDigits")),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("viber://calls?number=+$cleanDigits"))
+                chatIntent = Intent(
+                    Intent.ACTION_VIEW,
+                    "viber://chat?number=+$cleanDigits".toUri()
+                ),
+                audioCallIntent = Intent(
+                    Intent.ACTION_VIEW,
+                    "viber://calls?number=+$cleanDigits".toUri()
+                ),
+                videoCallIntent = Intent(
+                    Intent.ACTION_VIEW,
+                    "viber://calls?number=+$cleanDigits".toUri()
+                )
             )
         )
     }
@@ -2496,9 +2695,18 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
                 messengerName = "Signal",
                 accountDetail = number,
                 brandColor = Color(0xFF3A76F0),
-                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://signal.me/#p/+$cleanDigits")),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://signal.me/#p/+$cleanDigits")),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://signal.me/#p/+$cleanDigits"))
+                chatIntent = Intent(
+                    Intent.ACTION_VIEW,
+                    "https://signal.me/#p/+$cleanDigits".toUri()
+                ),
+                audioCallIntent = Intent(
+                    Intent.ACTION_VIEW,
+                    "https://signal.me/#p/+$cleanDigits".toUri()
+                ),
+                videoCallIntent = Intent(
+                    Intent.ACTION_VIEW,
+                    "https://signal.me/#p/+$cleanDigits".toUri()
+                )
             )
         )
     }
@@ -2511,9 +2719,12 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
                 messengerName = "Skype",
                 accountDetail = number,
                 brandColor = Color(0xFF00AFF0),
-                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("skype:+$cleanDigits?chat")),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("skype:+$cleanDigits?call")),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("skype:+$cleanDigits?call&video=true"))
+                chatIntent = Intent(Intent.ACTION_VIEW, "skype:+$cleanDigits?chat".toUri()),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, "skype:+$cleanDigits?call".toUri()),
+                videoCallIntent = Intent(
+                    Intent.ACTION_VIEW,
+                    "skype:+$cleanDigits?call&video=true".toUri()
+                )
             )
         )
     }
@@ -2526,9 +2737,9 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
                 messengerName = "VK Messenger",
                 accountDetail = number,
                 brandColor = Color(0xFF0077FF),
-                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://vk.me/+$cleanDigits")),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://vk.me/+$cleanDigits")),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://vk.me/+$cleanDigits"))
+                chatIntent = Intent(Intent.ACTION_VIEW, "https://vk.me/+$cleanDigits".toUri()),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, "https://vk.me/+$cleanDigits".toUri()),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, "https://vk.me/+$cleanDigits".toUri())
             )
         )
     }
@@ -2541,9 +2752,12 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
                 messengerName = "MAX",
                 accountDetail = number,
                 brandColor = Color(0xFF3B82F6),
-                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://max.ru/+$cleanDigits")),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://max.ru/+$cleanDigits")),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://max.ru/+$cleanDigits"))
+                chatIntent = Intent(Intent.ACTION_VIEW, "https://max.ru/+$cleanDigits".toUri()),
+                audioCallIntent = Intent(
+                    Intent.ACTION_VIEW,
+                    "https://max.ru/+$cleanDigits".toUri()
+                ),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, "https://max.ru/+$cleanDigits".toUri())
             )
         )
     }
@@ -2556,9 +2770,9 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
                 messengerName = "Messenger",
                 accountDetail = number,
                 brandColor = Color(0xFF0084FF),
-                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://m.me/+$cleanDigits")),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://m.me/+$cleanDigits")),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://m.me/+$cleanDigits"))
+                chatIntent = Intent(Intent.ACTION_VIEW, "https://m.me/+$cleanDigits".toUri()),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, "https://m.me/+$cleanDigits".toUri()),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, "https://m.me/+$cleanDigits".toUri())
             )
         )
     }
@@ -2571,9 +2785,18 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
                 messengerName = "Snapchat",
                 accountDetail = number,
                 brandColor = Color(0xFFE5C100),
-                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://snapchat.com/add/+$cleanDigits")),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://snapchat.com/add/+$cleanDigits")),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://snapchat.com/add/+$cleanDigits"))
+                chatIntent = Intent(
+                    Intent.ACTION_VIEW,
+                    "https://snapchat.com/add/+$cleanDigits".toUri()
+                ),
+                audioCallIntent = Intent(
+                    Intent.ACTION_VIEW,
+                    "https://snapchat.com/add/+$cleanDigits".toUri()
+                ),
+                videoCallIntent = Intent(
+                    Intent.ACTION_VIEW,
+                    "https://snapchat.com/add/+$cleanDigits".toUri()
+                )
             )
         )
     }
@@ -2586,9 +2809,9 @@ private fun loadMessengerAccounts(context: Context, contact: FavoriteContact): L
                 messengerName = "WeChat",
                 accountDetail = number,
                 brandColor = Color(0xFF07C160),
-                chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse("weixin://dl/chat")),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("weixin://dl/chat")),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, Uri.parse("weixin://dl/chat"))
+                chatIntent = Intent(Intent.ACTION_VIEW, "weixin://dl/chat".toUri()),
+                audioCallIntent = Intent(Intent.ACTION_VIEW, "weixin://dl/chat".toUri()),
+                videoCallIntent = Intent(Intent.ACTION_VIEW, "weixin://dl/chat".toUri())
             )
         )
     }
@@ -2616,7 +2839,12 @@ data class ContactImportantDate(
     val dateString: String
 )
 
-private fun saveImportantDates(context: Context, contactKey: String, contactNumber: String, dates: List<ContactImportantDate>) {
+private fun saveImportantDates(
+    context: Context,
+    contactKey: String,
+    contactNumber: String,
+    dates: List<ContactImportantDate>
+) {
     try {
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
         val cleanNum = contactNumber.replace(Regex("[^0-9+]"), "")
@@ -2631,18 +2859,22 @@ private fun saveImportantDates(context: Context, contactKey: String, contactNumb
             array.put(obj)
         }
 
-        val editor = prefs.edit()
-        editor.putString("important_dates_$contactKey", array.toString())
-        if (cleanNum.isNotBlank()) {
-            editor.putString("important_dates_$cleanNum", array.toString())
+        prefs.edit {
+            putString("important_dates_$contactKey", array.toString())
+            if (cleanNum.isNotBlank()) {
+                putString("important_dates_$cleanNum", array.toString())
+            }
         }
-        editor.apply()
     } catch (e: Exception) {
         e.printStackTrace()
     }
 }
 
-private fun getImportantDates(context: Context, contactKey: String, fallbackNumber: String? = null): List<ContactImportantDate> {
+private fun getImportantDates(
+    context: Context,
+    contactKey: String,
+    fallbackNumber: String? = null
+): List<ContactImportantDate> {
     try {
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
 
@@ -2659,7 +2891,10 @@ private fun getImportantDates(context: Context, contactKey: String, fallbackNumb
 
         // 3. Fallback: match by last 7 digits across all saved keys
         if (jsonString.isNullOrEmpty()) {
-            val searchNum = (if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey).replace(Regex("[^0-9]"), "")
+            val searchNum =
+                (if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey).replace(
+                    Regex("[^0-9]"), ""
+                )
             if (searchNum.length >= 7) {
                 val last7 = searchNum.takeLast(7)
                 val allKeys = prefs.all.keys.filter { it.startsWith("important_dates_") }
@@ -2688,7 +2923,7 @@ private fun getImportantDates(context: Context, contactKey: String, fallbackNumb
             )
         }
         return list
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         return emptyList()
     }
 }
@@ -2698,7 +2933,7 @@ private fun saveHiddenMessengers(context: Context, contactKey: String, hiddenIds
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
         val array = JSONArray()
         hiddenIds.forEach { array.put(it) }
-        prefs.edit().putString("hidden_messengers_$contactKey", array.toString()).apply()
+        prefs.edit { putString("hidden_messengers_$contactKey", array.toString()) }
     } catch (e: Exception) {
         e.printStackTrace()
     }
@@ -2714,12 +2949,16 @@ private fun getHiddenMessengers(context: Context, contactKey: String): Set<Strin
             set.add(array.getString(i))
         }
         return set
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         return emptySet()
     }
 }
 
-private fun saveCustomMessengerLinks(context: Context, contactKey: String, links: List<MessengerAccount>) {
+private fun saveCustomMessengerLinks(
+    context: Context,
+    contactKey: String,
+    links: List<MessengerAccount>
+) {
     try {
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
         val array = JSONArray()
@@ -2732,13 +2971,16 @@ private fun saveCustomMessengerLinks(context: Context, contactKey: String, links
             }
             array.put(obj)
         }
-        prefs.edit().putString("custom_msg_links_$contactKey", array.toString()).apply()
+        prefs.edit { putString("custom_msg_links_$contactKey", array.toString()) }
     } catch (e: Exception) {
         e.printStackTrace()
     }
 }
 
-private fun getSavedCustomMessengerLinks(context: Context, contactKey: String): List<MessengerAccount> {
+private fun getSavedCustomMessengerLinks(
+    context: Context,
+    contactKey: String
+): List<MessengerAccount> {
     try {
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
         val jsonString = prefs.getString("custom_msg_links_$contactKey", null) ?: return emptyList()
@@ -2764,7 +3006,7 @@ private fun getSavedCustomMessengerLinks(context: Context, contactKey: String): 
             )
         }
         return list
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         return emptyList()
     }
 }
@@ -2791,10 +3033,9 @@ private fun getApplicationIconBitmap(context: Context, packageName: String): Ima
         val bitmap = if (drawable is android.graphics.drawable.BitmapDrawable) {
             drawable.bitmap
         } else {
-            val bmp = android.graphics.Bitmap.createBitmap(
+            val bmp = createBitmap(
                 drawable.intrinsicWidth.coerceAtLeast(1),
-                drawable.intrinsicHeight.coerceAtLeast(1),
-                android.graphics.Bitmap.Config.ARGB_8888
+                drawable.intrinsicHeight.coerceAtLeast(1)
             )
             val canvas = android.graphics.Canvas(bmp)
             drawable.setBounds(0, 0, canvas.width, canvas.height)
@@ -2802,7 +3043,7 @@ private fun getApplicationIconBitmap(context: Context, packageName: String): Ima
             bmp
         }
         bitmap.asImageBitmap()
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         null
     }
 }
@@ -2875,12 +3116,31 @@ private fun getInstalledMessengersList(context: Context): List<InstalledMessenge
     val installed = candidates.filter { item ->
         when (item.messengerName) {
             "Telegram" -> isPackageInstalled(context, "org.telegram.messenger")
-            "WhatsApp" -> isPackageInstalled(context, "com.whatsapp") || isPackageInstalled(context, "com.whatsapp.w4b")
-            "MAX" -> isPackageInstalled(context, "ru.oneme.app") || isPackageInstalled(context, "ru.max.messenger") || isPackageInstalled(context, "com.max.app") || isPackageInstalled(context, "ru.vk.max")
+            "WhatsApp" -> isPackageInstalled(context, "com.whatsapp") || isPackageInstalled(
+                context,
+                "com.whatsapp.w4b"
+            )
+
+            "MAX" -> isPackageInstalled(context, "ru.oneme.app") || isPackageInstalled(
+                context,
+                "ru.max.messenger"
+            ) || isPackageInstalled(context, "com.max.app") || isPackageInstalled(
+                context,
+                "ru.vk.max"
+            )
+
             "Viber" -> isPackageInstalled(context, "com.viber.voip")
-            "VK Messenger" -> isPackageInstalled(context, "com.vk.im") || isPackageInstalled(context, "com.vkontakte.android")
+            "VK Messenger" -> isPackageInstalled(
+                context,
+                "com.vk.im"
+            ) || isPackageInstalled(context, "com.vkontakte.android")
+
             "Signal" -> isPackageInstalled(context, "org.thoughtcrime.securesms")
-            "Skype" -> isPackageInstalled(context, "com.skype.raider") || isPackageInstalled(context, "com.skype.android")
+            "Skype" -> isPackageInstalled(
+                context,
+                "com.skype.raider"
+            ) || isPackageInstalled(context, "com.skype.android")
+
             "Messenger" -> isPackageInstalled(context, "com.facebook.orca")
             "Snapchat" -> isPackageInstalled(context, "com.snapchat.android")
             "WeChat" -> isPackageInstalled(context, "com.tencent.mm")
@@ -2888,23 +3148,29 @@ private fun getInstalledMessengersList(context: Context): List<InstalledMessenge
         }
     }
 
-    return if (installed.isNotEmpty()) installed else listOf(
-        InstalledMessengerItem("org.telegram.messenger", "Telegram", Color(0xFF24A1DE)),
-        InstalledMessengerItem("com.whatsapp", "WhatsApp", Color(0xFF25D366)),
-        InstalledMessengerItem("ru.oneme.app", "MAX", Color(0xFF2A5885))
-    )
+    return installed.ifEmpty {
+        listOf(
+            InstalledMessengerItem("org.telegram.messenger", "Telegram", Color(0xFF24A1DE)),
+            InstalledMessengerItem("com.whatsapp", "WhatsApp", Color(0xFF25D366)),
+            InstalledMessengerItem("ru.oneme.app", "MAX", Color(0xFF2A5885))
+        )
+    }
 }
 
 private fun getContactCustomKey(contact: FavoriteContact): String {
-    return if (contact.id.isNotBlank()) contact.id else contact.number.replace(Regex("[^0-9+]"), "")
+    return contact.id.ifBlank { contact.number.replace(Regex("[^0-9+]"), "") }
 }
 
-private fun savePhoneNumbersOrder(context: Context, contactKey: String, numbers: List<ContactPhoneNumber>) {
+private fun savePhoneNumbersOrder(
+    context: Context,
+    contactKey: String,
+    numbers: List<ContactPhoneNumber>
+) {
     try {
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
         val array = JSONArray()
         numbers.forEach { array.put(it.number) }
-        prefs.edit().putString("phones_order_$contactKey", array.toString()).apply()
+        prefs.edit { putString("phones_order_$contactKey", array.toString()) }
     } catch (e: Exception) {
         e.printStackTrace()
     }
@@ -2920,17 +3186,21 @@ private fun getSavedPhoneNumbersOrder(context: Context, contactKey: String): Lis
             list.add(array.getString(i))
         }
         return list
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         return emptyList()
     }
 }
 
-private fun saveMessengerAccountsOrder(context: Context, contactKey: String, messengers: List<MessengerAccount>) {
+private fun saveMessengerAccountsOrder(
+    context: Context,
+    contactKey: String,
+    messengers: List<MessengerAccount>
+) {
     try {
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
         val array = JSONArray()
         messengers.forEach { array.put(it.id) }
-        prefs.edit().putString("messengers_order_$contactKey", array.toString()).apply()
+        prefs.edit { putString("messengers_order_$contactKey", array.toString()) }
     } catch (e: Exception) {
         e.printStackTrace()
     }
@@ -2946,7 +3216,7 @@ private fun getSavedMessengerAccountsOrder(context: Context, contactKey: String)
             list.add(array.getString(i))
         }
         return list
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         return emptyList()
     }
 }
@@ -2978,7 +3248,7 @@ private fun saveEmailOrder(context: Context, contactKey: String, emails: List<Co
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
         val array = JSONArray()
         emails.forEach { array.put(it.email) }
-        prefs.edit().putString("emails_order_$contactKey", array.toString()).apply()
+        prefs.edit { putString("emails_order_$contactKey", array.toString()) }
     } catch (e: Exception) {
         e.printStackTrace()
     }
@@ -2994,12 +3264,15 @@ private fun getSavedEmailOrder(context: Context, contactKey: String): List<Strin
             list.add(array.getString(i))
         }
         return list
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         return emptyList()
     }
 }
 
-private suspend fun loadContactEmails(context: Context, contact: FavoriteContact): List<ContactEmail> = withContext(Dispatchers.IO) {
+private suspend fun loadContactEmails(
+    context: Context,
+    contact: FavoriteContact
+): List<ContactEmail> = withContext(Dispatchers.IO) {
     val list = mutableListOf<ContactEmail>()
     val addedAddresses = mutableSetOf<String>()
 
@@ -3022,7 +3295,7 @@ private suspend fun loadContactEmails(context: Context, contact: FavoriteContact
                         if (idIdx != -1) contactId = c.getString(idIdx)
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // ignore
             }
         }
@@ -3030,7 +3303,8 @@ private suspend fun loadContactEmails(context: Context, contact: FavoriteContact
         val selection: String
         val selectionArgs: Array<String>
         if (!contactId.isNullOrBlank()) {
-            selection = "${ContactsContract.CommonDataKinds.Email.CONTACT_ID} = ? OR ${ContactsContract.CommonDataKinds.Email.DISPLAY_NAME} = ?"
+            selection =
+                "${ContactsContract.CommonDataKinds.Email.CONTACT_ID} = ? OR ${ContactsContract.CommonDataKinds.Email.DISPLAY_NAME} = ?"
             selectionArgs = arrayOf(contactId!!, contact.name)
         } else {
             selection = "${ContactsContract.CommonDataKinds.Email.DISPLAY_NAME} = ?"
@@ -3054,7 +3328,8 @@ private suspend fun loadContactEmails(context: Context, contact: FavoriteContact
             val labelIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Email.LABEL)
             while (c.moveToNext()) {
                 val email = if (addrIdx != -1) c.getString(addrIdx) else ""
-                val type = if (typeIdx != -1) c.getInt(typeIdx) else ContactsContract.CommonDataKinds.Email.TYPE_OTHER
+                val type =
+                    if (typeIdx != -1) c.getInt(typeIdx) else ContactsContract.CommonDataKinds.Email.TYPE_OTHER
                 val customLabel = if (labelIdx != -1) c.getString(labelIdx) else null
 
                 val cleanEmail = email.trim().lowercase()
@@ -3102,7 +3377,20 @@ private fun parseBirthdayString(rawDate: String): ContactBirthday {
         val currentMonth = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH) + 1
         val currentDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH)
 
-        val monthNames = arrayOf("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря")
+        val monthNames = arrayOf(
+            "января",
+            "февраля",
+            "марта",
+            "апреля",
+            "мая",
+            "июня",
+            "июля",
+            "августа",
+            "сентября",
+            "октября",
+            "ноября",
+            "декабря"
+        )
 
         if (cleanDate.startsWith("--") || cleanDate.length == 5) {
             val mm = cleanDate.takeLast(5).substring(0, 2).toIntOrNull() ?: 1
@@ -3126,7 +3414,8 @@ private fun parseBirthdayString(rawDate: String): ContactBirthday {
             }
         }
 
-        val numbers = Regex("\\d+").findAll(cleanDate).mapNotNull { it.value.toIntOrNull() }.toList()
+        val numbers =
+            Regex("\\d+").findAll(cleanDate).mapNotNull { it.value.toIntOrNull() }.toList()
 
         if (birthYear != null) {
             val nonYearNumbers = numbers.filter { it != birthYear }
@@ -3167,12 +3456,15 @@ private fun parseBirthdayString(rawDate: String): ContactBirthday {
         }
 
         return ContactBirthday(cleanDate, cleanDate, null)
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         return ContactBirthday(cleanDate, cleanDate, null)
     }
 }
 
-private suspend fun loadContactBirthday(context: Context, contact: FavoriteContact): ContactBirthday? = withContext(Dispatchers.IO) {
+private suspend fun loadContactBirthday(
+    context: Context,
+    contact: FavoriteContact
+): ContactBirthday? = withContext(Dispatchers.IO) {
     try {
         var contactId: String? = null
         if (contact.number.isNotBlank()) {
@@ -3192,7 +3484,7 @@ private suspend fun loadContactBirthday(context: Context, contact: FavoriteConta
                         if (idIdx != -1) contactId = c.getString(idIdx)
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // ignore
             }
         }
@@ -3200,11 +3492,22 @@ private suspend fun loadContactBirthday(context: Context, contact: FavoriteConta
         val selection: String
         val selectionArgs: Array<String>
         if (!contactId.isNullOrBlank()) {
-            selection = "(${ContactsContract.Data.CONTACT_ID} = ? OR ${ContactsContract.Data.DISPLAY_NAME} = ?) AND ${ContactsContract.Data.MIMETYPE} = ? AND ${ContactsContract.CommonDataKinds.Event.TYPE} = ?"
-            selectionArgs = arrayOf(contactId!!, contact.name, ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE, ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY.toString())
+            selection =
+                "(${ContactsContract.Data.CONTACT_ID} = ? OR ${ContactsContract.Data.DISPLAY_NAME} = ?) AND ${ContactsContract.Data.MIMETYPE} = ? AND ${ContactsContract.CommonDataKinds.Event.TYPE} = ?"
+            selectionArgs = arrayOf(
+                contactId!!,
+                contact.name,
+                ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
+                ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY.toString()
+            )
         } else {
-            selection = "${ContactsContract.Data.DISPLAY_NAME} = ? AND ${ContactsContract.Data.MIMETYPE} = ? AND ${ContactsContract.CommonDataKinds.Event.TYPE} = ?"
-            selectionArgs = arrayOf(contact.name, ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE, ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY.toString())
+            selection =
+                "${ContactsContract.Data.DISPLAY_NAME} = ? AND ${ContactsContract.Data.MIMETYPE} = ? AND ${ContactsContract.CommonDataKinds.Event.TYPE} = ?"
+            selectionArgs = arrayOf(
+                contact.name,
+                ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
+                ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY.toString()
+            )
         }
 
         val cursor = context.contentResolver.query(
@@ -3239,15 +3542,21 @@ data class CustomSwipeAction(
     val messengerColorHex: String? = null
 )
 
-private fun saveCustomSwipeAction(context: Context, contactKey: String, contactNumber: String, isRight: Boolean, action: CustomSwipeAction?) {
+private fun saveCustomSwipeAction(
+    context: Context,
+    contactKey: String,
+    contactNumber: String,
+    isRight: Boolean,
+    action: CustomSwipeAction?
+) {
     try {
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
         val keySuffix = if (isRight) "swipe_right_" else "swipe_left_"
         val cleanNum = contactNumber.replace(Regex("[^0-9+]"), "")
 
         if (action == null) {
-            prefs.edit().remove(keySuffix + contactKey).apply()
-            if (cleanNum.isNotBlank()) prefs.edit().remove(keySuffix + cleanNum).apply()
+            prefs.edit { remove(keySuffix + contactKey) }
+            if (cleanNum.isNotBlank()) prefs.edit { remove(keySuffix + cleanNum) }
             return
         }
 
@@ -3259,18 +3568,23 @@ private fun saveCustomSwipeAction(context: Context, contactKey: String, contactN
             put("messengerColorHex", action.messengerColorHex ?: JSONObject.NULL)
         }
 
-        val editor = prefs.edit()
-        editor.putString(keySuffix + contactKey, obj.toString())
-        if (cleanNum.isNotBlank()) {
-            editor.putString(keySuffix + cleanNum, obj.toString())
+        prefs.edit {
+            putString(keySuffix + contactKey, obj.toString())
+            if (cleanNum.isNotBlank()) {
+                putString(keySuffix + cleanNum, obj.toString())
+            }
         }
-        editor.apply()
     } catch (e: Exception) {
         e.printStackTrace()
     }
 }
 
-fun getCustomSwipeAction(context: Context, contactKey: String, isRight: Boolean, fallbackNumber: String? = null): CustomSwipeAction? {
+fun getCustomSwipeAction(
+    context: Context,
+    contactKey: String,
+    isRight: Boolean,
+    fallbackNumber: String? = null
+): CustomSwipeAction? {
     try {
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
         val keySuffix = if (isRight) "swipe_right_" else "swipe_left_"
@@ -3288,7 +3602,10 @@ fun getCustomSwipeAction(context: Context, contactKey: String, isRight: Boolean,
 
         // 3. Fallback: match by last 7 digits of phone number across all saved keys
         if (jsonString.isNullOrEmpty()) {
-            val searchNum = (if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey).replace(Regex("[^0-9]"), "")
+            val searchNum =
+                (if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey).replace(
+                    Regex("[^0-9]"), ""
+                )
             if (searchNum.length >= 7) {
                 val last7 = searchNum.takeLast(7)
                 val allKeys = prefs.all.keys.filter { it.startsWith(keySuffix) }
@@ -3309,15 +3626,24 @@ fun getCustomSwipeAction(context: Context, contactKey: String, isRight: Boolean,
             actionType = obj.getString("actionType"),
             targetValue = obj.getString("targetValue"),
             label = obj.getString("label"),
-            messengerName = if (obj.has("messengerName") && !obj.isNull("messengerName")) obj.getString("messengerName") else null,
-            messengerColorHex = if (obj.has("messengerColorHex") && !obj.isNull("messengerColorHex")) obj.getString("messengerColorHex") else null
+            messengerName = if (obj.has("messengerName") && !obj.isNull("messengerName")) obj.getString(
+                "messengerName"
+            ) else null,
+            messengerColorHex = if (obj.has("messengerColorHex") && !obj.isNull("messengerColorHex")) obj.getString(
+                "messengerColorHex"
+            ) else null
         )
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         return null
     }
 }
 
-fun executeCustomSwipeAction(context: Context, action: CustomSwipeAction, onCall: (String, Int?) -> Unit, onSms: (String) -> Unit) {
+fun executeCustomSwipeAction(
+    context: Context,
+    action: CustomSwipeAction,
+    onCall: (String, Int?) -> Unit,
+    onSms: (String) -> Unit
+) {
     try {
         when (action.actionType) {
             "call_sim1" -> onCall(action.targetValue, 1)
@@ -3325,16 +3651,18 @@ fun executeCustomSwipeAction(context: Context, action: CustomSwipeAction, onCall
             "call_single" -> onCall(action.targetValue, null)
             "sms" -> onSms(action.targetValue)
             "email" -> {
-                val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:${action.targetValue}"))
+                val intent = Intent(Intent.ACTION_SENDTO, "mailto:${action.targetValue}".toUri())
                 context.startActivity(intent)
             }
+
             "messenger_chat", "messenger_audio", "messenger_video" -> {
-                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(action.targetValue))
+                val intent = Intent(Intent.ACTION_VIEW, action.targetValue.toUri())
                 context.startActivity(intent)
             }
+
             else -> onCall(action.targetValue, null)
         }
-    } catch (e: Exception) {
+    } catch (_: Exception) {
         Toast.makeText(context, "Не удалось выполнить действие", Toast.LENGTH_SHORT).show()
     }
 }
@@ -3345,7 +3673,10 @@ data class SwipeBackgroundVisuals(
     val label: String
 )
 
-fun getSwipeBackgroundVisuals(customAction: CustomSwipeAction?, defaultIsRight: Boolean): SwipeBackgroundVisuals {
+fun getSwipeBackgroundVisuals(
+    customAction: CustomSwipeAction?,
+    defaultIsRight: Boolean
+): SwipeBackgroundVisuals {
     if (customAction == null) {
         return if (defaultIsRight) {
             SwipeBackgroundVisuals(
@@ -3371,6 +3702,7 @@ fun getSwipeBackgroundVisuals(customAction: CustomSwipeAction?, defaultIsRight: 
                 label = if (!messenger.isNullOrBlank()) messenger else "Вызов"
             )
         }
+
         "sms" -> {
             val messenger = customAction.messengerName
             SwipeBackgroundVisuals(
@@ -3379,6 +3711,7 @@ fun getSwipeBackgroundVisuals(customAction: CustomSwipeAction?, defaultIsRight: 
                 label = if (!messenger.isNullOrBlank()) messenger else "SMS"
             )
         }
+
         "messenger_chat" -> {
             val messenger = customAction.messengerName ?: "Сообщение"
             SwipeBackgroundVisuals(
@@ -3387,6 +3720,7 @@ fun getSwipeBackgroundVisuals(customAction: CustomSwipeAction?, defaultIsRight: 
                 label = messenger
             )
         }
+
         "messenger_audio" -> {
             val messenger = customAction.messengerName ?: "Вызов"
             SwipeBackgroundVisuals(
@@ -3395,6 +3729,7 @@ fun getSwipeBackgroundVisuals(customAction: CustomSwipeAction?, defaultIsRight: 
                 label = messenger
             )
         }
+
         "messenger_video" -> {
             val messenger = customAction.messengerName ?: "Видеовызов"
             SwipeBackgroundVisuals(
@@ -3403,6 +3738,7 @@ fun getSwipeBackgroundVisuals(customAction: CustomSwipeAction?, defaultIsRight: 
                 label = messenger
             )
         }
+
         "email" -> {
             SwipeBackgroundVisuals(
                 icon = Icons.Default.Email,
@@ -3410,6 +3746,7 @@ fun getSwipeBackgroundVisuals(customAction: CustomSwipeAction?, defaultIsRight: 
                 label = "E-mail"
             )
         }
+
         else -> {
             if (defaultIsRight) {
                 SwipeBackgroundVisuals(Icons.Default.Phone, SamsungGreen, "Вызов")
@@ -3445,10 +3782,17 @@ private fun getActionVisuals(action: CustomSwipeAction?, defaultIsRight: Boolean
         "call_single" -> ActionVisuals(Icons.Default.Phone, brandColor ?: SamsungGreen)
         "sms" -> ActionVisuals(Icons.AutoMirrored.Filled.Message, brandColor ?: SamsungSmsBlue)
         "email" -> ActionVisuals(Icons.Default.Email, Color(0xFFFFB300))
-        "messenger_chat" -> ActionVisuals(Icons.AutoMirrored.Filled.Message, brandColor ?: SamsungGreen)
+        "messenger_chat" -> ActionVisuals(
+            Icons.AutoMirrored.Filled.Message,
+            brandColor ?: SamsungGreen
+        )
+
         "messenger_audio" -> ActionVisuals(Icons.Default.Phone, brandColor ?: SamsungGreen)
         "messenger_video" -> ActionVisuals(Icons.Default.Videocam, brandColor ?: SamsungGreen)
-        else -> if (defaultIsRight) ActionVisuals(Icons.Default.Phone, SamsungGreen) else ActionVisuals(Icons.AutoMirrored.Filled.Message, SamsungSmsBlue)
+        else -> if (defaultIsRight) ActionVisuals(
+            Icons.Default.Phone,
+            SamsungGreen
+        ) else ActionVisuals(Icons.AutoMirrored.Filled.Message, SamsungSmsBlue)
     }
 }
 
@@ -3465,7 +3809,11 @@ private fun SwipeActionPickerDialog(
     onActionSelected: (CustomSwipeAction) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var pickerMessengerList by remember(messengerAccountsList) { mutableStateOf(messengerAccountsList) }
+    var pickerMessengerList by remember(messengerAccountsList) {
+        mutableStateOf(
+            messengerAccountsList
+        )
+    }
     var showAddCustomLinkDialogInPicker by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -3548,7 +3896,11 @@ private fun SwipeActionPickerDialog(
                                                     CustomSwipeAction(
                                                         actionType = "call_sim1",
                                                         targetValue = phoneItem.number,
-                                                        label = "Вызов SIM 1 (${formatPhoneNumber(phoneItem.number)})"
+                                                        label = "Вызов SIM 1 (${
+                                                            formatPhoneNumber(
+                                                                phoneItem.number
+                                                            )
+                                                        })"
                                                     )
                                                 )
                                             },
@@ -3584,7 +3936,11 @@ private fun SwipeActionPickerDialog(
                                                     CustomSwipeAction(
                                                         actionType = "call_sim2",
                                                         targetValue = phoneItem.number,
-                                                        label = "Вызов SIM 2 (${formatPhoneNumber(phoneItem.number)})"
+                                                        label = "Вызов SIM 2 (${
+                                                            formatPhoneNumber(
+                                                                phoneItem.number
+                                                            )
+                                                        })"
                                                     )
                                                 )
                                             },
@@ -3620,7 +3976,11 @@ private fun SwipeActionPickerDialog(
                                                     CustomSwipeAction(
                                                         actionType = "call_single",
                                                         targetValue = phoneItem.number,
-                                                        label = "Вызов (${formatPhoneNumber(phoneItem.number)})"
+                                                        label = "Вызов (${
+                                                            formatPhoneNumber(
+                                                                phoneItem.number
+                                                            )
+                                                        })"
                                                     )
                                                 )
                                             },
@@ -3671,7 +4031,12 @@ private fun SwipeActionPickerDialog(
             }
 
             // Section 2: Мессенджеры
-            val hiddenSetInPicker = remember(pickerMessengerList) { getHiddenMessengers(context, getContactCustomKey(contact)) }
+            val hiddenSetInPicker = remember(pickerMessengerList) {
+                getHiddenMessengers(
+                    context,
+                    getContactCustomKey(contact)
+                )
+            }
             val visiblePickerMessengers = pickerMessengerList.filter { messenger ->
                 val key = if (messenger.isCustomLink) messenger.id else messenger.packageName
                 !hiddenSetInPicker.contains(key)
@@ -3728,7 +4093,9 @@ private fun SwipeActionPickerDialog(
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(messenger.accountDetail),
+                                        text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(
+                                            messenger.accountDetail
+                                        ),
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface,
@@ -3745,7 +4112,8 @@ private fun SwipeActionPickerDialog(
                                                 onActionSelected(
                                                     CustomSwipeAction(
                                                         actionType = "messenger_chat",
-                                                        targetValue = messenger.chatIntent.dataString ?: "",
+                                                        targetValue = messenger.chatIntent.dataString
+                                                            ?: "",
                                                         label = "${messenger.messengerName} Чат",
                                                         messengerName = messenger.messengerName
                                                     )
@@ -3772,7 +4140,8 @@ private fun SwipeActionPickerDialog(
                                                 onActionSelected(
                                                     CustomSwipeAction(
                                                         actionType = "messenger_audio",
-                                                        targetValue = messenger.audioCallIntent.dataString ?: "",
+                                                        targetValue = messenger.audioCallIntent.dataString
+                                                            ?: "",
                                                         label = "${messenger.messengerName} Аудиовызов",
                                                         messengerName = messenger.messengerName
                                                     )
@@ -3799,7 +4168,8 @@ private fun SwipeActionPickerDialog(
                                                 onActionSelected(
                                                     CustomSwipeAction(
                                                         actionType = "messenger_video",
-                                                        targetValue = messenger.videoCallIntent.dataString ?: "",
+                                                        targetValue = messenger.videoCallIntent.dataString
+                                                            ?: "",
                                                         label = "${messenger.messengerName} Видеовызов",
                                                         messengerName = messenger.messengerName
                                                     )
@@ -3965,12 +4335,17 @@ private fun AddCustomMessengerLinkDialog(
     var showQrScannerDialog by remember { mutableStateOf(false) }
 
     val installedMessengers = remember { getInstalledMessengersList(context) }
-    val activeMessenger = installedMessengers.getOrNull(selectedMessengerIndex) ?: installedMessengers.firstOrNull()
+    val activeMessenger =
+        installedMessengers.getOrNull(selectedMessengerIndex) ?: installedMessengers.firstOrNull()
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
-            Text(text = "Добавить ссылку мессенджера", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+            Text(
+                text = "Добавить ссылку мессенджера",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
         },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
@@ -4086,9 +4461,13 @@ private fun AddCustomMessengerLinkDialog(
                 onClick = {
                     val inputUrl = customLinkInput.trim()
                     if (inputUrl.isNotBlank() && activeMessenger != null) {
-                        val formattedUrl = if (!inputUrl.startsWith("http://") && !inputUrl.startsWith("https://") && !inputUrl.startsWith("viber://") && !inputUrl.startsWith("skype:")) {
-                            "https://$inputUrl"
-                        } else inputUrl
+                        val formattedUrl =
+                            if (!inputUrl.startsWith("http://") && !inputUrl.startsWith("https://") && !inputUrl.startsWith(
+                                    "viber://"
+                                ) && !inputUrl.startsWith("skype:")
+                            ) {
+                                "https://$inputUrl"
+                            } else inputUrl
 
                         val newAccount = MessengerAccount(
                             id = "custom_${System.currentTimeMillis()}",
@@ -4096,7 +4475,7 @@ private fun AddCustomMessengerLinkDialog(
                             messengerName = activeMessenger.messengerName,
                             accountDetail = formattedUrl,
                             brandColor = activeMessenger.brandColor,
-                            chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse(formattedUrl)),
+                            chatIntent = Intent(Intent.ACTION_VIEW, formattedUrl.toUri()),
                             isCustomLink = true
                         )
 
@@ -4119,7 +4498,10 @@ private fun AddCustomMessengerLinkDialog(
         var qrInputText by remember { mutableStateOf("") }
         var hasCameraPermission by remember {
             mutableStateOf(
-                ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.CAMERA
+                ) == PackageManager.PERMISSION_GRANTED
             )
         }
 
@@ -4140,21 +4522,41 @@ private fun AddCustomMessengerLinkDialog(
                         .addOnSuccessListener { barcodes ->
                             val qrUrl = barcodes.firstOrNull()?.rawValue
                             if (!qrUrl.isNullOrBlank()) {
-                                val formatted = if (!qrUrl.startsWith("http://") && !qrUrl.startsWith("https://") && !qrUrl.startsWith("viber://") && !qrUrl.startsWith("skype:")) {
-                                    "https://$qrUrl"
-                                } else qrUrl
+                                val formatted =
+                                    if (!qrUrl.startsWith("http://") && !qrUrl.startsWith("https://") && !qrUrl.startsWith(
+                                            "viber://"
+                                        ) && !qrUrl.startsWith("skype:")
+                                    ) {
+                                        "https://$qrUrl"
+                                    } else qrUrl
                                 customLinkInput = formatted
                                 showQrScannerDialog = false
-                                Toast.makeText(context, "QR-код из галереи успешно распознан!", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    "QR-код из галереи успешно распознан!",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             } else {
-                                Toast.makeText(context, "Не удалось найти QR-код на изображении", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    "Не удалось найти QR-код на изображении",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         }
                         .addOnFailureListener {
-                            Toast.makeText(context, "Ошибка анализа изображения", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(
+                                context,
+                                "Ошибка анализа изображения",
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
-                } catch (e: Exception) {
-                    Toast.makeText(context, "Не удалось загрузить фото из галереи", Toast.LENGTH_SHORT).show()
+                } catch (_: Exception) {
+                    Toast.makeText(
+                        context,
+                        "Не удалось загрузить фото из галереи",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
@@ -4187,15 +4589,28 @@ private fun AddCustomMessengerLinkDialog(
                             .clip(RoundedCornerShape(16.dp))
                             .padding(vertical = 4.dp)
                     ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
                             if (hasCameraPermission) {
                                 CameraQrScannerView { scannedUrl ->
-                                    val formatted = if (!scannedUrl.startsWith("http://") && !scannedUrl.startsWith("https://") && !scannedUrl.startsWith("viber://") && !scannedUrl.startsWith("skype:")) {
-                                        "https://$scannedUrl"
-                                    } else scannedUrl
+                                    val formatted =
+                                        if (!scannedUrl.startsWith("http://") && !scannedUrl.startsWith(
+                                                "https://"
+                                            ) && !scannedUrl.startsWith("viber://") && !scannedUrl.startsWith(
+                                                "skype:"
+                                            )
+                                        ) {
+                                            "https://$scannedUrl"
+                                        } else scannedUrl
                                     customLinkInput = formatted
                                     showQrScannerDialog = false
-                                    Toast.makeText(context, "QR-код успешно сканирован!", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(
+                                        context,
+                                        "QR-код успешно сканирован!",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
                                 }
                             } else {
                                 Column(
@@ -4214,7 +4629,12 @@ private fun AddCustomMessengerLinkDialog(
                                             permissionLauncher.launch(Manifest.permission.CAMERA)
                                         }
                                     ) {
-                                        Text("Разрешить камеру", color = SamsungGreen, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                        Text(
+                                            "Разрешить камеру",
+                                            color = SamsungGreen,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
                                     }
                                 }
                             }
@@ -4295,7 +4715,6 @@ private fun AddCustomMessengerLinkDialog(
 private fun CameraQrScannerView(
     onQrCodeScanned: (String) -> Unit
 ) {
-    val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     var isScanned by remember { mutableStateOf(false) }
 
@@ -4307,7 +4726,7 @@ private fun CameraQrScannerView(
             cameraProviderFuture.addListener({
                 val cameraProvider = cameraProviderFuture.get()
                 val preview = Preview.Builder().build().also {
-                    it.setSurfaceProvider(previewView.surfaceProvider)
+                    it.surfaceProvider = previewView.surfaceProvider
                 }
 
                 val barcodeScanner = BarcodeScanning.getClient()
@@ -4319,7 +4738,10 @@ private fun CameraQrScannerView(
                     @Suppress("UnsafeOptInUsageError")
                     val mediaImage = imageProxy.image
                     if (mediaImage != null && !isScanned) {
-                        val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
+                        val image = InputImage.fromMediaImage(
+                            mediaImage,
+                            imageProxy.imageInfo.rotationDegrees
+                        )
                         barcodeScanner.process(image)
                             .addOnSuccessListener { barcodes ->
                                 val qrUrl = barcodes.firstOrNull()?.rawValue
@@ -4363,19 +4785,35 @@ private fun showCalendarDatePicker(
     onDateSelected: (formattedDate: String) -> Unit
 ) {
     val cal = java.util.Calendar.getInstance()
-    val numbers = Regex("\\d+").findAll(initialDateString).mapNotNull { it.value.toIntOrNull() }.toList()
+    val numbers =
+        Regex("\\d+").findAll(initialDateString).mapNotNull { it.value.toIntOrNull() }.toList()
     if (numbers.size >= 3) {
         val y = numbers.firstOrNull { it in 1900..2100 } ?: cal.get(java.util.Calendar.YEAR)
         val nonYears = numbers.filter { it != y }
-        val m = if (nonYears.size >= 2 && nonYears[1] in 1..12) nonYears[1] - 1 else cal.get(java.util.Calendar.MONTH)
-        val d = if (nonYears.isNotEmpty() && nonYears[0] in 1..31) nonYears[0] else cal.get(java.util.Calendar.DAY_OF_MONTH)
+        val m =
+            if (nonYears.size >= 2 && nonYears[1] in 1..12) nonYears[1] - 1 else cal.get(java.util.Calendar.MONTH)
+        val d =
+            if (nonYears.isNotEmpty() && nonYears[0] in 1..31) nonYears[0] else cal.get(java.util.Calendar.DAY_OF_MONTH)
         cal.set(y, m, d)
     }
 
     val picker = android.app.DatePickerDialog(
         context,
         { _, year, month, dayOfMonth ->
-            val monthNames = arrayOf("января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря")
+            val monthNames = arrayOf(
+                "января",
+                "февраля",
+                "марта",
+                "апреля",
+                "мая",
+                "июня",
+                "июля",
+                "августа",
+                "сентября",
+                "октября",
+                "ноября",
+                "декабря"
+            )
             val mName = monthNames.getOrElse(month) { "" }
             val formatted = "$dayOfMonth $mName $year г."
             onDateSelected(formatted)
@@ -4422,7 +4860,14 @@ private fun EditContactDialog(
     var editableMessengers by remember { mutableStateOf(messengerAccountsList.toMutableList()) }
 
     val contactKey = remember(contact) { getContactCustomKey(contact) }
-    var hiddenSet by remember { mutableStateOf(getHiddenMessengers(context, contactKey).toMutableSet()) }
+    var hiddenSet by remember {
+        mutableStateOf(
+            getHiddenMessengers(
+                context,
+                contactKey
+            ).toMutableSet()
+        )
+    }
 
     var showAddMessengerDialogInEdit by remember { mutableStateOf(false) }
     var customLinkToEditIndex by remember { mutableStateOf<Int?>(null) }
@@ -4436,10 +4881,11 @@ private fun EditContactDialog(
                     val bitmap = BitmapFactory.decodeStream(stream)
                     if (bitmap != null) {
                         currentAvatarBitmap = bitmap.asImageBitmap()
-                        Toast.makeText(context, "Фото контакта обновлено", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Фото контакта обновлено", Toast.LENGTH_SHORT)
+                            .show()
                     }
                 }
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 Toast.makeText(context, "Не удалось загрузить фото", Toast.LENGTH_SHORT).show()
             }
         }
@@ -4486,7 +4932,8 @@ private fun EditContactDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = contact.name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?",
+                                text = contact.name.trim().firstOrNull()?.uppercaseChar()
+                                    ?.toString() ?: "?",
                                 color = Color.White,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 36.sp
@@ -4538,14 +4985,27 @@ private fun EditContactDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Телефоны", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Text(
+                        "Телефоны",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
                     IconButton(
                         onClick = {
-                            editablePhones = (editablePhones + ContactPhoneNumber("", "Мобильный")).toMutableList()
+                            editablePhones = (editablePhones + ContactPhoneNumber(
+                                "",
+                                "Мобильный"
+                            )).toMutableList()
                         },
                         modifier = Modifier.size(28.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Добавить номер", tint = SamsungGreen, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Добавить номер",
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -4576,7 +5036,11 @@ private fun EditContactDialog(
                                     editablePhones = updated
                                 }
                             ) {
-                                Icon(Icons.Default.Delete, contentDescription = "Удалить номер", tint = MaterialTheme.colorScheme.error)
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Удалить номер",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
                             }
                         }
                     }
@@ -4590,12 +5054,22 @@ private fun EditContactDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("Мессенджеры (видимость)", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Text(
+                        "Мессенджеры (видимость)",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
                     IconButton(
                         onClick = { showAddMessengerDialogInEdit = true },
                         modifier = Modifier.size(28.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Добавить мессенджер", tint = SamsungGreen, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Добавить мессенджер",
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
@@ -4607,7 +5081,8 @@ private fun EditContactDialog(
                 ) {
                     Column(modifier = Modifier.padding(10.dp)) {
                         editableMessengers.forEachIndexed { index, messenger ->
-                            val messengerKey = if (messenger.isCustomLink) messenger.id else messenger.packageName
+                            val messengerKey =
+                                if (messenger.isCustomLink) messenger.id else messenger.packageName
                             val isHidden = hiddenSet.contains(messengerKey)
 
                             Row(
@@ -4637,9 +5112,13 @@ private fun EditContactDialog(
                                             color = if (isHidden) Color.Gray else messenger.brandColor
                                         )
                                         Text(
-                                            text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(messenger.accountDetail),
+                                            text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(
+                                                messenger.accountDetail
+                                            ),
                                             fontSize = 11.sp,
-                                            color = if (isHidden) Color.Gray.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                            color = if (isHidden) Color.Gray.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface.copy(
+                                                alpha = 0.6f
+                                            ),
                                             maxLines = 1,
                                             overflow = TextOverflow.Ellipsis
                                         )
@@ -4653,7 +5132,12 @@ private fun EditContactDialog(
                                             onClick = { customLinkToEditIndex = index },
                                             modifier = Modifier.size(32.dp)
                                         ) {
-                                            Icon(Icons.Default.Edit, contentDescription = "Изменить ссылку", tint = SamsungGreen, modifier = Modifier.size(18.dp))
+                                            Icon(
+                                                Icons.Default.Edit,
+                                                contentDescription = "Изменить ссылку",
+                                                tint = SamsungGreen,
+                                                modifier = Modifier.size(18.dp)
+                                            )
                                         }
 
                                         // Delete Custom Link Button
@@ -4665,14 +5149,21 @@ private fun EditContactDialog(
                                             },
                                             modifier = Modifier.size(32.dp)
                                         ) {
-                                            Icon(Icons.Default.Delete, contentDescription = "Удалить ссылку", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(18.dp))
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = "Удалить ссылку",
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(18.dp)
+                                            )
                                         }
                                     } else {
                                         // Visibility Toggle Button for Standard Messengers
                                         IconButton(
                                             onClick = {
                                                 val newSet = hiddenSet.toMutableSet()
-                                                if (isHidden) newSet.remove(messengerKey) else newSet.add(messengerKey)
+                                                if (isHidden) newSet.remove(messengerKey) else newSet.add(
+                                                    messengerKey
+                                                )
                                                 hiddenSet = newSet
                                             },
                                             modifier = Modifier.size(32.dp)
@@ -4699,20 +5190,36 @@ private fun EditContactDialog(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text("E-mail адреса", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                    Text(
+                        "E-mail адреса",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
                     IconButton(
                         onClick = {
-                            editableEmails = (editableEmails + ContactEmail("", "Личный")).toMutableList()
+                            editableEmails =
+                                (editableEmails + ContactEmail("", "Личный")).toMutableList()
                         },
                         modifier = Modifier.size(28.dp)
                     ) {
-                        Icon(Icons.Default.Add, contentDescription = "Добавить email", tint = SamsungGreen, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = "Добавить email",
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
                 Spacer(modifier = Modifier.height(6.dp))
 
                 if (editableEmails.isEmpty()) {
-                    Text("E-mail адреса не заданы", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f), modifier = Modifier.fillMaxWidth())
+                    Text(
+                        "E-mail адреса не заданы",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 } else {
                     editableEmails.forEachIndexed { index, emailItem ->
                         Row(
@@ -4740,7 +5247,11 @@ private fun EditContactDialog(
                                     editableEmails = updated
                                 }
                             ) {
-                                Icon(Icons.Default.Delete, contentDescription = "Удалить email", tint = MaterialTheme.colorScheme.error)
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = "Удалить email",
+                                    tint = MaterialTheme.colorScheme.error
+                                )
                             }
                         }
                     }
@@ -4749,7 +5260,13 @@ private fun EditContactDialog(
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // 5. BIRTHDAY & IMPORTANT DATES SECTION
-                Text("Важные даты", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f), modifier = Modifier.fillMaxWidth())
+                Text(
+                    "Важные даты",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth()
+                )
                 Spacer(modifier = Modifier.height(6.dp))
 
                 if (isEditingBirthday) {
@@ -4773,7 +5290,11 @@ private fun EditContactDialog(
                                         }
                                     }
                                 ) {
-                                    Icon(Icons.Default.Event, contentDescription = "Календарь", tint = SamsungGreen)
+                                    Icon(
+                                        Icons.Default.Event,
+                                        contentDescription = "Календарь",
+                                        tint = SamsungGreen
+                                    )
                                 }
                             },
                             modifier = Modifier.weight(1f)
@@ -4785,7 +5306,11 @@ private fun EditContactDialog(
                                 editableBirthday = null
                             }
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Удалить день рождения", tint = MaterialTheme.colorScheme.error)
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Удалить день рождения",
+                                tint = MaterialTheme.colorScheme.error
+                            )
                         }
                     }
                 } else {
@@ -4801,9 +5326,19 @@ private fun EditContactDialog(
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Icon(Icons.Default.Cake, contentDescription = "День рождения", tint = SamsungGreen, modifier = Modifier.size(20.dp))
+                        Icon(
+                            Icons.Default.Cake,
+                            contentDescription = "День рождения",
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("+ Добавить день рождения", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SamsungGreen)
+                        Text(
+                            "+ Добавить день рождения",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SamsungGreen
+                        )
                     }
                 }
 
@@ -4843,14 +5378,21 @@ private fun EditContactDialog(
                             trailingIcon = {
                                 IconButton(
                                     onClick = {
-                                        showCalendarDatePicker(context, dateItem.dateString) { newDate ->
+                                        showCalendarDatePicker(
+                                            context,
+                                            dateItem.dateString
+                                        ) { newDate ->
                                             val updated = customImportantDates.toMutableList()
                                             updated[index] = dateItem.copy(dateString = newDate)
                                             customImportantDates = updated
                                         }
                                     }
                                 ) {
-                                    Icon(Icons.Default.Event, contentDescription = "Календарь", tint = SamsungGreen)
+                                    Icon(
+                                        Icons.Default.Event,
+                                        contentDescription = "Календарь",
+                                        tint = SamsungGreen
+                                    )
                                 }
                             },
                             modifier = Modifier.weight(0.55f)
@@ -4863,7 +5405,11 @@ private fun EditContactDialog(
                                 customImportantDates = updated
                             }
                         ) {
-                            Icon(Icons.Default.Delete, contentDescription = "Удалить дату", tint = MaterialTheme.colorScheme.error)
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = "Удалить дату",
+                                tint = MaterialTheme.colorScheme.error
+                            )
                         }
                     }
                 }
@@ -4876,16 +5422,31 @@ private fun EditContactDialog(
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                         .clickable {
-                            val labels = listOf("Годовщина", "Юбилей", "Именины", "Памятная дата", "Свадьба")
-                            val nextLabel = labels.getOrElse(customImportantDates.size % labels.size) { "Важная дата" }
-                            customImportantDates = (customImportantDates + ContactImportantDate(label = nextLabel, dateString = "")).toMutableList()
+                            val labels =
+                                listOf("Годовщина", "Юбилей", "Именины", "Памятная дата", "Свадьба")
+                            val nextLabel =
+                                labels.getOrElse(customImportantDates.size % labels.size) { "Важная дата" }
+                            customImportantDates = (customImportantDates + ContactImportantDate(
+                                label = nextLabel,
+                                dateString = ""
+                            )).toMutableList()
                         }
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.Event, contentDescription = "Важная дата", tint = SamsungGreen, modifier = Modifier.size(20.dp))
+                    Icon(
+                        Icons.Default.Event,
+                        contentDescription = "Важная дата",
+                        tint = SamsungGreen,
+                        modifier = Modifier.size(20.dp)
+                    )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("+ Добавить другую важную дату", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = SamsungGreen)
+                    Text(
+                        "+ Добавить другую важную дату",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SamsungGreen
+                    )
                 }
             }
         },
@@ -4900,7 +5461,7 @@ private fun EditContactDialog(
 
                     onSave(
                         nameInput.trim(),
-                        if (cleanPhones.isNotEmpty()) cleanPhones else phoneNumbersList,
+                        cleanPhones.ifEmpty { phoneNumbersList },
                         cleanEmails,
                         newBday,
                         customImportantDates,
@@ -4957,17 +5518,29 @@ private fun EditCustomMessengerLinkDialog(
     val installedMessengers = remember { getInstalledMessengersList(context) }
     var selectedMessengerIndex by remember {
         mutableIntStateOf(
-            installedMessengers.indexOfFirst { it.messengerName.equals(initialMessenger.messengerName, true) }.coerceAtLeast(0)
+            installedMessengers.indexOfFirst {
+                it.messengerName.equals(
+                    initialMessenger.messengerName,
+                    true
+                )
+            }.coerceAtLeast(0)
         )
     }
     var dropdownExpanded by remember { mutableStateOf(false) }
     var customLinkInput by remember { mutableStateOf(initialMessenger.accountDetail) }
 
-    val activeMessenger = installedMessengers.getOrNull(selectedMessengerIndex) ?: installedMessengers.firstOrNull()
+    val activeMessenger =
+        installedMessengers.getOrNull(selectedMessengerIndex) ?: installedMessengers.firstOrNull()
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(text = "Редактировать ссылку", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+        title = {
+            Text(
+                text = "Редактировать ссылку",
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        },
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
@@ -5053,16 +5626,20 @@ private fun EditCustomMessengerLinkDialog(
                 onClick = {
                     val inputUrl = customLinkInput.trim()
                     if (inputUrl.isNotBlank() && activeMessenger != null) {
-                        val formattedUrl = if (!inputUrl.startsWith("http://") && !inputUrl.startsWith("https://") && !inputUrl.startsWith("viber://") && !inputUrl.startsWith("skype:")) {
-                            "https://$inputUrl"
-                        } else inputUrl
+                        val formattedUrl =
+                            if (!inputUrl.startsWith("http://") && !inputUrl.startsWith("https://") && !inputUrl.startsWith(
+                                    "viber://"
+                                ) && !inputUrl.startsWith("skype:")
+                            ) {
+                                "https://$inputUrl"
+                            } else inputUrl
 
                         val updatedAccount = initialMessenger.copy(
                             packageName = activeMessenger.packageName,
                             messengerName = activeMessenger.messengerName,
                             accountDetail = formattedUrl,
                             brandColor = activeMessenger.brandColor,
-                            chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse(formattedUrl))
+                            chatIntent = Intent(Intent.ACTION_VIEW, formattedUrl.toUri())
                         )
 
                         onSaveCustomLink(updatedAccount)

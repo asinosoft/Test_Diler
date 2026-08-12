@@ -1,7 +1,6 @@
 package com.example.test_dialer.ui.recents.components
 
 import android.graphics.BitmapFactory
-import android.net.Uri
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
@@ -25,11 +24,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.automirrored.filled.CallReceived
-import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -68,7 +63,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.test_dialer.data.model.CallLogItem
 import com.example.test_dialer.data.model.CallType
-import com.example.test_dialer.ui.recents.components.getSwipeBackgroundVisuals
 import com.example.test_dialer.ui.theme.IncomingGreen
 import com.example.test_dialer.ui.theme.MissedRed
 import com.example.test_dialer.ui.theme.OutgoingBlue
@@ -82,6 +76,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
+import androidx.core.net.toUri
 
 class SimCardShape(private val cutSizeDp: Float = 2.5f) : Shape {
     override fun createOutline(
@@ -127,7 +122,7 @@ fun SwipeableCallLogCard(
     ) {
         val currentOffset = offsetX.value
 
-        val contactKey = if (item.id.isNotBlank()) item.id else item.number.replace(Regex("[^0-9+]"), "")
+        val contactKey = item.id.ifBlank { item.number.replace(Regex("[^0-9+]"), "") }
 
         val customRightAction = if (currentOffset > 0f) {
             getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = item.number)
@@ -201,7 +196,8 @@ fun SwipeableCallLogCard(
                         onDragEnd = {
                             coroutineScope.launch {
                                 val finalOffset = offsetX.value
-                                val contactKey = if (item.id.isNotBlank()) item.id else item.number.replace(Regex("[^0-9+]"), "")
+                                val contactKey =
+                                    item.id.ifBlank { item.number.replace(Regex("[^0-9+]"), "") }
                                 if (finalOffset > thresholdPx) {
                                     val customAction = getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = item.number)
                                     if (customAction != null) {
@@ -334,12 +330,12 @@ private fun AvatarView(name: String, photoUri: String?) {
         if (!photoUri.isNullOrEmpty()) {
             withContext(Dispatchers.IO) {
                 try {
-                    val uri = Uri.parse(photoUri)
+                    val uri = photoUri.toUri()
                     context.contentResolver.openInputStream(uri)?.use { stream ->
                         val bitmap = BitmapFactory.decodeStream(stream)
                         avatarBitmap = bitmap?.asImageBitmap()
                     }
-                } catch (e: Exception) {
+                } catch (_: Exception) {
                     avatarBitmap = null
                 }
             }

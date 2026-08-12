@@ -40,6 +40,7 @@ import com.example.test_dialer.ui.theme.SamsungGreen
 import com.example.test_dialer.ui.theme.SamsungSmsBlue
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 data class CubeFaceData(
     val title: String,
@@ -116,7 +117,7 @@ fun InteractiveCubeSection(
                 // Draw face if visible (-90°..+90°)
                 if (faceAngle in -89.9f..89.9f) {
                     val rad = Math.toRadians(faceAngle.toDouble())
-                    val translationXVal = (radiusPx * Math.sin(rad)).toFloat()
+                    val translationXVal = (radiusPx * sin(rad)).toFloat()
 
                     Surface(
                         modifier = Modifier
