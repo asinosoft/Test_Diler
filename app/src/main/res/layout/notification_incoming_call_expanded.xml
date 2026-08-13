@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="80dp"
+    android:paddingStart="12dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp"
+    android:background="#FFFFFFFF">
+
+    <ImageView
+        android:id="@+id/notification_avatar"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_alignParentStart="true"
+        android:layout_centerVertical="true"
+        android:scaleType="centerCrop"
+        android:src="@mipmap/ic_launcher_round" />
+
+    <LinearLayout
+        android:id="@+id/notification_actions"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:orientation="horizontal">
+
+        <ImageButton
+            android:id="@+id/btn_answer"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:background="@drawable/bg_circle_green"
+            android:src="@android:drawable/ic_menu_call"
+            android:scaleType="centerInside"
+            android:contentDescription="Ответить" />
+
+        <LinearLayout
+            android:layout_width="12dp"
+            android:layout_height="1dp" />
+
+        <ImageButton
+            android:id="@+id/btn_decline"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
+            android:background="@drawable/bg_circle_red"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:scaleType="centerInside"
+            android:contentDescription="Отклонить" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_toEndOf="@id/notification_avatar"
+        android:layout_toStartOf="@id/notification_actions"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="12dp"
+        android:layout_marginEnd="8dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/notification_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Входящий вызов"
+            android:textColor="#FF000000"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/notification_subtitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Имя Контакта"
+            android:textColor="#88000000"
+            android:textSize="13sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/notification_number"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="+7 999 123-45-67"
+            android:textColor="#88000000"
+            android:textSize="13sp"
+            android:singleLine="true"
+            android:ellipsize="end" />
+    </LinearLayout>
+
+</RelativeLayout>
