@@ -9,7 +9,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import com.asinosoft.dialer.ui.theme.Test_dialerTheme
+import com.asinosoft.dialer.ui.theme.DialerTheme
 
 class InCallActivity : ComponentActivity() {
 
@@ -38,7 +38,7 @@ class InCallActivity : ComponentActivity() {
         })
 
         setContent {
-            Test_dialerTheme {
+            DialerTheme {
                 BackHandler {
                     // Consume back gesture
                 }

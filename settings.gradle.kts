@@ -22,6 +22,6 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Test_dialer"
+rootProject.name = "Dialer"
 include(":app")
  

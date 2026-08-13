@@ -56,13 +56,13 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Test_dialer">
+        android:theme="@style/Theme.Dialer">
 
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.Test_dialer"
+            android:theme="@style/Theme.Dialer"
             android:windowSoftInputMode="adjustResize"
             tools:ignore="DiscouragedOrientationUser">
             <intent-filter>
@@ -94,7 +94,7 @@
             android:exported="true"
             android:label="Текущий вызов"
             android:screenOrientation="portrait"
-            android:theme="@style/Theme.Test_dialer"
+            android:theme="@style/Theme.Dialer"
             android:launchMode="singleInstance"
             android:excludeFromRecents="false"
             android:taskAffinity="com.asinosoft.dialer.incall"

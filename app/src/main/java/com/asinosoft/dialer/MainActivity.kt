@@ -52,7 +52,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.asinosoft.dialer.ui.recents.RecentsScreen
 import com.asinosoft.dialer.ui.recents.RecentsViewModel
 import com.asinosoft.dialer.ui.theme.SamsungGreen
-import com.asinosoft.dialer.ui.theme.Test_dialerTheme
+import com.asinosoft.dialer.ui.theme.DialerTheme
 
 class MainActivity : ComponentActivity() {
 
@@ -70,7 +70,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            Test_dialerTheme {
+            DialerTheme {
                 val viewModel: RecentsViewModel = viewModel()
                 var isPermissionsGranted by remember { mutableStateOf(false) }
 

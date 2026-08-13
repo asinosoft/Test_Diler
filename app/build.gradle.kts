@@ -8,7 +8,7 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.example.test_dialer"
+        applicationId = "com.asinosoft.dialer"
         minSdk = 24
         targetSdk = 36
         versionCode = 1

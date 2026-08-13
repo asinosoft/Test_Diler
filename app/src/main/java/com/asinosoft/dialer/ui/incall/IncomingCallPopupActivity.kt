@@ -68,7 +68,7 @@ import com.asinosoft.dialer.service.CallManager
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.ui.theme.SamsungSmsBlue
-import com.asinosoft.dialer.ui.theme.Test_dialerTheme
+import com.asinosoft.dialer.ui.theme.DialerTheme
 import com.asinosoft.dialer.util.formatPhoneNumber
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -104,7 +104,7 @@ class IncomingCallPopupActivity : ComponentActivity() {
         window.navigationBarColor = android.graphics.Color.TRANSPARENT
 
         setContent {
-            Test_dialerTheme {
+            DialerTheme {
                 IncomingCallPopupScreen(
                     onAnswer = {
                         CallManager.answer()

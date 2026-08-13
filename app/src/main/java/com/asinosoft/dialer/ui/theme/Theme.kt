@@ -31,7 +31,7 @@ private val LightColorScheme = lightColorScheme(
 )
 
 @Composable
-fun Test_dialerTheme(
+fun DialerTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     dynamicColor: Boolean = false, // Set default false to preserve One UI branding colors
     content: @Composable () -> Unit

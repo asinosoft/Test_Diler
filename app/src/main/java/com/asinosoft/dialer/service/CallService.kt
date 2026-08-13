@@ -34,8 +34,8 @@ class CallService : InCallService() {
         const val MISSED_CHANNEL_ID = "missed_call_channel"
         const val NOTIFICATION_ID = 1001
 
-        const val ACTION_ANSWER = "com.example.test_dialer.ACTION_ANSWER"
-        const val ACTION_DISCONNECT = "com.example.test_dialer.ACTION_DISCONNECT"
+        const val ACTION_ANSWER = "com.asinosoft.dialer.ACTION_ANSWER"
+        const val ACTION_DISCONNECT = "com.asinosoft.dialer.ACTION_DISCONNECT"
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.Main)
