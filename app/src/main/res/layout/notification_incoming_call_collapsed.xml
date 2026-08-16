@@ -1,12 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="64dp"
-    android:paddingStart="12dp"
-    android:paddingEnd="12dp"
-    android:paddingTop="8dp"
-    android:paddingBottom="8dp"
-    android:background="#FFFFFFFF">
+    android:layout_height="64dp">
 
     <ImageView
         android:id="@+id/notification_avatar"
@@ -14,6 +9,7 @@
         android:layout_height="48dp"
         android:layout_alignParentStart="true"
         android:layout_centerVertical="true"
+        android:contentDescription="@string/photo"
         android:scaleType="centerCrop"
         android:src="@mipmap/ic_launcher_round" />
 
@@ -32,20 +28,17 @@
             android:background="@drawable/bg_circle_green"
             android:src="@android:drawable/ic_menu_call"
             android:scaleType="centerInside"
-            android:contentDescription="Ответить" />
-
-        <LinearLayout
-            android:layout_width="10dp"
-            android:layout_height="1dp" />
+            android:contentDescription="@string/accept" />
 
         <ImageButton
             android:id="@+id/btn_decline"
             android:layout_width="42dp"
             android:layout_height="42dp"
+            android:layout_marginStart="10dp"
             android:background="@drawable/bg_circle_red"
             android:src="@android:drawable/ic_menu_close_clear_cancel"
             android:scaleType="centerInside"
-            android:contentDescription="Отклонить" />
+            android:contentDescription="@string/reject" />
     </LinearLayout>
 
     <LinearLayout
@@ -73,7 +66,7 @@
             android:id="@+id/notification_subtitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Входящий вызов"
+            android:text="+7 999 123-45-67"
             android:textColor="#88000000"
             android:textSize="13sp"
             android:singleLine="true"

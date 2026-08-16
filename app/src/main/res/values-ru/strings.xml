@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Телефон</string>
+    <string name="accept">Ответить</string>
+    <string name="reject">Отклонить</string>
+    <string name="photo">Фото</string>
+</resources>
