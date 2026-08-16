@@ -4,4 +4,7 @@
     <string name="accept">Ответить</string>
     <string name="reject">Отклонить</string>
     <string name="photo">Фото</string>
+    <string name="incoming">Входящий вызов</string>
+    <string name="contact_name">Имя контакта</string>
+    <string name="phone_number">Номер</string>
 </resources>

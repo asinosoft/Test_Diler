@@ -16,7 +16,10 @@ import android.provider.ContactsContract
 import android.telecom.Call
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
+import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
 import com.asinosoft.dialer.MainActivity
 import com.asinosoft.dialer.R
@@ -110,11 +113,11 @@ class NotificationManager(val service: Service) {
                 }
             }
 
-            val title = contactName ?: call.displayName.ifBlank { formatPhoneNumber(call.rawNumber) }
+            val callerName = contactName ?: call.displayName.ifBlank { formatPhoneNumber(call.rawNumber) }
             val formattedNumber = formatPhoneNumber(call.rawNumber)
 
             val callerPerson = Person.Builder()
-                .setName(title)
+                .setName(callerName)
                 .setImportant(true)
                 .build()
 
@@ -154,80 +157,47 @@ class NotificationManager(val service: Service) {
             val circularAvatar: Bitmap? = if (contactBitmap != null) {
                 getCircularBitmap(contactBitmap)
             } else {
-                createRoundAvatarBitmap(title)
+                createRoundAvatarBitmap(callerName)
             }
 
+            val sim = ContextCompat.getDrawable(service, R.drawable.ic_sim1)?.toBitmap(16, 16)
+
             if (isRinging) {
-                val collapsedView = android.widget.RemoteViews(
-                    service.packageName,
-                    R.layout.notification_incoming_call_collapsed
-                ).apply {
-                    setTextViewText(R.id.notification_title, title)
-                    setTextViewText(R.id.notification_subtitle, "Входящий вызов")
-                    if (circularAvatar != null) {
-                        setImageViewBitmap(R.id.notification_avatar, circularAvatar)
-                    }
-                    setOnClickPendingIntent(R.id.btn_answer, answerPendingIntent)
-                    setOnClickPendingIntent(R.id.btn_decline, disconnectPendingIntent)
-                }
-
-                val expandedView = android.widget.RemoteViews(
-                    service.packageName,
-                    R.layout.notification_incoming_call_expanded
-                ).apply {
-                    setTextViewText(R.id.notification_title, title)
-                    setTextViewText(R.id.notification_subtitle, "Входящий вызов")
-                    setTextViewText(R.id.notification_number, formattedNumber)
-                    if (circularAvatar != null) {
-                        setImageViewBitmap(R.id.notification_avatar, circularAvatar)
-                    }
-                    setOnClickPendingIntent(R.id.btn_answer, answerPendingIntent)
-                    setOnClickPendingIntent(R.id.btn_decline, disconnectPendingIntent)
-                }
-
                 val notificationBuilder = NotificationCompat.Builder(service,CHANNEL_ID)
                     .setSmallIcon(R.drawable.ic_phone_white)
-                    .setSubText("Входящий вызов")
-                    .setCustomContentView(collapsedView)
-                    .setCustomBigContentView(expandedView)
-                    .setStyle(NotificationCompat.BigPictureStyle())
-//                    .setStyle(NotificationCompat.BigTextStyle()
-//                        .setBigContentTitle("Входящий вызов")
-//                        .setSummaryText("Входящий вызов")
-//                        .bigText(formattedNumber))
-                    .setLargeIcon(contactBitmap)
+                    .setLargeIcon(circularAvatar)
+                    .setStyle(
+                        NotificationCompat.CallStyle.forIncomingCall(
+                            callerPerson,
+                            disconnectPendingIntent,
+                            answerPendingIntent
+                        )
+                            .setVerificationIcon(sim)
+                            .setVerificationText("SIM 1")
+                    )
                     .setContentIntent(openPendingIntent)
                     .setOngoing(true)
                     .setAutoCancel(false)
                     .setShowWhen(false)
-                    .setPriority(NotificationCompat.PRIORITY_LOW)
+                    .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setCategory(NotificationCompat.CATEGORY_CALL)
                     .setSound(null)
-
-                // Action 1 (Left): Green Answer
-//                notificationBuilder.addAction(android.R.drawable.ic_menu_call, "Ответить", answerPendingIntent)
-//                // Action 2 (Right): Red Decline
-//                notificationBuilder.addAction(android.R.drawable.ic_menu_close_clear_cancel, "Отклонить", disconnectPendingIntent)
-
-//                if (circularAvatar != null) {
-//                    notificationBuilder.setLargeIcon(circularAvatar)
-//                }
 
                 val notification = notificationBuilder.build()
                 service.startForeground(NOTIFICATION_ID, notification)
             } else {
-                val ongoingStyle = NotificationCompat.CallStyle.forOngoingCall(
-                    callerPerson,
-                    disconnectPendingIntent
-                )
-
                 val notificationBuilder = NotificationCompat.Builder(service, CHANNEL_ID)
                     .setSmallIcon(R.drawable.ic_phone_white)
-                    .setContentTitle(title)
-                    .setContentText(formattedNumber)
-                    .setStyle(NotificationCompat.BigTextStyle().bigText(formattedNumber))
+                    .setLargeIcon(circularAvatar)
+                    .setStyle(
+                        NotificationCompat.CallStyle.forOngoingCall(
+                            callerPerson,
+                            disconnectPendingIntent
+                        )
+                            .setVerificationIcon(sim)
+                            .setVerificationText("SIM 1")
+                    )
                     .setContentIntent(openPendingIntent)
-                    .setStyle(ongoingStyle)
                     .setOngoing(true)
                     .setAutoCancel(false)
                     .setUsesChronometer(isCallActive)
@@ -236,10 +206,6 @@ class NotificationManager(val service: Service) {
                     .setPriority(NotificationCompat.PRIORITY_HIGH)
                     .setCategory(NotificationCompat.CATEGORY_CALL)
                     .setSound(null)
-
-                if (circularAvatar != null) {
-                    notificationBuilder.setLargeIcon(circularAvatar)
-                }
 
                 val notification = notificationBuilder.build()
                 service.startForeground(NOTIFICATION_ID, notification)
