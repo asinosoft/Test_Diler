@@ -11,6 +11,7 @@ import com.asinosoft.dialer.ui.incall.IncomingCallPopupActivity
 
 class CallService : InCallService() {
     lateinit var notification: NotificationManager
+    private val ringtonePlayer by lazy { CallRingtonePlayer(this) }
 
     override fun onCreate() {
         super.onCreate()
@@ -48,17 +49,24 @@ class CallService : InCallService() {
         }
         startActivity(intent)
 
+        if (call.state == Call.STATE_RINGING) {
+            ringtonePlayer.start()
+        }
+
         notification.showCallNotification(CallState.fromSystemCall(call, this))
 
         call.registerCallback(object : Call.Callback() {
             override fun onStateChanged(call: Call, state: Int) {
                 if (state == Call.STATE_RINGING) {
                     wasRinging = true
+                    ringtonePlayer.start()
                 } else if (state == Call.STATE_ACTIVE) {
                     wasAnswered = true
+                    ringtonePlayer.stop()
                 }
 
                 if (state == Call.STATE_DISCONNECTED) {
+                    ringtonePlayer.stop()
                     stopForeground(true)
                     if (wasRinging && !wasAnswered && rawNumber.isNotBlank()) {
                         notification.showMissedCallNotification(rawNumber)
@@ -72,6 +80,7 @@ class CallService : InCallService() {
 
     override fun onCallRemoved(call: Call) {
         super.onCallRemoved(call)
+        ringtonePlayer.stop()
         if (CallManager.currentCall.value == call) {
             CallManager.setCall(null)
             stopForeground(true)
@@ -80,6 +89,7 @@ class CallService : InCallService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        ringtonePlayer.stop()
         if (CallManager.inCallService == this) {
             CallManager.inCallService = null
         }
