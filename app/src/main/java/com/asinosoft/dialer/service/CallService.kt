@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.telecom.Call
 import android.telecom.InCallService
+import com.asinosoft.dialer.data.model.CallState
 import com.asinosoft.dialer.ui.incall.InCallActivity
 import com.asinosoft.dialer.ui.incall.IncomingCallPopupActivity
 
@@ -47,7 +48,7 @@ class CallService : InCallService() {
         }
         startActivity(intent)
 
-        notification.showCallNotification(CallState.fromSystemCall(call))
+        notification.showCallNotification(CallState.fromSystemCall(call, this))
 
         call.registerCallback(object : Call.Callback() {
             override fun onStateChanged(call: Call, state: Int) {
@@ -63,7 +64,7 @@ class CallService : InCallService() {
                         notification.showMissedCallNotification(rawNumber)
                     }
                 } else {
-                    notification.showCallNotification(CallState.fromSystemCall(call))
+                    notification.showCallNotification(CallState.fromSystemCall(call, this@CallService))
                 }
             }
         })

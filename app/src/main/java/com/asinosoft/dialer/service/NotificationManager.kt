@@ -17,12 +17,12 @@ import android.telecom.Call
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.ContextCompat
-import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
 import com.asinosoft.dialer.MainActivity
 import com.asinosoft.dialer.R
+import com.asinosoft.dialer.data.model.CallState
 import com.asinosoft.dialer.ui.incall.InCallActivity
 import com.asinosoft.dialer.util.formatPhoneNumber
 import kotlinx.coroutines.CoroutineScope
@@ -114,7 +114,6 @@ class NotificationManager(val service: Service) {
             }
 
             val callerName = contactName ?: call.displayName.ifBlank { formatPhoneNumber(call.rawNumber) }
-            val formattedNumber = formatPhoneNumber(call.rawNumber)
 
             val callerPerson = Person.Builder()
                 .setName(callerName)
@@ -360,7 +359,7 @@ class NotificationManager(val service: Service) {
             canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
 
             val drawable =
-                androidx.core.content.ContextCompat.getDrawable(context, R.drawable.ic_missed_call)
+                ContextCompat.getDrawable(context, R.drawable.ic_missed_call)
             if (drawable != null) {
                 val iconSize = 72
                 val margin = (size - iconSize) / 2
@@ -387,7 +386,7 @@ class NotificationManager(val service: Service) {
         }
 
         try {
-            if (androidx.core.content.ContextCompat.checkSelfPermission(
+            if (ContextCompat.checkSelfPermission(
                     service,
                     android.Manifest.permission.WRITE_CALL_LOG
                 ) == android.content.pm.PackageManager.PERMISSION_GRANTED
@@ -460,21 +459,5 @@ class NotificationManager(val service: Service) {
         } catch (_: Exception) {
             return null
         }
-    }
-}
-
-data class CallState(
-    val state: Int,
-    val rawNumber: String,
-    val displayName: String,
-    val connectTimeMillis: Long?,
-) {
-    companion object {
-        fun fromSystemCall(call: Call) = CallState(
-            state = call.state,
-            rawNumber = call.details?.handle?.schemeSpecificPart ?: "",
-            displayName = call.details?.callerDisplayName ?: call.details?.handle?.schemeSpecificPart ?: "",
-            connectTimeMillis = call.details?.connectTimeMillis
-        )
     }
 }

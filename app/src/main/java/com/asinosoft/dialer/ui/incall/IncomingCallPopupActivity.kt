@@ -1,16 +1,13 @@
 package com.asinosoft.dialer.ui.incall
 
-import android.Manifest
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.ContactsContract
 import android.telecom.Call
-import android.telephony.SubscriptionManager
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.Toast
@@ -45,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -63,16 +61,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.asinosoft.dialer.service.CallManager
+import com.asinosoft.dialer.data.model.CallState
+import com.asinosoft.dialer.ui.theme.DialerTheme
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.ui.theme.SamsungSmsBlue
-import com.asinosoft.dialer.ui.theme.DialerTheme
 import com.asinosoft.dialer.util.formatPhoneNumber
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import androidx.core.net.toUri
 
 class IncomingCallPopupActivity : ComponentActivity() {
 
@@ -165,19 +163,15 @@ private fun IncomingCallPopupScreen(
         return
     }
 
-    val handle = activeCall?.details?.handle
-    val rawNumber = handle?.schemeSpecificPart ?: ""
-    val displayName = activeCall?.details?.callerDisplayName ?: rawNumber
+    val call by remember(activeCall) { derivedStateOf { CallState.fromSystemCall(activeCall as Call, context) } }
 
     var contactName by remember { mutableStateOf<String?>(null) }
     var contactPhotoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
-    val simNumber = remember(activeCall) { getSimNumberFromCall(activeCall, context) }
-
-    LaunchedEffect(rawNumber) {
-        if (rawNumber.isNotBlank()) {
+    LaunchedEffect(call) {
+        if (call.rawNumber.isNotBlank()) {
             withContext(Dispatchers.IO) {
-                val result = lookupContactInfo(context, rawNumber)
+                val result = lookupContactInfo(context, call.rawNumber)
                 contactName = result.name
 
                 if (!result.photoUri.isNullOrEmpty()) {
@@ -220,7 +214,7 @@ private fun IncomingCallPopupScreen(
     }
 
     val finalName = contactName
-        ?: if (displayName.isNotBlank() && displayName != rawNumber) displayName else "Неизвестный номер"
+        ?: if (call.displayName.isNotBlank() && call.displayName != call.rawNumber) call.displayName else "Неизвестный номер"
 
     Box(
         modifier = Modifier
@@ -285,7 +279,7 @@ private fun IncomingCallPopupScreen(
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            InCallSimBadge(simNumber = simNumber)
+                            InCallSimBadge(call.simNumber)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Входящие вызовы",
@@ -309,7 +303,7 @@ private fun IncomingCallPopupScreen(
                         Spacer(modifier = Modifier.height(2.dp))
 
                         Text(
-                            text = formatPhoneNumber(rawNumber),
+                            text = formatPhoneNumber(call.rawNumber),
                             fontSize = 15.sp,
                             color = Color.Black.copy(alpha = 0.65f),
                             maxLines = 1,
@@ -349,7 +343,7 @@ private fun IncomingCallPopupScreen(
                                 try {
                                     val smsIntent = Intent(
                                         Intent.ACTION_SENDTO,
-                                        "smsto:${Uri.encode(rawNumber)}".toUri()
+                                        "smsto:${Uri.encode(call.rawNumber)}".toUri()
                                     ).apply {
                                         flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                     }
@@ -398,68 +392,6 @@ private fun IncomingCallPopupScreen(
             }
         }
     }
-}
-
-private fun getSimNumberFromCall(call: Call?, context: Context): Int {
-    if (call == null) return 1
-    val details = call.details ?: return 1
-    val accountHandle = details.accountHandle ?: return 1
-    val accountId = accountHandle.id ?: return 1
-
-    try {
-        val hasPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.READ_PHONE_STATE
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (hasPermission) {
-            val subManager =
-                context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
-
-            @Suppress("MissingPermission")
-            val activeList = subManager?.activeSubscriptionInfoList
-
-            if (!activeList.isNullOrEmpty()) {
-                if (activeList.size == 1) {
-                    return activeList[0].simSlotIndex + 1
-                }
-
-                for (info in activeList) {
-                    val subId = info.subscriptionId.toString()
-                    val slotIndex = info.simSlotIndex
-                    val iccId = info.iccId.orEmpty()
-
-                    if (accountId == subId || accountId == "sub_$subId") {
-                        return slotIndex + 1
-                    }
-
-                    if (iccId.isNotBlank() && accountId.contains(iccId)) {
-                        return slotIndex + 1
-                    }
-
-                    if (accountId == slotIndex.toString() ||
-                        accountId.endsWith(":$slotIndex") ||
-                        accountId.endsWith("_$slotIndex") ||
-                        accountId.contains("slot$slotIndex", ignoreCase = true) ||
-                        accountId.contains("sim${slotIndex + 1}", ignoreCase = true)
-                    ) {
-                        return slotIndex + 1
-                    }
-                }
-            }
-        }
-    } catch (_: Exception) {
-        // ignore
-    }
-
-    val cleanId = accountId.lowercase().trim()
-    if (cleanId.contains("sim2") || cleanId.contains("slot1") || cleanId.contains("sub2") || cleanId.endsWith(
-            "_1"
-        ) || cleanId.endsWith(":1")
-    ) {
-        return 2
-    }
-    return 1
 }
 
 private data class PopupContactLookupResult(
