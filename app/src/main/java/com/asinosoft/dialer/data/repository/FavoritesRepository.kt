@@ -2,48 +2,68 @@ package com.asinosoft.dialer.data.repository
 
 import android.content.Context
 import android.provider.ContactsContract
+import androidx.core.content.edit
 import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.data.model.FavoriteTab
 import org.json.JSONArray
 import org.json.JSONObject
-import androidx.core.content.edit
 
 class FavoritesRepository(private val context: Context) {
 
     private val prefs = context.getSharedPreferences("favorites_prefs", Context.MODE_PRIVATE)
+    private val contactsWrite = ContactsWriteRepository(context)
 
     fun getFavorites(): List<FavoriteContact> {
         val savedFavorites = getSavedFavorites()
         val systemStarred = getSystemStarredContacts()
 
-        // Combine saved & system starred contacts without duplicates by name and ID
         val combined = mutableListOf<FavoriteContact>()
         val addedNames = mutableSetOf<String>()
         val addedIds = mutableSetOf<String>()
+        val addedPhones = mutableSetOf<String>()
+
+        fun mark(fav: FavoriteContact) {
+            val nameKey = fav.name.trim().lowercase()
+            if (nameKey.isNotEmpty()) addedNames.add(nameKey)
+            normalizeId(fav.id)?.let { addedIds.add(it) }
+            phoneKey(fav.number)?.let { addedPhones.add(it) }
+        }
+
+        fun isDuplicate(fav: FavoriteContact): Boolean {
+            val nameKey = fav.name.trim().lowercase()
+            val idKey = normalizeId(fav.id)
+            val phone = phoneKey(fav.number)
+            return (nameKey.isNotEmpty() && nameKey in addedNames) ||
+                    (idKey != null && idKey in addedIds) ||
+                    (phone != null && phone in addedPhones)
+        }
 
         savedFavorites.forEach { fav ->
-            val nameKey = fav.name.trim().lowercase()
             combined.add(fav)
-            if (nameKey.isNotEmpty()) addedNames.add(nameKey)
-            if (fav.id.isNotEmpty()) addedIds.add(fav.id)
+            mark(fav)
         }
 
         systemStarred.forEach { starred ->
-            val nameKey = starred.name.trim().lowercase()
-            val rawIdKey = starred.id.replace("starred_", "").trim()
-
-            val isDuplicate = addedNames.contains(nameKey) ||
-                    addedIds.contains(starred.id) ||
-                    (rawIdKey.isNotEmpty() && addedIds.contains(rawIdKey))
-
-            if (!isDuplicate) {
+            if (!isDuplicate(starred)) {
                 combined.add(starred.copy(order = combined.size))
-                if (nameKey.isNotEmpty()) addedNames.add(nameKey)
-                if (starred.id.isNotEmpty()) addedIds.add(starred.id)
+                mark(starred)
             }
         }
 
         return combined
+    }
+
+    fun isFavorite(contact: FavoriteContact): Boolean {
+        val idKey = normalizeId(contact.id)
+        val phone = phoneKey(contact.number)
+        val nameKey = contact.name.trim().lowercase()
+        return getFavorites().any { fav ->
+            val favId = normalizeId(fav.id)
+            val favPhone = phoneKey(fav.number)
+            (idKey != null && favId != null && idKey == favId) ||
+                    (phone != null && favPhone != null && phone == favPhone) ||
+                    (nameKey.isNotEmpty() && fav.name.trim().equals(contact.name.trim(), true))
+        }
     }
 
     private fun getSavedFavorites(): List<FavoriteContact> {
@@ -111,7 +131,7 @@ class FavoritesRepository(private val context: Context) {
                         addedContactKeys.add(key)
                         list.add(
                             FavoriteContact(
-                                id = "starred_$id",
+                                id = id.ifBlank { "starred_$name" },
                                 name = name,
                                 number = number,
                                 photoUri = photoUri
@@ -212,8 +232,7 @@ class FavoritesRepository(private val context: Context) {
         val current = getTabs().filter { it.id != id }
         if (current.isNotEmpty()) {
             saveTabs(current)
-            // Reassign contacts from deleted tab to default tab "default"
-            val favorites = getFavorites().map {
+            val favorites = getSavedFavorites().map {
                 if (it.tabId == id) it.copy(tabId = "default") else it
             }
             saveFavorites(favorites)
@@ -222,23 +241,79 @@ class FavoritesRepository(private val context: Context) {
     }
 
     fun addFavorite(contact: FavoriteContact): List<FavoriteContact> {
-        val current = getFavorites().toMutableList()
-        val existingIndex = current.indexOfFirst {
-            it.id == contact.id || (it.name.trim().isNotBlank() && it.name.trim()
-                .equals(contact.name.trim(), ignoreCase = true))
-        }
-        if (existingIndex != -1) {
-            current[existingIndex] = contact
+        val androidId = contactsWrite.setStarred(contact, starred = true)
+        val normalized = if (androidId != null) {
+            contact.copy(id = androidId.toString())
         } else {
-            current.add(contact.copy(order = current.size))
+            contact
+        }
+
+        val current = getSavedFavorites().toMutableList()
+        val existingIndex = current.indexOfFirst { sameContact(it, normalized) }
+        if (existingIndex != -1) {
+            current[existingIndex] = normalized.copy(order = existingIndex, tabId = normalized.tabId)
+        } else {
+            current.add(normalized.copy(order = current.size))
         }
         saveFavorites(current)
-        return current
+        return getFavorites()
     }
 
-    fun removeFavorite(id: String): List<FavoriteContact> {
-        val current = getFavorites().filter { it.id != id }
+    fun removeFavorite(contact: FavoriteContact): List<FavoriteContact> {
+        contactsWrite.setStarred(contact, starred = false)
+
+        val current = getSavedFavorites().filterNot { sameContact(it, contact) }
         saveFavorites(current)
-        return current
+        return getFavorites()
+    }
+
+    /** @deprecated prefer [removeFavorite] with full contact for STARRED sync */
+    fun removeFavorite(id: String): List<FavoriteContact> {
+        val fromSaved = getSavedFavorites().find { it.id == id || normalizeId(it.id) == normalizeId(id) }
+        val fromMerged = getFavorites().find { it.id == id || normalizeId(it.id) == normalizeId(id) }
+        val contact = fromSaved ?: fromMerged
+        return if (contact != null) {
+            removeFavorite(contact)
+        } else {
+            saveFavorites(getSavedFavorites().filterNot { it.id == id })
+            getFavorites()
+        }
+    }
+
+    fun updateFavorite(contact: FavoriteContact): List<FavoriteContact> {
+        val current = getSavedFavorites().toMutableList()
+        val existingIndex = current.indexOfFirst { sameContact(it, contact) }
+        if (existingIndex != -1) {
+            current[existingIndex] = contact.copy(order = existingIndex)
+            saveFavorites(current)
+        } else if (isFavorite(contact)) {
+            // Was only system-starred — persist metadata
+            current.add(contact.copy(order = current.size))
+            saveFavorites(current)
+        }
+        return getFavorites()
+    }
+
+    private fun sameContact(a: FavoriteContact, b: FavoriteContact): Boolean {
+        val idA = normalizeId(a.id)
+        val idB = normalizeId(b.id)
+        if (idA != null && idB != null && idA == idB) return true
+        val phoneA = phoneKey(a.number)
+        val phoneB = phoneKey(b.number)
+        if (phoneA != null && phoneB != null && phoneA == phoneB) return true
+        return a.name.trim().isNotBlank() &&
+                a.name.trim().equals(b.name.trim(), ignoreCase = true)
+    }
+
+    private fun normalizeId(id: String?): String? {
+        if (id.isNullOrBlank()) return null
+        val raw = id.removePrefix("starred_").removePrefix("fav_contact_")
+        if (raw.startsWith("call_log_")) return null
+        return raw.takeIf { it.isNotBlank() }
+    }
+
+    private fun phoneKey(number: String): String? {
+        val digits = number.filter { it.isDigit() }
+        return if (digits.length >= 7) digits.takeLast(10) else null
     }
 }

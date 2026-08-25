@@ -94,7 +94,11 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.asAndroidBitmap
+import com.asinosoft.dialer.data.repository.ContactsWriteRepository
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -166,15 +170,21 @@ data class ContactPhoneNumber(
 fun ContactDetailDialog(
     contact: FavoriteContact,
     initialTab: Int = 0,
+    isFavorite: Boolean = false,
     tabs: List<FavoriteTab> = emptyList(),
     onDismiss: () -> Unit,
     onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
     onRemoveFavorite: (FavoriteContact) -> Unit,
+    onToggleFavorite: (FavoriteContact, Boolean) -> Unit = { c, fav ->
+        if (!fav) onRemoveFavorite(c)
+    },
     onUpdateContact: (FavoriteContact) -> Unit = {},
-    onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", "Основные") }
+    onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", "Мои") }
 ) {
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val contactsWrite = remember { ContactsWriteRepository(context) }
     var avatarBitmap by remember(contact.photoUri) { mutableStateOf<ImageBitmap?>(null) }
     var phoneNumbersList by remember(contact) {
         mutableStateOf(listOf(ContactPhoneNumber(number = contact.number, label = "Мобильный")))
@@ -477,6 +487,7 @@ fun ContactDetailDialog(
                                 2 -> {
                                     SettingsTabContent(
                                         contact = contact,
+                                        isFavoriteInitial = isFavorite,
                                         phoneNumbersList = phoneNumbersList,
                                         messengerAccountsList = messengerAccountsList,
                                         onUpdateMessengerAccounts = { messengerAccountsList = it },
@@ -486,6 +497,7 @@ fun ContactDetailDialog(
                                         tabs = tabs,
                                         onDismiss = onDismiss,
                                         onRemoveFavorite = onRemoveFavorite,
+                                        onToggleFavorite = onToggleFavorite,
                                         onUpdateContact = onUpdateContact,
                                         onAddTab = onAddTab
                                     )
@@ -760,6 +772,20 @@ fun ContactDetailDialog(
                             contact.number,
                             newImportantDates
                         )
+                        coroutineScope.launch {
+                            contactsWrite.updateContactDetails(
+                                contact = contact,
+                                displayName = newName,
+                                phones = newPhones.map {
+                                    ContactsWriteRepository.PhoneEntry(it.number, it.label)
+                                },
+                                emails = newEmails.map {
+                                    ContactsWriteRepository.EmailEntry(it.email, it.label)
+                                },
+                                birthdayDateString = newBirthday?.dateString,
+                                photoBitmap = newBitmap?.asAndroidBitmap()
+                            )
+                        }
                         showEditContactDialog = false
                     },
                     onDismiss = { showEditContactDialog = false }
@@ -1779,6 +1805,7 @@ private fun HistoryCallRow(item: CallLogItem) {
 @Composable
 private fun SettingsTabContent(
     contact: FavoriteContact,
+    isFavoriteInitial: Boolean,
     phoneNumbersList: List<ContactPhoneNumber>,
     messengerAccountsList: List<MessengerAccount>,
     onUpdateMessengerAccounts: (List<MessengerAccount>) -> Unit = {},
@@ -1788,10 +1815,13 @@ private fun SettingsTabContent(
     tabs: List<FavoriteTab>,
     onDismiss: () -> Unit,
     onRemoveFavorite: (FavoriteContact) -> Unit,
+    onToggleFavorite: (FavoriteContact, Boolean) -> Unit,
     onUpdateContact: (FavoriteContact) -> Unit,
     onAddTab: (String) -> FavoriteTab
 ) {
-    var isFavorite by remember { mutableStateOf(true) }
+    var isFavorite by remember(contact.id, contact.number, isFavoriteInitial) {
+        mutableStateOf(isFavoriteInitial)
+    }
     var selectedTabId by remember(contact.tabId) { mutableStateOf(contact.tabId) }
 
     Column(
@@ -1822,7 +1852,7 @@ private fun SettingsTabContent(
                         )
                         Spacer(modifier = Modifier.width(14.dp))
                         Text(
-                            text = "В избранных контактах",
+                            text = "В избранных",
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface
@@ -1833,9 +1863,9 @@ private fun SettingsTabContent(
                         checked = isFavorite,
                         onCheckedChange = { checked ->
                             isFavorite = checked
+                            onToggleFavorite(contact, checked)
                             if (!checked) {
                                 onDismiss()
-                                onRemoveFavorite(contact)
                             }
                         },
                         colors = SwitchDefaults.colors(
@@ -1856,7 +1886,7 @@ private fun SettingsTabContent(
                     var showCreateTabDialog by remember { mutableStateOf(false) }
                     var newTabNameInput by remember { mutableStateOf("") }
 
-                    val currentTabName = tabs.find { it.id == selectedTabId }?.name ?: "Основные"
+                    val currentTabName = tabs.find { it.id == selectedTabId }?.name ?: "Мои"
 
                     Row(
                         modifier = Modifier
@@ -1875,7 +1905,7 @@ private fun SettingsTabContent(
                             )
                             Spacer(modifier = Modifier.width(14.dp))
                             Text(
-                                text = "Вкладка избранного",
+                                text = "Вкладка",
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -2403,17 +2433,55 @@ private suspend fun loadContactPhoneNumbers(
     val addedCleanNumbers = mutableSetOf<String>()
 
     try {
-        val cursor = context.contentResolver.query(
-            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-            arrayOf(
-                ContactsContract.CommonDataKinds.Phone.NUMBER,
-                ContactsContract.CommonDataKinds.Phone.TYPE,
-                ContactsContract.CommonDataKinds.Phone.LABEL
-            ),
-            "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} = ?",
-            arrayOf(contact.name),
-            "${ContactsContract.CommonDataKinds.Phone.IS_PRIMARY} DESC"
-        )
+        var contactId: String? = ContactsWriteRepository(context)
+            .resolveContactId(contact)?.toString()
+
+        if (contactId == null && contact.number.isNotBlank()) {
+            try {
+                val lookupUri = Uri.withAppendedPath(
+                    ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                    Uri.encode(contact.number)
+                )
+                context.contentResolver.query(
+                    lookupUri,
+                    arrayOf(ContactsContract.PhoneLookup._ID),
+                    null, null, null
+                )?.use { c ->
+                    if (c.moveToFirst()) {
+                        val idIdx = c.getColumnIndex(ContactsContract.PhoneLookup._ID)
+                        if (idIdx != -1) contactId = c.getString(idIdx)
+                    }
+                }
+            } catch (_: Exception) {
+                // ignore
+            }
+        }
+
+        val cursor = if (contactId != null) {
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.NUMBER,
+                    ContactsContract.CommonDataKinds.Phone.TYPE,
+                    ContactsContract.CommonDataKinds.Phone.LABEL
+                ),
+                "${ContactsContract.CommonDataKinds.Phone.CONTACT_ID} = ?",
+                arrayOf(contactId),
+                "${ContactsContract.CommonDataKinds.Phone.IS_PRIMARY} DESC"
+            )
+        } else {
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.NUMBER,
+                    ContactsContract.CommonDataKinds.Phone.TYPE,
+                    ContactsContract.CommonDataKinds.Phone.LABEL
+                ),
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} = ?",
+                arrayOf(contact.name),
+                "${ContactsContract.CommonDataKinds.Phone.IS_PRIMARY} DESC"
+            )
+        }
 
         cursor?.use { c ->
             val numberIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
@@ -2426,7 +2494,7 @@ private suspend fun loadContactPhoneNumbers(
                     if (typeIdx != -1) c.getInt(typeIdx) else ContactsContract.CommonDataKinds.Phone.TYPE_OTHER
                 val customLabel = if (labelIdx != -1) c.getString(labelIdx) else null
 
-                val cleanNum = num.replace(Regex("[^0-9+]"), "")
+                val cleanNum = num.filter { it.isDigit() || it == '+' }
                 if (cleanNum.isNotBlank() && !addedCleanNumbers.contains(cleanNum)) {
                     addedCleanNumbers.add(cleanNum)
                     val labelStr = getPhoneTypeLabel(type, customLabel)
@@ -2438,7 +2506,7 @@ private suspend fun loadContactPhoneNumbers(
         e.printStackTrace()
     }
 
-    val cleanMain = contact.number.replace(Regex("[^0-9+]"), "")
+    val cleanMain = contact.number.filter { it.isDigit() || it == '+' }
     if (cleanMain.isNotBlank() && !addedCleanNumbers.contains(cleanMain)) {
         numbersList.add(0, ContactPhoneNumber(number = contact.number, label = "Мобильный"))
     } else if (numbersList.isEmpty() && contact.number.isNotBlank()) {
@@ -2448,9 +2516,9 @@ private suspend fun loadContactPhoneNumbers(
     val contactKey = getContactCustomKey(contact)
     val savedOrder = getSavedPhoneNumbersOrder(context, contactKey)
     if (savedOrder.isNotEmpty()) {
-        val cleanSaved = savedOrder.map { it.replace(Regex("[^0-9+]"), "") }
+        val cleanSaved = savedOrder.map { it.filter { ch -> ch.isDigit() || ch == '+' } }
         numbersList.sortBy { item ->
-            val clean = item.number.replace(Regex("[^0-9+]"), "")
+            val clean = item.number.filter { it.isDigit() || it == '+' }
             val idx = cleanSaved.indexOf(clean)
             if (idx != -1) idx else 999
         }

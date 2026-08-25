@@ -14,6 +14,7 @@ import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.data.repository.CallLogRepository
 import com.asinosoft.dialer.data.repository.FavoritesRepository
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,12 +25,13 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.core.content.edit
 import kotlin.time.Duration.Companion.milliseconds
-
 data class ContactDetailState(
     val contact: FavoriteContact,
-    val initialTab: Int = 0
+    val initialTab: Int = 0,
+    val isFavorite: Boolean = false
 )
 
 data class SearchDialerItem(
@@ -192,13 +194,17 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private lateinit var callLogObserver: ContentObserver
+    private lateinit var contactsObserver: ContentObserver
     private var callLogReloadJob: Job? = null
+    private var contactsReloadJob: Job? = null
     private var loadCallLogsJob: Job? = null
     private var suppressCallLogObserverUntilElapsed = 0L
+    private var suppressContactsObserverUntilElapsed = 0L
 
     init {
         loadTabs()
         startObservingCallLogs()
+        startObservingContacts()
     }
 
     private fun startObservingCallLogs() {
@@ -221,6 +227,32 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    private fun startObservingContacts() {
+        contactsObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                super.onChange(selfChange)
+                if (!_hasLoadedCallLogs.value) return
+                if (SystemClock.elapsedRealtime() < suppressContactsObserverUntilElapsed) return
+                scheduleContactsReload()
+            }
+        }
+        try {
+            val cr = getApplication<Application>().contentResolver
+            cr.registerContentObserver(
+                android.provider.ContactsContract.Contacts.CONTENT_URI,
+                true,
+                contactsObserver
+            )
+            cr.registerContentObserver(
+                android.provider.ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                true,
+                contactsObserver
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
     private fun scheduleCallLogReload() {
         callLogReloadJob?.cancel()
         callLogReloadJob = viewModelScope.launch {
@@ -229,11 +261,30 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    private fun scheduleContactsReload() {
+        contactsReloadJob?.cancel()
+        contactsReloadJob = viewModelScope.launch {
+            delay(500)
+            // Favorites (STARRED / name / photo) + refresh call log cached fields
+            _favorites.value = withContext(Dispatchers.IO) {
+                favoritesRepository.getFavorites()
+            }
+            loadCallLogs(showLoading = false)
+            // Keep open contact detail in sync
+            _contactDetailToShow.update { state ->
+                state?.copy(isFavorite = favoritesRepository.isFavorite(state.contact))
+            }
+        }
+    }
+
     override fun onCleared() {
         callLogReloadJob?.cancel()
+        contactsReloadJob?.cancel()
         loadCallLogsJob?.cancel()
         try {
-            getApplication<Application>().contentResolver.unregisterContentObserver(callLogObserver)
+            val cr = getApplication<Application>().contentResolver
+            cr.unregisterContentObserver(callLogObserver)
+            cr.unregisterContentObserver(contactsObserver)
         } catch (_: Exception) {
             // ignore
         }
@@ -345,26 +396,6 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         _isTopBarVisible.value = false
     }
 
-    fun addFavorite(contact: FavoriteContact) {
-        viewModelScope.launch {
-            val contactWithTab = contact.copy(tabId = _activeTabId.value)
-            _favorites.value = favoritesRepository.addFavorite(contactWithTab)
-        }
-    }
-
-    fun updateFavorite(contact: FavoriteContact) {
-        viewModelScope.launch {
-            _favorites.value = favoritesRepository.addFavorite(contact)
-        }
-    }
-
-    fun removeFavorite(contact: FavoriteContact) {
-        viewModelScope.launch {
-            _favorites.value = favoritesRepository.removeFavorite(contact.id)
-            clearFavoriteSelection()
-        }
-    }
-
     fun reorderFavorites(fromIndex: Int, toIndex: Int) {
         val currentTabId = _activeTabId.value
         val allList = _favorites.value.toMutableList()
@@ -412,24 +443,77 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         _isAppSettingsOpen.value = false
     }
 
+    fun addFavorite(contact: FavoriteContact) {
+        viewModelScope.launch {
+            suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 1_500L
+            val contactWithTab = contact.copy(tabId = _activeTabId.value)
+            _favorites.value = withContext(Dispatchers.IO) {
+                favoritesRepository.addFavorite(contactWithTab)
+            }
+            _contactDetailToShow.update { state ->
+                if (state == null) null
+                else state.copy(
+                    contact = state.contact.copy(tabId = contactWithTab.tabId),
+                    isFavorite = true
+                )
+            }
+        }
+    }
+
+    fun updateFavorite(contact: FavoriteContact) {
+        viewModelScope.launch {
+            suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 1_500L
+            _favorites.value = withContext(Dispatchers.IO) {
+                favoritesRepository.updateFavorite(contact)
+            }
+            _contactDetailToShow.update { state ->
+                state?.copy(contact = contact, isFavorite = favoritesRepository.isFavorite(contact))
+            }
+        }
+    }
+
+    fun setContactFavorite(contact: FavoriteContact, favorite: Boolean) {
+        if (favorite) addFavorite(contact) else removeFavorite(contact)
+    }
+
+    fun removeFavorite(contact: FavoriteContact) {
+        viewModelScope.launch {
+            suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 1_500L
+            _favorites.value = withContext(Dispatchers.IO) {
+                favoritesRepository.removeFavorite(contact)
+            }
+            _contactDetailToShow.update { state ->
+                if (state == null) return@update null
+                val same =
+                    state.contact.id == contact.id ||
+                            state.contact.number == contact.number ||
+                            state.contact.name.equals(contact.name, ignoreCase = true)
+                if (same) state.copy(isFavorite = false) else state
+            }
+            clearFavoriteSelection()
+        }
+    }
+
     fun openContactDetail(contact: FavoriteContact, initialTab: Int = 0) {
         if (_isSearchDialerOpen.value) return
         openContactDetailJob?.cancel()
         openContactDetailJob = viewModelScope.launch {
             kotlinx.coroutines.delay(200.milliseconds)
             if (!_isSearchDialerOpen.value) {
-                _contactDetailToShow.value = ContactDetailState(contact, initialTab)
+                val isFav = withContext(Dispatchers.IO) {
+                    favoritesRepository.isFavorite(contact)
+                }
+                _contactDetailToShow.value = ContactDetailState(contact, initialTab, isFav)
             }
         }
     }
 
     fun openContactDetailFromCallLog(item: CallLogItem) {
-        val cleanCallNum = item.number.replace(Regex("[^0-9+]"), "")
+        val cleanCallNum = item.number.filter { it.isDigit() || it == '+' }
         val existingFav = _favorites.value.find { fav ->
-            val cleanFavNum = fav.number.replace(Regex("[^0-9+]"), "")
-            (cleanCallNum.isNotBlank() && cleanFavNum.isNotBlank() && cleanCallNum.takeLast(7) == cleanFavNum.takeLast(
-                7
-            )) ||
+            val cleanFavNum = fav.number.filter { it.isDigit() || it == '+' }
+            (cleanCallNum.isNotBlank() && cleanFavNum.isNotBlank() &&
+                    cleanCallNum.takeLast(7) == cleanFavNum.takeLast(7)) ||
                     (!item.name.isNullOrBlank() && fav.name.trim()
                         .equals(item.name.trim(), ignoreCase = true))
         }
