@@ -1,6 +1,5 @@
 package com.asinosoft.dialer.ui.recents.components
 
-import android.graphics.BitmapFactory
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
@@ -51,7 +50,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.core.net.toUri
 import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import kotlinx.coroutines.Dispatchers
@@ -334,24 +332,35 @@ private fun FavoriteAvatar(
     photoUri: String?
 ) {
     val context = LocalContext.current
-    var avatarBitmap by remember(photoUri) { mutableStateOf<ImageBitmap?>(null) }
+    val density = LocalDensity.current
+    val targetPx = with(density) { 72.dp.roundToPx() }.coerceAtLeast(1)
 
-    LaunchedEffect(photoUri) {
-        if (!photoUri.isNullOrEmpty()) {
+    var avatarBitmap by remember(photoUri) {
+        mutableStateOf(photoUri?.let { AvatarBitmapCache.get(it)?.asImageBitmap() })
+    }
+
+    LaunchedEffect(photoUri, targetPx) {
+        if (photoUri.isNullOrEmpty()) {
+            avatarBitmap = null
+            return@LaunchedEffect
+        }
+        val cached = AvatarBitmapCache.get(photoUri)
+        if (cached != null) {
+            avatarBitmap = cached.asImageBitmap()
+            return@LaunchedEffect
+        }
+        val decoded = AvatarBitmapCache.withDecodeSlot {
             withContext(Dispatchers.IO) {
                 try {
-                    val uri = photoUri.toUri()
-                    context.contentResolver.openInputStream(uri)?.use { stream ->
-                        val bitmap = BitmapFactory.decodeStream(stream)
-                        avatarBitmap = bitmap?.asImageBitmap()
+                    decodeSampledBitmap(context, photoUri, targetPx)?.also {
+                        AvatarBitmapCache.put(photoUri, it)
                     }
                 } catch (_: Exception) {
-                    avatarBitmap = null
+                    null
                 }
             }
-        } else {
-            avatarBitmap = null
         }
+        avatarBitmap = decoded?.asImageBitmap()
     }
 
     val bitmap = avatarBitmap

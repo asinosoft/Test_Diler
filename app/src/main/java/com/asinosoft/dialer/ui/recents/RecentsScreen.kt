@@ -32,6 +32,7 @@ import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
@@ -61,11 +62,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToDown
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -76,6 +79,7 @@ import com.asinosoft.dialer.ui.components.LazyListVerticalScrollbar
 import com.asinosoft.dialer.ui.dialer.SearchDialerScreen
 import com.asinosoft.dialer.ui.recents.components.AddFavoriteDialog
 import com.asinosoft.dialer.ui.recents.components.AppSettingsDialog
+import com.asinosoft.dialer.ui.recents.components.AvatarBitmapCache
 import com.asinosoft.dialer.ui.recents.components.ContactDetailDialog
 import com.asinosoft.dialer.ui.recents.components.FavoriteContactCard
 import com.asinosoft.dialer.ui.recents.components.FavoritesTopBar
@@ -96,6 +100,7 @@ fun RecentsScreen(
     onSms: (String) -> Unit
 ) {
     val density = LocalDensity.current
+    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val callLogs by viewModel.filteredCallLogs.collectAsState(initial = emptyList())
     val allFavorites by viewModel.favorites.collectAsState()
@@ -112,8 +117,10 @@ fun RecentsScreen(
     val searchQuery by viewModel.searchQuery.collectAsState()
     val showOnlyMissed by viewModel.showOnlyMissed.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val hasLoadedCallLogs by viewModel.hasLoadedCallLogs.collectAsState()
     var showHint by remember { mutableStateOf(true) }
     var initialScrollDone by remember { mutableStateOf(false) }
+    var listReady by remember { mutableStateOf(false) }
 
     var draggingContactId by remember { mutableStateOf<String?>(null) }
     var dragFromIndex by remember { mutableIntStateOf(-1) }
@@ -157,12 +164,28 @@ fun RecentsScreen(
         1 + targetGridRowIndex
     }
 
-    // Scroll to initial position AFTER call logs and favorites finish loading
-    LaunchedEffect(isLoading, favorites, callLogs) {
-        if (!isLoading && !initialScrollDone && favoriteRows.isNotEmpty()) {
-            listState.scrollToItem(initialItemIndex, 0)
-            initialScrollDone = true
-        }
+    // Position list once; prefetch avatars first so first frames don't decode mid-scroll
+    LaunchedEffect(hasLoadedCallLogs, initialItemIndex, favoriteRows.size) {
+        if (!hasLoadedCallLogs || initialScrollDone) return@LaunchedEffect
+
+        val callLogAvatarPx = with(density) { 48.dp.roundToPx() }.coerceAtLeast(1)
+        val favoriteAvatarPx = with(density) { 72.dp.roundToPx() }.coerceAtLeast(1)
+
+        AvatarBitmapCache.prefetch(
+            context = context,
+            uris = favorites.map { it.photoUri },
+            targetPx = favoriteAvatarPx
+        )
+        AvatarBitmapCache.prefetch(
+            context = context,
+            uris = callLogs.take(24).map { it.photoUri },
+            targetPx = callLogAvatarPx
+        )
+
+        val target = if (favoriteRows.isNotEmpty()) initialItemIndex else 0
+        listState.scrollToItem(target.coerceAtLeast(0), 0)
+        initialScrollDone = true
+        listReady = true
     }
 
     // Check if scrolled away by more than 33% of viewport / threshold
@@ -251,8 +274,10 @@ fun RecentsScreen(
             ) {
                 LazyColumn(
                     state = listState,
-                    userScrollEnabled = draggingContactId == null,
-                    modifier = Modifier.fillMaxSize(),
+                    userScrollEnabled = draggingContactId == null && listReady,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { alpha = if (listReady) 1f else 0f },
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -684,7 +709,15 @@ fun RecentsScreen(
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight()
                         .zIndex(5f)
+                        .graphicsLayer { alpha = if (listReady) 1f else 0f }
                 )
+
+                if (!listReady) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center),
+                        color = SamsungGreen
+                    )
+                }
             }
         }
 

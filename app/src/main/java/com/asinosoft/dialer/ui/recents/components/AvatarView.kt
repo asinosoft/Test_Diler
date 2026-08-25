@@ -1,9 +1,5 @@
 package com.asinosoft.dialer.ui.recents.components
 
-import android.content.Context
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -28,24 +24,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-
-private object AvatarBitmapCache {
-    private val maxKb = (Runtime.getRuntime().maxMemory() / 1024 / 16).toInt().coerceIn(2048, 8192)
-    private val cache = object : LruCache<String, Bitmap>(maxKb) {
-        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
-    }
-
-    @Synchronized
-    fun get(key: String): Bitmap? = cache.get(key)
-
-    @Synchronized
-    fun put(key: String, bitmap: Bitmap) {
-        cache.put(key, bitmap)
-    }
-}
 
 @Composable
 fun AvatarView(name: String, photoUri: String?) {
@@ -53,7 +33,12 @@ fun AvatarView(name: String, photoUri: String?) {
     val density = LocalDensity.current
     val targetPx = with(density) { 48.dp.roundToPx() }.coerceAtLeast(1)
 
-    var avatarBitmap by remember(photoUri) { mutableStateOf<ImageBitmap?>(null) }
+    // Prefer cache hit immediately to avoid letter→photo flicker during scroll
+    var avatarBitmap by remember(photoUri) {
+        mutableStateOf(
+            photoUri?.let { AvatarBitmapCache.get(it)?.asImageBitmap() }
+        )
+    }
 
     LaunchedEffect(photoUri, targetPx) {
         if (photoUri.isNullOrEmpty()) {
@@ -62,18 +47,21 @@ fun AvatarView(name: String, photoUri: String?) {
         }
 
         val cached = AvatarBitmapCache.get(photoUri)
-        if (cached != null && !cached.isRecycled) {
+        if (cached != null) {
             avatarBitmap = cached.asImageBitmap()
             return@LaunchedEffect
         }
 
-        val decoded = withContext(Dispatchers.IO) {
-            try {
-                decodeSampledBitmap(context, photoUri, targetPx)?.also {
-                    AvatarBitmapCache.put(photoUri, it)
+        // Already showing initials; decode in background without blocking scroll
+        val decoded = AvatarBitmapCache.withDecodeSlot {
+            withContext(Dispatchers.IO) {
+                try {
+                    decodeSampledBitmap(context, photoUri, targetPx)?.also {
+                        AvatarBitmapCache.put(photoUri, it)
+                    }
+                } catch (_: Exception) {
+                    null
                 }
-            } catch (_: Exception) {
-                null
             }
         }
         avatarBitmap = decoded?.asImageBitmap()
@@ -117,32 +105,4 @@ fun AvatarView(name: String, photoUri: String?) {
             )
         }
     }
-}
-
-private fun decodeSampledBitmap(context: Context, photoUri: String, targetPx: Int): Bitmap? {
-    val uri = photoUri.toUri()
-    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    context.contentResolver.openInputStream(uri)?.use { stream ->
-        BitmapFactory.decodeStream(stream, null, bounds)
-    }
-    val options = BitmapFactory.Options().apply {
-        inSampleSize = calculateInSampleSize(bounds.outWidth, bounds.outHeight, targetPx)
-    }
-    return context.contentResolver.openInputStream(uri)?.use { stream ->
-        BitmapFactory.decodeStream(stream, null, options)
-    }
-}
-
-private fun calculateInSampleSize(width: Int, height: Int, targetPx: Int): Int {
-    var inSampleSize = 1
-    val w = width.coerceAtLeast(1)
-    val h = height.coerceAtLeast(1)
-    if (h > targetPx || w > targetPx) {
-        val halfH = h / 2
-        val halfW = w / 2
-        while (halfH / inSampleSize >= targetPx && halfW / inSampleSize >= targetPx) {
-            inSampleSize *= 2
-        }
-    }
-    return inSampleSize.coerceAtLeast(1)
 }

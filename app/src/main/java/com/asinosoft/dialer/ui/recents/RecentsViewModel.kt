@@ -5,6 +5,7 @@ import android.content.Context
 import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.asinosoft.dialer.data.model.CallLogItem
@@ -89,8 +90,11 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     private val _showOnlyMissed = MutableStateFlow(false)
     val showOnlyMissed: StateFlow<Boolean> = _showOnlyMissed.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(false)
+    private val _isLoading = MutableStateFlow(true)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _hasLoadedCallLogs = MutableStateFlow(false)
+    val hasLoadedCallLogs: StateFlow<Boolean> = _hasLoadedCallLogs.asStateFlow()
 
     private val _isSearchDialerOpen = MutableStateFlow(false)
     val isSearchDialerOpen: StateFlow<Boolean> = _isSearchDialerOpen.asStateFlow()
@@ -189,10 +193,11 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     private lateinit var callLogObserver: ContentObserver
     private var callLogReloadJob: Job? = null
+    private var loadCallLogsJob: Job? = null
+    private var suppressCallLogObserverUntilElapsed = 0L
 
     init {
         loadTabs()
-        loadFavorites()
         startObservingCallLogs()
     }
 
@@ -200,6 +205,8 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         callLogObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
                 super.onChange(selfChange)
+                if (!_hasLoadedCallLogs.value) return
+                if (SystemClock.elapsedRealtime() < suppressCallLogObserverUntilElapsed) return
                 scheduleCallLogReload()
             }
         }
@@ -224,6 +231,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     override fun onCleared() {
         callLogReloadJob?.cancel()
+        loadCallLogsJob?.cancel()
         try {
             getApplication<Application>().contentResolver.unregisterContentObserver(callLogObserver)
         } catch (_: Exception) {
@@ -255,13 +263,17 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun loadCallLogs(showLoading: Boolean = true) {
-        viewModelScope.launch {
-            val shouldShowLoading = showLoading && _rawCallLogs.value.isEmpty()
+        if (loadCallLogsJob?.isActive == true) return
+        loadCallLogsJob = viewModelScope.launch {
+            val shouldShowLoading = showLoading && !_hasLoadedCallLogs.value
             if (shouldShowLoading) _isLoading.value = true
             try {
                 _rawCallLogs.value = repository.getCallLogs()
-                loadFavorites()
+                _favorites.value = favoritesRepository.getFavorites()
             } finally {
+                _hasLoadedCallLogs.value = true
+                // Ignore observer spam for a few seconds after cold start
+                suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 3_000L
                 _isLoading.value = false
             }
         }
