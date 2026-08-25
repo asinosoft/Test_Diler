@@ -1,5 +1,6 @@
 package com.asinosoft.dialer.data.repository
 
+import android.content.ContentUris
 import android.content.Context
 import android.provider.ContactsContract
 import androidx.core.content.edit
@@ -15,6 +16,12 @@ class FavoritesRepository(private val context: Context) {
 
     fun getFavorites(): List<FavoriteContact> {
         val savedFavorites = getSavedFavorites()
+        val refreshedSaved = savedFavorites.map { refreshContactFromAndroid(it) }
+        // Keep SharedPreferences in sync with Android (name / photo / id)
+        if (refreshedSaved != savedFavorites) {
+            saveFavorites(refreshedSaved)
+        }
+
         val systemStarred = getSystemStarredContacts()
 
         val combined = mutableListOf<FavoriteContact>()
@@ -30,15 +37,14 @@ class FavoritesRepository(private val context: Context) {
         }
 
         fun isDuplicate(fav: FavoriteContact): Boolean {
-            val nameKey = fav.name.trim().lowercase()
             val idKey = normalizeId(fav.id)
             val phone = phoneKey(fav.number)
-            return (nameKey.isNotEmpty() && nameKey in addedNames) ||
-                    (idKey != null && idKey in addedIds) ||
+            // Match by id/phone only — name alone must not hide Android renames
+            return (idKey != null && idKey in addedIds) ||
                     (phone != null && phone in addedPhones)
         }
 
-        savedFavorites.forEach { fav ->
+        refreshedSaved.forEach { fav ->
             combined.add(fav)
             mark(fav)
         }
@@ -63,6 +69,44 @@ class FavoritesRepository(private val context: Context) {
             (idKey != null && favId != null && idKey == favId) ||
                     (phone != null && favPhone != null && phone == favPhone) ||
                     (nameKey.isNotEmpty() && fav.name.trim().equals(contact.name.trim(), true))
+        }
+    }
+
+    private fun refreshContactFromAndroid(fav: FavoriteContact): FavoriteContact {
+        val contactId = contactsWrite.resolveContactId(fav) ?: return fav
+        return try {
+            val uri = ContentUris.withAppendedId(
+                ContactsContract.Contacts.CONTENT_URI,
+                contactId
+            )
+            context.contentResolver.query(
+                uri,
+                arrayOf(
+                    ContactsContract.Contacts.DISPLAY_NAME_PRIMARY,
+                    ContactsContract.Contacts.PHOTO_URI,
+                    ContactsContract.Contacts.PHOTO_THUMBNAIL_URI
+                ),
+                null,
+                null,
+                null
+            )?.use { c ->
+                if (!c.moveToFirst()) return@use fav
+                val nameIdx = c.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME_PRIMARY)
+                val photoIdx = c.getColumnIndex(ContactsContract.Contacts.PHOTO_URI)
+                val thumbIdx = c.getColumnIndex(ContactsContract.Contacts.PHOTO_THUMBNAIL_URI)
+                val name = if (nameIdx != -1) c.getString(nameIdx) else null
+                var photo = if (photoIdx != -1) c.getString(photoIdx) else null
+                if (photo.isNullOrEmpty() && thumbIdx != -1) {
+                    photo = c.getString(thumbIdx)
+                }
+                fav.copy(
+                    id = contactId.toString(),
+                    name = if (!name.isNullOrBlank()) name else fav.name,
+                    photoUri = if (!photo.isNullOrEmpty()) photo else fav.photoUri
+                )
+            } ?: fav
+        } catch (_: Exception) {
+            fav
         }
     }
 

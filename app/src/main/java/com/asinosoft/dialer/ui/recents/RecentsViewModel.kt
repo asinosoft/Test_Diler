@@ -13,6 +13,7 @@ import com.asinosoft.dialer.data.model.CallType
 import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.data.repository.CallLogRepository
+import com.asinosoft.dialer.data.repository.ContactsWriteRepository
 import com.asinosoft.dialer.data.repository.FavoritesRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -49,6 +50,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     private val repository = CallLogRepository(application)
     private val favoritesRepository = FavoritesRepository(application)
+    private val contactsWriteRepository = ContactsWriteRepository(application)
 
     private val _rawCallLogs = MutableStateFlow<List<CallLogItem>>(emptyList())
 
@@ -265,16 +267,73 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         contactsReloadJob?.cancel()
         contactsReloadJob = viewModelScope.launch {
             delay(500)
-            // Favorites (STARRED / name / photo) + refresh call log cached fields
-            _favorites.value = withContext(Dispatchers.IO) {
+            repository.clearNameCache()
+            val favorites = withContext(Dispatchers.IO) {
                 favoritesRepository.getFavorites()
             }
+            seedCallLogCachesFromFavorites(favorites)
+            _favorites.value = favorites
+            // Instant UI: prefs may have been refreshed from Android already
+            _rawCallLogs.value = applyFavoriteNames(_rawCallLogs.value, favorites)
+            syncOpenContactDetail(favorites)
+            // Force full reload even if a previous load is still running
+            loadCallLogsJob?.cancel()
             loadCallLogs(showLoading = false)
-            // Keep open contact detail in sync
-            _contactDetailToShow.update { state ->
-                state?.copy(isFavorite = favoritesRepository.isFavorite(state.contact))
+        }
+    }
+
+    private suspend fun syncOpenContactDetail(favorites: List<FavoriteContact>) {
+        val current = _contactDetailToShow.value
+        val liveNameForOpen = if (current != null &&
+            favorites.none { sameContact(it, current.contact) }
+        ) {
+            withContext(Dispatchers.IO) {
+                repository.resolveDisplayName(current.contact.number)
+            }
+        } else {
+            null
+        }
+
+        _contactDetailToShow.update { state ->
+            if (state == null) return@update null
+            val match = favorites.find { sameContact(it, state.contact) }
+            if (match != null) {
+                state.copy(
+                    contact = match.copy(
+                        tabId = state.contact.tabId,
+                        order = state.contact.order
+                    ),
+                    isFavorite = true
+                )
+            } else {
+                val contact = if (!liveNameForOpen.isNullOrBlank() &&
+                    liveNameForOpen != state.contact.name
+                ) {
+                    state.contact.copy(name = liveNameForOpen)
+                } else {
+                    state.contact
+                }
+                state.copy(
+                    contact = contact,
+                    isFavorite = favorites.any { sameContact(it, contact) }
+                )
             }
         }
+        _selectedFavorite.update { selected ->
+            if (selected == null) return@update null
+            favorites.find { sameContact(it, selected) }
+                ?.copy(tabId = selected.tabId, order = selected.order)
+                ?: selected
+        }
+    }
+
+    private fun sameContact(a: FavoriteContact, b: FavoriteContact): Boolean {
+        val aId = a.id.trim().takeIf { it.isNotEmpty() && it != "0" }
+        val bId = b.id.trim().takeIf { it.isNotEmpty() && it != "0" }
+        if (aId != null && bId != null && aId == bId) return true
+        val aPhone = phoneMatchKey(a.number)
+        val bPhone = phoneMatchKey(b.number)
+        return aPhone != null && aPhone == bPhone
     }
 
     override fun onCleared() {
@@ -314,7 +373,10 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun loadCallLogs(showLoading: Boolean = true) {
-        if (loadCallLogsJob?.isActive == true) return
+        if (loadCallLogsJob?.isActive == true) {
+            if (showLoading) return
+            loadCallLogsJob?.cancel()
+        }
         loadCallLogsJob = viewModelScope.launch {
             val shouldShowLoading = showLoading && !_hasLoadedCallLogs.value
             if (shouldShowLoading) _isLoading.value = true
@@ -322,22 +384,32 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                 val favorites = withContext(Dispatchers.IO) {
                     favoritesRepository.getFavorites()
                 }
-                seedCallLogPhotosFromFavorites(favorites)
+                seedCallLogCachesFromFavorites(favorites)
 
                 if (shouldShowLoading || _rawCallLogs.value.isEmpty()) {
                     // Phase 1: fast window so startup time stays the same
-                    _rawCallLogs.value = repository.getCallLogs(CallLogRepository.DEFAULT_RECENTS_LIMIT)
+                    _rawCallLogs.value = applyFavoriteNames(
+                        repository.getCallLogs(CallLogRepository.DEFAULT_RECENTS_LIMIT),
+                        favorites
+                    )
                     _favorites.value = favorites
                     _hasLoadedCallLogs.value = true
                     _isLoading.value = false
 
                     // Phase 2: full journal in background (photo cache already warm)
-                    _rawCallLogs.value = repository.getCallLogs(limit = null)
+                    _rawCallLogs.value = applyFavoriteNames(
+                        repository.getCallLogs(limit = null),
+                        favorites
+                    )
                 } else {
                     // Silent refresh — full list, no spinner
-                    _rawCallLogs.value = repository.getCallLogs(limit = null)
+                    _rawCallLogs.value = applyFavoriteNames(
+                        repository.getCallLogs(limit = null),
+                        favorites
+                    )
                     _favorites.value = favorites
                 }
+                syncOpenContactDetail(favorites)
             } finally {
                 _hasLoadedCallLogs.value = true
                 // Ignore observer spam for a few seconds after cold start
@@ -347,10 +419,44 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    private fun seedCallLogPhotosFromFavorites(favorites: List<FavoriteContact>) {
+    private fun seedCallLogCachesFromFavorites(favorites: List<FavoriteContact>) {
         val byNumber = favorites.associate { it.number to it.photoUri }
         val byName = favorites.associate { it.name to it.photoUri }
         repository.seedPhotoCache(byNumber, byName)
+        repository.seedNameCache(favorites.associate { it.number to it.name })
+    }
+
+    /** Prefer favorite display names over stale CallLog.CACHED_NAME. */
+    private fun applyFavoriteNames(
+        logs: List<CallLogItem>,
+        favorites: List<FavoriteContact>
+    ): List<CallLogItem> {
+        if (logs.isEmpty() || favorites.isEmpty()) return logs
+        val nameByPhone = HashMap<String, String>(favorites.size * 2)
+        for (fav in favorites) {
+            val key = phoneMatchKey(fav.number) ?: continue
+            if (fav.name.isNotBlank()) nameByPhone[key] = fav.name
+        }
+        if (nameByPhone.isEmpty()) return logs
+        return logs.map { item ->
+            val key = phoneMatchKey(item.number) ?: return@map item
+            val favName = nameByPhone[key] ?: return@map item
+            if (item.name == favName) item else item.copy(name = favName)
+        }
+    }
+
+    private fun phoneMatchKey(number: String): String? {
+        val digits = number.filter { it.isDigit() }
+        return if (digits.length >= 7) digits.takeLast(10) else null
+    }
+
+    private fun patchCallLogNames(phones: Collection<String>, newName: String) {
+        val keys = phones.mapNotNull { phoneMatchKey(it) }.toSet()
+        if (keys.isEmpty() || newName.isBlank()) return
+        _rawCallLogs.value = _rawCallLogs.value.map { item ->
+            val key = phoneMatchKey(item.number)
+            if (key != null && key in keys) item.copy(name = newName) else item
+        }
     }
 
     private fun loadFavorites() {
@@ -473,12 +579,60 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     fun updateFavorite(contact: FavoriteContact) {
         viewModelScope.launch {
-            suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 1_500L
+            suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 2_500L
+            suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 2_500L
+
+            withContext(Dispatchers.IO) {
+                contactsWriteRepository.renameContact(
+                    contact = contact,
+                    newDisplayName = contact.name,
+                    phoneNumbers = listOf(contact.number)
+                )
+            }
+
             _favorites.value = withContext(Dispatchers.IO) {
                 favoritesRepository.updateFavorite(contact)
             }
+            patchCallLogNames(listOf(contact.number), contact.name)
             _contactDetailToShow.update { state ->
-                state?.copy(contact = contact, isFavorite = favoritesRepository.isFavorite(contact))
+                state?.copy(contact = contact, isFavorite = true)
+            }
+        }
+    }
+
+    /**
+     * Full contact edit from detail dialog: Android Contacts + CallLog + favorites + UI list.
+     */
+    fun saveEditedContact(
+        original: FavoriteContact,
+        updated: FavoriteContact,
+        phones: List<ContactsWriteRepository.PhoneEntry>,
+        emails: List<ContactsWriteRepository.EmailEntry>,
+        birthdayDateString: String?,
+        photoBitmap: android.graphics.Bitmap?
+    ) {
+        viewModelScope.launch {
+            suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 2_500L
+            suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 2_500L
+
+            withContext(Dispatchers.IO) {
+                contactsWriteRepository.updateContactDetails(
+                    contact = original,
+                    displayName = updated.name,
+                    phones = phones,
+                    emails = emails,
+                    birthdayDateString = birthdayDateString,
+                    photoBitmap = photoBitmap
+                )
+            }
+
+            _favorites.value = withContext(Dispatchers.IO) {
+                favoritesRepository.updateFavorite(updated)
+            }
+            val phoneNumbers = phones.map { it.number }.ifEmpty { listOf(updated.number) }
+            patchCallLogNames(phoneNumbers, updated.name)
+            _contactDetailToShow.update { state ->
+                state?.copy(contact = updated, isFavorite = favoritesRepository.isFavorite(updated))
             }
         }
     }

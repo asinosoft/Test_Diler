@@ -94,7 +94,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.asAndroidBitmap
 import com.asinosoft.dialer.data.repository.ContactsWriteRepository
@@ -180,11 +179,17 @@ fun ContactDetailDialog(
         if (!fav) onRemoveFavorite(c)
     },
     onUpdateContact: (FavoriteContact) -> Unit = {},
-    onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", "Мои") }
+    onSaveEditedContact: (
+        original: FavoriteContact,
+        updated: FavoriteContact,
+        phones: List<ContactsWriteRepository.PhoneEntry>,
+        emails: List<ContactsWriteRepository.EmailEntry>,
+        birthdayDateString: String?,
+        photoBitmap: android.graphics.Bitmap?
+    ) -> Unit = { _, updated, _, _, _, _ -> onUpdateContact(updated) },
+    onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", "Основные") }
 ) {
     val context = LocalContext.current
-    val coroutineScope = rememberCoroutineScope()
-    val contactsWrite = remember { ContactsWriteRepository(context) }
     var avatarBitmap by remember(contact.photoUri) { mutableStateOf<ImageBitmap?>(null) }
     var phoneNumbersList by remember(contact) {
         mutableStateOf(listOf(ContactPhoneNumber(number = contact.number, label = "Мобильный")))
@@ -751,7 +756,6 @@ fun ContactDetailDialog(
                             name = newName,
                             number = newPhones.firstOrNull()?.number ?: contact.number
                         )
-                        onUpdateContact(updatedContact)
                         phoneNumbersList = newPhones
                         emailsList = newEmails
                         birthdayInfo = newBirthday
@@ -763,29 +767,27 @@ fun ContactDetailDialog(
                         saveHiddenMessengers(context, getContactCustomKey(contact), hiddenSet)
                         saveCustomMessengerLinks(
                             context,
-                            getContactCustomKey(contact),
+                            getContactCustomKey(updatedContact),
                             updatedMessengers
                         )
                         saveImportantDates(
                             context,
-                            getContactCustomKey(contact),
-                            contact.number,
+                            getContactCustomKey(updatedContact),
+                            updatedContact.number,
                             newImportantDates
                         )
-                        coroutineScope.launch {
-                            contactsWrite.updateContactDetails(
-                                contact = contact,
-                                displayName = newName,
-                                phones = newPhones.map {
-                                    ContactsWriteRepository.PhoneEntry(it.number, it.label)
-                                },
-                                emails = newEmails.map {
-                                    ContactsWriteRepository.EmailEntry(it.email, it.label)
-                                },
-                                birthdayDateString = newBirthday?.dateString,
-                                photoBitmap = newBitmap?.asAndroidBitmap()
-                            )
-                        }
+                        onSaveEditedContact(
+                            contact,
+                            updatedContact,
+                            newPhones.map {
+                                ContactsWriteRepository.PhoneEntry(it.number, it.label)
+                            },
+                            newEmails.map {
+                                ContactsWriteRepository.EmailEntry(it.email, it.label)
+                            },
+                            newBirthday?.dateString,
+                            newBitmap?.asAndroidBitmap()
+                        )
                         showEditContactDialog = false
                     },
                     onDismiss = { showEditContactDialog = false }

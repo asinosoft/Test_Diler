@@ -25,6 +25,9 @@ class CallLogRepository(private val context: Context) {
     /** Normalized name → photo URI */
     private val photoByNameCache = mutableMapOf<String, String>()
 
+    /** Normalized number → display name from Contacts (overrides stale CallLog cache) */
+    private val nameCache = mutableMapOf<String, String>()
+
     @Volatile
     private var cachedSubscriptions: List<SubscriptionInfo>? = null
 
@@ -45,6 +48,18 @@ class CallLogRepository(private val context: Context) {
         }
     }
 
+    fun seedNameCache(numberToName: Map<String, String?>) {
+        for ((number, name) in numberToName) {
+            if (name.isNullOrBlank()) continue
+            val key = photoCacheKey(number)
+            if (key.isNotEmpty()) nameCache[key] = name
+        }
+    }
+
+    fun clearNameCache() {
+        nameCache.clear()
+    }
+
     /**
      * @param limit max raw CallLog rows (newest first). Null = entire journal.
      */
@@ -55,7 +70,8 @@ class CallLogRepository(private val context: Context) {
                 selectionArgs = null,
                 limit = limit
             )
-            val withPhotos = enrichPhotos(raw)
+            val withNames = enrichNames(raw)
+            val withPhotos = enrichPhotos(withNames)
             groupConsecutiveCallLogs(withPhotos)
         }
 
@@ -181,6 +197,71 @@ class CallLogRepository(private val context: Context) {
         }
 
         return rawCallLogs
+    }
+
+    /**
+     * Prefer live Contacts display name over stale CallLog.CACHED_NAME.
+     */
+    private fun enrichNames(logs: List<CallLogItem>): List<CallLogItem> {
+        if (logs.isEmpty()) return logs
+
+        val numbersNeedingLookup = LinkedHashSet<String>()
+        for (item in logs) {
+            if (item.number.isBlank()) continue
+            val key = photoCacheKey(item.number)
+            if (key.isEmpty() || nameCache.containsKey(key)) continue
+            numbersNeedingLookup.add(item.number)
+        }
+
+        for (number in numbersNeedingLookup) {
+            val name = lookupContactDisplayName(number)
+            if (!name.isNullOrBlank()) {
+                val key = photoCacheKey(number)
+                if (key.isNotEmpty()) nameCache[key] = name
+            }
+        }
+
+        return logs.map { item ->
+            val key = photoCacheKey(item.number)
+            val live = if (key.isNotEmpty()) nameCache[key] else null
+            if (!live.isNullOrBlank() && live != item.name) item.copy(name = live) else item
+        }
+    }
+
+    fun resolveDisplayName(phoneNumber: String): String? {
+        if (phoneNumber.isBlank()) return null
+        val key = photoCacheKey(phoneNumber)
+        if (key.isNotEmpty()) nameCache[key]?.let { return it }
+        val name = lookupContactDisplayName(phoneNumber) ?: return null
+        if (key.isNotEmpty()) nameCache[key] = name
+        return name
+    }
+
+    private fun lookupContactDisplayName(phoneNumber: String): String? {
+        for (candidate in numberLookupCandidates(phoneNumber)) {
+            try {
+                val uri = Uri.withAppendedPath(
+                    ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                    Uri.encode(candidate)
+                )
+                context.contentResolver.query(
+                    uri,
+                    arrayOf(ContactsContract.PhoneLookup.DISPLAY_NAME),
+                    null,
+                    null,
+                    null
+                )?.use { c ->
+                    if (c.moveToFirst()) {
+                        val idx = c.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                        val name = if (idx != -1) c.getString(idx) else null
+                        if (!name.isNullOrBlank()) return name
+                    }
+                }
+            } catch (_: Exception) {
+                // try next candidate
+            }
+        }
+        return null
     }
 
     /**
