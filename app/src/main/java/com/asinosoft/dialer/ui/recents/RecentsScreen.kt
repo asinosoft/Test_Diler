@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -75,6 +76,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.asinosoft.dialer.data.model.FavoriteTab
+import com.asinosoft.dialer.ui.components.LazyListVerticalScrollbar
 import com.asinosoft.dialer.ui.dialer.SearchDialerScreen
 import com.asinosoft.dialer.ui.recents.components.AddFavoriteDialog
 import com.asinosoft.dialer.ui.recents.components.AppSettingsDialog
@@ -259,15 +261,18 @@ fun RecentsScreen(
                 } else Modifier
             )
         ) { innerPadding ->
-            LazyColumn(
-                state = listState,
-                userScrollEnabled = draggingContactId == null,
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                    .padding(innerPadding)
             ) {
+                LazyColumn(
+                    state = listState,
+                    userScrollEnabled = draggingContactId == null,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                 item(key = "top_header") {
                     // Samsung One UI Top Header
                     Row(
@@ -688,6 +693,15 @@ fun RecentsScreen(
                         }
                     }
                 }
+                }
+
+                LazyListVerticalScrollbar(
+                    listState = listState,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .zIndex(5f)
+                )
             }
         }
 

@@ -35,6 +35,8 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -136,6 +138,7 @@ import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.data.repository.CallLogRepository
 import com.asinosoft.dialer.data.repository.ContactsRepository
+import com.asinosoft.dialer.ui.components.LazyListVerticalScrollbar
 import com.asinosoft.dialer.ui.theme.IncomingGreen
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
@@ -147,6 +150,7 @@ import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import androidx.compose.foundation.layout.fillMaxHeight
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -180,6 +184,11 @@ fun ContactDetailDialog(
 
     var historyLogs by remember { mutableStateOf<List<CallLogItem>>(emptyList()) }
     var isLoadingHistory by remember { mutableStateOf(false) }
+
+    LaunchedEffect(contact) {
+        historyLogs = emptyList()
+        isLoadingHistory = false
+    }
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -248,32 +257,28 @@ fun ContactDetailDialog(
         }
     }
 
-    // Load call history when History tab selected
-    LaunchedEffect(selectedTab, contact) {
-        if (selectedTab == 1) {
-            isLoadingHistory = true
-            withContext(Dispatchers.IO) {
-                try {
-                    val repository = CallLogRepository(context)
-                    val allLogs = repository.getCallLogs()
-                    val cleanContactNum = contact.number.replace(Regex("[^0-9+]"), "")
-
-                    historyLogs = allLogs.filter { log ->
-                        val cleanLogNum = log.number.replace(Regex("[^0-9+]"), "")
-                        (cleanContactNum.isNotBlank() && cleanLogNum.takeLast(7) == cleanContactNum.takeLast(
-                            7
-                        )) ||
-                                (!log.name.isNullOrBlank() && log.name.equals(
-                                    contact.name,
-                                    ignoreCase = true
-                                ))
-                    }
-                } catch (_: Exception) {
-                    historyLogs = emptyList()
-                }
-            }
-            isLoadingHistory = false
+    // Load call history when History tab selected (scoped query, not full CallLog scan)
+    LaunchedEffect(selectedTab, contact, phoneNumbersList) {
+        if (selectedTab != 1) return@LaunchedEffect
+        val numbers = buildList {
+            add(contact.number)
+            phoneNumbersList.forEach { add(it.number) }
         }
+        val showSpinner = historyLogs.isEmpty()
+        if (showSpinner) isLoadingHistory = true
+        withContext(Dispatchers.IO) {
+            try {
+                val repository = CallLogRepository(context)
+                historyLogs = repository.getCallLogsForNumbers(numbers)
+            } catch (_: Exception) {
+                if (historyLogs.isEmpty()) historyLogs = emptyList()
+            }
+        }
+        isLoadingHistory = false
+    }
+
+    val groupedHistoryLogs = remember(historyLogs) {
+        historyLogs.groupBy { formatDateHeader(it.timestamp) }.toList()
     }
 
     Dialog(
@@ -298,168 +303,273 @@ fun ContactDetailDialog(
             colors[index]
         }
 
-        val scrollState = rememberScrollState()
+        val listState = rememberLazyListState()
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
         ) {
-            // Full Screen Scrollable Container
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize()
             ) {
-                // TOP HERO PHOTO HEADER
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(280.dp)
-                        .background(avatarBgColor)
-                ) {
-                    val bitmap = avatarBitmap
-                    if (bitmap != null) {
-                        Image(
-                            bitmap = bitmap,
-                            contentDescription = contact.name,
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        // Vibrant gradient placeholder with large letter
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(
-                                    Brush.verticalGradient(
-                                        colors = listOf(
-                                            avatarBgColor,
-                                            avatarBgColor.copy(alpha = 0.7f)
-                                        )
-                                    )
-                                ),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            val initial =
-                                contact.name.trim().firstOrNull()?.uppercaseChar()?.toString()
-                                    ?: "?"
-                            Text(
-                                text = initial,
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 80.sp
-                            )
-                        }
-                    }
-
-                    // Bottom Gradient Overlay for Smooth Card Blend
+                item(key = "hero") {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(100.dp)
-                            .align(Alignment.BottomCenter)
-                            .background(
-                                Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color.Transparent,
-                                        Color.Black.copy(alpha = 0.4f)
-                                    )
-                                )
-                            )
-                    )
-                }
-
-                // BOTTOM CONTENT CARD
-                Surface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .offset(y = (-24).dp),
-                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                            .height(280.dp)
+                            .background(avatarBgColor)
                     ) {
-                        // Contact Name
-                        Text(
-                            text = contact.name,
-                            fontSize = 26.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground,
-                            textAlign = TextAlign.Center,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Spacer(modifier = Modifier.height(16.dp))
-
-                        // FLOATING TAB BAR (Контакт | История | Настройки)
-                        FloatingTabBar(
-                            selectedTab = selectedTab,
-                            onTabSelected = { selectedTab = it }
-                        )
-
-                        Spacer(modifier = Modifier.height(24.dp))
-
-                        // TAB CONTENT SWITCHING
-                        when (selectedTab) {
-                            0 -> {
-                                // TAB 0: КОНТАКТ
-                                ContactTabContent(
-                                    phoneNumbersList = phoneNumbersList,
-                                    messengerAccountsList = messengerAccountsList,
-                                    onUpdateMessengerAccounts = { messengerAccountsList = it },
-                                    onUpdatePhoneNumbers = { phoneNumbersList = it },
-                                    onUpdateEmails = { emailsList = it },
-                                    emailsList = emailsList,
-                                    birthdayInfo = birthdayInfo,
-                                    importantDatesList = importantDatesList,
-                                    activeSimCount = activeSimCount,
-                                    contact = contact,
-                                    context = context,
-                                    onCall = onCall,
-                                    onSms = onSms,
-                                    onDismiss = onDismiss,
-                                    onRemoveFavorite = onRemoveFavorite
-                                )
-                            }
-
-                            1 -> {
-                                // TAB 1: ИСТОРИЯ
-                                HistoryTabContent(
-                                    isLoading = isLoadingHistory,
-                                    logs = historyLogs
-                                )
-                            }
-
-                            2 -> {
-                                // TAB 2: НАСТРОЙКИ
-                                SettingsTabContent(
-                                    contact = contact,
-                                    phoneNumbersList = phoneNumbersList,
-                                    messengerAccountsList = messengerAccountsList,
-                                    onUpdateMessengerAccounts = { messengerAccountsList = it },
-                                    emailsList = emailsList,
-                                    activeSimCount = activeSimCount,
-                                    context = context,
-                                    tabs = tabs,
-                                    onDismiss = onDismiss,
-                                    onRemoveFavorite = onRemoveFavorite,
-                                    onUpdateContact = onUpdateContact,
-                                    onAddTab = onAddTab
+                        val bitmap = avatarBitmap
+                        if (bitmap != null) {
+                            Image(
+                                bitmap = bitmap,
+                                contentDescription = contact.name,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                avatarBgColor,
+                                                avatarBgColor.copy(alpha = 0.7f)
+                                            )
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val initial =
+                                    contact.name.trim().firstOrNull()?.uppercaseChar()?.toString()
+                                        ?: "?"
+                                Text(
+                                    text = initial,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 80.sp
                                 )
                             }
                         }
 
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(100.dp)
+                                .align(Alignment.BottomCenter)
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            Color.Black.copy(alpha = 0.4f)
+                                        )
+                                    )
+                                )
+                        )
+                    }
+                }
+
+                item(key = "content_header") {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .offset(y = (-24).dp),
+                        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = contact.name,
+                                fontSize = 26.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            FloatingTabBar(
+                                selectedTab = selectedTab,
+                                onTabSelected = { selectedTab = it }
+                            )
+
+                            Spacer(modifier = Modifier.height(24.dp))
+
+                            when (selectedTab) {
+                                0 -> {
+                                    ContactTabContent(
+                                        phoneNumbersList = phoneNumbersList,
+                                        messengerAccountsList = messengerAccountsList,
+                                        onUpdateMessengerAccounts = { messengerAccountsList = it },
+                                        onUpdatePhoneNumbers = { phoneNumbersList = it },
+                                        onUpdateEmails = { emailsList = it },
+                                        emailsList = emailsList,
+                                        birthdayInfo = birthdayInfo,
+                                        importantDatesList = importantDatesList,
+                                        activeSimCount = activeSimCount,
+                                        contact = contact,
+                                        context = context,
+                                        onCall = onCall,
+                                        onSms = onSms,
+                                        onDismiss = onDismiss,
+                                        onRemoveFavorite = onRemoveFavorite
+                                    )
+                                    Spacer(modifier = Modifier.height(40.dp))
+                                }
+
+                                1 -> {
+                                    when {
+                                        isLoadingHistory -> {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .height(120.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "Загрузка истории...",
+                                                    fontSize = 15.sp,
+                                                    color = MaterialTheme.colorScheme.onBackground.copy(
+                                                        alpha = 0.5f
+                                                    )
+                                                )
+                                            }
+                                        }
+
+                                        historyLogs.isEmpty() -> {
+                                            Surface(
+                                                modifier = Modifier.fillMaxWidth(),
+                                                shape = RoundedCornerShape(20.dp),
+                                                color = MaterialTheme.colorScheme.surface,
+                                                tonalElevation = 1.dp
+                                            ) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(vertical = 32.dp),
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    Text(
+                                                        text = "История вызовов отсутствует",
+                                                        fontSize = 15.sp,
+                                                        color = MaterialTheme.colorScheme.onSurface.copy(
+                                                            alpha = 0.5f
+                                                        )
+                                                    )
+                                                }
+                                            }
+                                            Spacer(modifier = Modifier.height(40.dp))
+                                        }
+                                    }
+                                }
+
+                                2 -> {
+                                    SettingsTabContent(
+                                        contact = contact,
+                                        phoneNumbersList = phoneNumbersList,
+                                        messengerAccountsList = messengerAccountsList,
+                                        onUpdateMessengerAccounts = { messengerAccountsList = it },
+                                        emailsList = emailsList,
+                                        activeSimCount = activeSimCount,
+                                        context = context,
+                                        tabs = tabs,
+                                        onDismiss = onDismiss,
+                                        onRemoveFavorite = onRemoveFavorite,
+                                        onUpdateContact = onUpdateContact,
+                                        onAddTab = onAddTab
+                                    )
+                                    Spacer(modifier = Modifier.height(40.dp))
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (selectedTab == 1 && !isLoadingHistory && historyLogs.isNotEmpty()) {
+                    groupedHistoryLogs.forEach { (dateHeader, logsInDay) ->
+                        if (dateHeader.isNotEmpty()) {
+                            item(key = "history_header_$dateHeader") {
+                                Text(
+                                    text = dateHeader,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(start = 24.dp, end = 20.dp, top = 0.dp, bottom = 2.dp)
+                                )
+                            }
+                        }
+
+                        items(
+                            count = logsInDay.size,
+                            key = { index -> "history_${dateHeader}_${logsInDay[index].id}" }
+                        ) { index ->
+                            val item = logsInDay[index]
+                            val isFirst = index == 0
+                            val isLast = index == logsInDay.lastIndex
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        start = 20.dp,
+                                        end = 20.dp,
+                                        bottom = if (isLast) 12.dp else 0.dp
+                                    )
+                            ) {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(
+                                        topStart = if (isFirst) 20.dp else 0.dp,
+                                        topEnd = if (isFirst) 20.dp else 0.dp,
+                                        bottomStart = if (isLast) 20.dp else 0.dp,
+                                        bottomEnd = if (isLast) 20.dp else 0.dp
+                                    ),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    tonalElevation = 1.dp
+                                ) {
+                                    Column {
+                                        if (!isFirst) {
+                                            HorizontalDivider(
+                                                color = MaterialTheme.colorScheme.onSurface.copy(
+                                                    alpha = 0.08f
+                                                ),
+                                                thickness = 1.dp,
+                                                modifier = Modifier.padding(horizontal = 16.dp)
+                                            )
+                                        }
+                                        HistoryCallRow(item = item)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item(key = "history_bottom_spacer") {
                         Spacer(modifier = Modifier.height(40.dp))
                     }
                 }
             }
+
+            LazyListVerticalScrollbar(
+                listState = listState,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .zIndex(5f)
+            )
 
             var showEditContactDialog by remember { mutableStateOf(false) }
 
@@ -1581,168 +1691,88 @@ private fun ContactTabContent(
 }
 
 @Composable
-private fun HistoryTabContent(
-    isLoading: Boolean,
-    logs: List<CallLogItem>
-) {
-    val groupedLogs = remember(logs) {
-        logs.groupBy { formatDateHeader(it.timestamp) }
-    }
-
-    Column(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
+private fun HistoryCallRow(item: CallLogItem) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        if (isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(120.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Загрузка истории...",
-                    fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            val (icon, color, desc) = when (item.type) {
+                CallType.INCOMING -> Triple(
+                    Icons.AutoMirrored.Filled.CallReceived,
+                    IncomingGreen,
+                    "Входящий"
+                )
+
+                CallType.OUTGOING -> Triple(
+                    Icons.AutoMirrored.Filled.CallMade,
+                    OutgoingBlue,
+                    "Исходящий"
+                )
+
+                CallType.MISSED -> Triple(
+                    Icons.AutoMirrored.Filled.CallMissed,
+                    MissedRed,
+                    "Пропущенный"
+                )
+
+                CallType.REJECTED -> Triple(
+                    Icons.Default.CallEnd,
+                    MissedRed,
+                    "Отклоненный"
                 )
             }
-        } else if (logs.isEmpty()) {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 1.dp
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "История вызовов отсутствует",
-                        fontSize = 15.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                    )
-                }
-            }
-        } else {
-            groupedLogs.forEach { (dateHeader, logsInDay) ->
-                if (dateHeader.isNotEmpty()) {
-                    Text(
-                        text = dateHeader,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 4.dp, top = 12.dp, bottom = 4.dp)
-                    )
-                }
 
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 1.dp
-                ) {
-                    Column {
-                        logsInDay.forEachIndexed { index, item ->
-                            if (index > 0) {
-                                HorizontalDivider(
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                    thickness = 1.dp,
-                                    modifier = Modifier.padding(horizontal = 16.dp)
-                                )
-                            }
+            Icon(
+                imageVector = icon,
+                contentDescription = desc,
+                tint = color,
+                modifier = Modifier.size(20.dp)
+            )
 
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    val (icon, color, desc) = when (item.type) {
-                                        CallType.INCOMING -> Triple(
-                                            Icons.AutoMirrored.Filled.CallReceived,
-                                            IncomingGreen,
-                                            "Входящий"
-                                        )
+            Spacer(modifier = Modifier.width(12.dp))
 
-                                        CallType.OUTGOING -> Triple(
-                                            Icons.AutoMirrored.Filled.CallMade,
-                                            OutgoingBlue,
-                                            "Исходящий"
-                                        )
-
-                                        CallType.MISSED -> Triple(
-                                            Icons.AutoMirrored.Filled.CallMissed,
-                                            MissedRed,
-                                            "Пропущенный"
-                                        )
-
-                                        CallType.REJECTED -> Triple(
-                                            Icons.Default.CallEnd,
-                                            MissedRed,
-                                            "Отклоненный"
-                                        )
-                                    }
-
-                                    Icon(
-                                        imageVector = icon,
-                                        contentDescription = desc,
-                                        tint = color,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-
-                                    Spacer(modifier = Modifier.width(12.dp))
-
-                                    Column {
-                                        Text(
-                                            text = formatTimeOnly(item.timestamp),
-                                            fontSize = 15.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = if (item.type == CallType.MISSED || item.type == CallType.REJECTED) MissedRed else MaterialTheme.colorScheme.onSurface
-                                        )
-
-                                        Spacer(modifier = Modifier.height(3.dp))
-
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            SimCardBadge(simNumber = item.simNumber)
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                            Text(
-                                                text = formatPhoneNumber(item.number),
-                                                fontSize = 13.sp,
-                                                color = MaterialTheme.colorScheme.onSurface.copy(
-                                                    alpha = 0.6f
-                                                )
-                                            )
-                                        }
-                                    }
-                                }
-
-                                Spacer(modifier = Modifier.width(12.dp))
-
-                                Text(
-                                    text = formatCallDuration(item.duration),
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                    textAlign = TextAlign.End
-                                )
-                            }
-                        }
+            Column {
+                Text(
+                    text = formatTimeOnly(item.timestamp),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (item.type == CallType.MISSED || item.type == CallType.REJECTED) {
+                        MissedRed
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
                     }
+                )
+
+                Spacer(modifier = Modifier.height(3.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SimCardBadge(simNumber = item.simNumber)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = formatPhoneNumber(item.number),
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
                 }
             }
         }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Text(
+            text = formatCallDuration(item.duration),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            textAlign = TextAlign.End
+        )
     }
 }
 
