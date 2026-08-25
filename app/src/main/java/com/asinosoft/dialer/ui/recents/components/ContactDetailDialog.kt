@@ -135,6 +135,7 @@ import com.asinosoft.dialer.data.model.CallType
 import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.data.repository.CallLogRepository
+import com.asinosoft.dialer.data.repository.ContactsRepository
 import com.asinosoft.dialer.ui.theme.IncomingGreen
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
@@ -2604,217 +2605,21 @@ private fun loadMessengerAccounts(
     context: Context,
     contact: FavoriteContact
 ): List<MessengerAccount> {
-    val list = mutableListOf<MessengerAccount>()
-    val number = contact.number
-    if (number.isBlank()) return list
-    val cleanDigits = number.replace(Regex("[^0-9]"), "")
-    if (cleanDigits.isBlank()) return list
-
-    val installedWhatsApp = isPackageInstalled(context, "com.whatsapp") || isPackageInstalled(
-        context,
-        "com.whatsapp.w4b"
-    )
-    val installedTelegram = isPackageInstalled(context, "org.telegram.messenger")
-    val installedViber = isPackageInstalled(context, "com.viber.voip")
-    val installedSignal = isPackageInstalled(context, "org.thoughtcrime.securesms")
-    val installedSkype = isPackageInstalled(context, "com.skype.raider") || isPackageInstalled(
-        context,
-        "com.skype.android"
-    )
-    val installedVK = isPackageInstalled(context, "com.vk.im") || isPackageInstalled(
-        context,
-        "com.vkontakte.android"
-    )
-    val installedMAX = isPackageInstalled(context, "ru.oneme.app") || isPackageInstalled(
-        context,
-        "ru.max.messenger"
-    ) || isPackageInstalled(context, "com.max.app") || isPackageInstalled(context, "ru.vk.max")
-    val installedMessenger = isPackageInstalled(context, "com.facebook.orca")
-    val installedSnapchat = isPackageInstalled(context, "com.snapchat.android")
-    val installedWeChat = isPackageInstalled(context, "com.tencent.mm")
-
-    if (installedWhatsApp) {
-        list.add(
+    val repository = ContactsRepository(context)
+    val list = repository.getMessengerActions(contact)
+        .map { action ->
             MessengerAccount(
-                id = "whatsapp",
-                packageName = "com.whatsapp",
-                messengerName = "WhatsApp",
-                accountDetail = number,
-                brandColor = Color(0xFF25D366),
-                chatIntent = Intent(Intent.ACTION_VIEW, "https://wa.me/$cleanDigits".toUri()),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, "https://wa.me/$cleanDigits".toUri()),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, "https://wa.me/$cleanDigits".toUri())
+                id = action.id,
+                packageName = action.packageName,
+                messengerName = action.messengerName,
+                accountDetail = action.accountDetail,
+                brandColor = action.brandColor,
+                chatIntent = action.chatIntent,
+                audioCallIntent = action.audioCallIntent,
+                videoCallIntent = action.videoCallIntent
             )
-        )
-    }
-
-    if (installedTelegram) {
-        list.add(
-            MessengerAccount(
-                id = "telegram",
-                packageName = "org.telegram.messenger",
-                messengerName = "Telegram",
-                accountDetail = number,
-                brandColor = Color(0xFF24A1DE),
-                chatIntent = Intent(Intent.ACTION_VIEW, "https://t.me/+$cleanDigits".toUri()),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, "https://t.me/+$cleanDigits".toUri()),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, "https://t.me/+$cleanDigits".toUri())
-            )
-        )
-    }
-
-    if (installedViber) {
-        list.add(
-            MessengerAccount(
-                id = "viber",
-                packageName = "com.viber.voip",
-                messengerName = "Viber",
-                accountDetail = number,
-                brandColor = Color(0xFF7360F2),
-                chatIntent = Intent(
-                    Intent.ACTION_VIEW,
-                    "viber://chat?number=+$cleanDigits".toUri()
-                ),
-                audioCallIntent = Intent(
-                    Intent.ACTION_VIEW,
-                    "viber://calls?number=+$cleanDigits".toUri()
-                ),
-                videoCallIntent = Intent(
-                    Intent.ACTION_VIEW,
-                    "viber://calls?number=+$cleanDigits".toUri()
-                )
-            )
-        )
-    }
-
-    if (installedSignal) {
-        list.add(
-            MessengerAccount(
-                id = "signal",
-                packageName = "org.thoughtcrime.securesms",
-                messengerName = "Signal",
-                accountDetail = number,
-                brandColor = Color(0xFF3A76F0),
-                chatIntent = Intent(
-                    Intent.ACTION_VIEW,
-                    "https://signal.me/#p/+$cleanDigits".toUri()
-                ),
-                audioCallIntent = Intent(
-                    Intent.ACTION_VIEW,
-                    "https://signal.me/#p/+$cleanDigits".toUri()
-                ),
-                videoCallIntent = Intent(
-                    Intent.ACTION_VIEW,
-                    "https://signal.me/#p/+$cleanDigits".toUri()
-                )
-            )
-        )
-    }
-
-    if (installedSkype) {
-        list.add(
-            MessengerAccount(
-                id = "skype",
-                packageName = "com.skype.raider",
-                messengerName = "Skype",
-                accountDetail = number,
-                brandColor = Color(0xFF00AFF0),
-                chatIntent = Intent(Intent.ACTION_VIEW, "skype:+$cleanDigits?chat".toUri()),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, "skype:+$cleanDigits?call".toUri()),
-                videoCallIntent = Intent(
-                    Intent.ACTION_VIEW,
-                    "skype:+$cleanDigits?call&video=true".toUri()
-                )
-            )
-        )
-    }
-
-    if (installedVK) {
-        list.add(
-            MessengerAccount(
-                id = "vk",
-                packageName = "com.vk.im",
-                messengerName = "VK Messenger",
-                accountDetail = number,
-                brandColor = Color(0xFF0077FF),
-                chatIntent = Intent(Intent.ACTION_VIEW, "https://vk.me/+$cleanDigits".toUri()),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, "https://vk.me/+$cleanDigits".toUri()),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, "https://vk.me/+$cleanDigits".toUri())
-            )
-        )
-    }
-
-    if (installedMAX) {
-        list.add(
-            MessengerAccount(
-                id = "max",
-                packageName = "ru.oneme.app",
-                messengerName = "MAX",
-                accountDetail = number,
-                brandColor = Color(0xFF3B82F6),
-                chatIntent = Intent(Intent.ACTION_VIEW, "https://max.ru/+$cleanDigits".toUri()),
-                audioCallIntent = Intent(
-                    Intent.ACTION_VIEW,
-                    "https://max.ru/+$cleanDigits".toUri()
-                ),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, "https://max.ru/+$cleanDigits".toUri())
-            )
-        )
-    }
-
-    if (installedMessenger) {
-        list.add(
-            MessengerAccount(
-                id = "messenger",
-                packageName = "com.facebook.orca",
-                messengerName = "Messenger",
-                accountDetail = number,
-                brandColor = Color(0xFF0084FF),
-                chatIntent = Intent(Intent.ACTION_VIEW, "https://m.me/+$cleanDigits".toUri()),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, "https://m.me/+$cleanDigits".toUri()),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, "https://m.me/+$cleanDigits".toUri())
-            )
-        )
-    }
-
-    if (installedSnapchat) {
-        list.add(
-            MessengerAccount(
-                id = "snapchat",
-                packageName = "com.snapchat.android",
-                messengerName = "Snapchat",
-                accountDetail = number,
-                brandColor = Color(0xFFE5C100),
-                chatIntent = Intent(
-                    Intent.ACTION_VIEW,
-                    "https://snapchat.com/add/+$cleanDigits".toUri()
-                ),
-                audioCallIntent = Intent(
-                    Intent.ACTION_VIEW,
-                    "https://snapchat.com/add/+$cleanDigits".toUri()
-                ),
-                videoCallIntent = Intent(
-                    Intent.ACTION_VIEW,
-                    "https://snapchat.com/add/+$cleanDigits".toUri()
-                )
-            )
-        )
-    }
-
-    if (installedWeChat) {
-        list.add(
-            MessengerAccount(
-                id = "wechat",
-                packageName = "com.tencent.mm",
-                messengerName = "WeChat",
-                accountDetail = number,
-                brandColor = Color(0xFF07C160),
-                chatIntent = Intent(Intent.ACTION_VIEW, "weixin://dl/chat".toUri()),
-                audioCallIntent = Intent(Intent.ACTION_VIEW, "weixin://dl/chat".toUri()),
-                videoCallIntent = Intent(Intent.ACTION_VIEW, "weixin://dl/chat".toUri())
-            )
-        )
-    }
+        }
+        .toMutableList()
 
     val contactKey = getContactCustomKey(contact)
     val customSavedLinks = getSavedCustomMessengerLinks(context, contactKey)
