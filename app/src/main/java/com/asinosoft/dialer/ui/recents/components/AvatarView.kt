@@ -16,8 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -33,11 +31,8 @@ fun AvatarView(name: String, photoUri: String?) {
     val density = LocalDensity.current
     val targetPx = with(density) { 48.dp.roundToPx() }.coerceAtLeast(1)
 
-    // Prefer cache hit immediately to avoid letter→photo flicker during scroll
     var avatarBitmap by remember(photoUri) {
-        mutableStateOf(
-            photoUri?.let { AvatarBitmapCache.get(it)?.asImageBitmap() }
-        )
+        mutableStateOf(photoUri?.let { AvatarBitmapCache.getImageBitmap(it) })
     }
 
     LaunchedEffect(photoUri, targetPx) {
@@ -46,13 +41,12 @@ fun AvatarView(name: String, photoUri: String?) {
             return@LaunchedEffect
         }
 
-        val cached = AvatarBitmapCache.get(photoUri)
+        val cached = AvatarBitmapCache.getImageBitmap(photoUri)
         if (cached != null) {
-            avatarBitmap = cached.asImageBitmap()
+            avatarBitmap = cached
             return@LaunchedEffect
         }
 
-        // Already showing initials; decode in background without blocking scroll
         val decoded = AvatarBitmapCache.withDecodeSlot {
             withContext(Dispatchers.IO) {
                 try {
@@ -64,7 +58,7 @@ fun AvatarView(name: String, photoUri: String?) {
                 }
             }
         }
-        avatarBitmap = decoded?.asImageBitmap()
+        avatarBitmap = decoded?.let { AvatarBitmapCache.getImageBitmap(photoUri) }
     }
 
     val bitmap = avatarBitmap

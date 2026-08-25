@@ -3,7 +3,11 @@ package com.asinosoft.dialer.util
 fun formatPhoneNumber(rawNumber: String): String {
     if (rawNumber.isBlank()) return rawNumber
 
-    val cleanDigits = rawNumber.replace(Regex("[^0-9]"), "")
+    val cleanDigits = buildString(rawNumber.length) {
+        for (c in rawNumber) {
+            if (c.isDigit()) append(c)
+        }
+    }
 
     if (cleanDigits.length == 11 && (cleanDigits.startsWith("7") || cleanDigits.startsWith("8"))) {
         val code = cleanDigits.substring(1, 4)

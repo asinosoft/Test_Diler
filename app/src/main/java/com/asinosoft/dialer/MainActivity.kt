@@ -72,7 +72,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             DialerTheme {
                 val viewModel: RecentsViewModel = viewModel()
-                var isPermissionsGranted by remember { mutableStateOf(false) }
+                var isPermissionsGranted by remember {
+                    mutableStateOf(
+                        requiredPermissions.all { perm ->
+                            ContextCompat.checkSelfPermission(
+                                this,
+                                perm
+                            ) == PackageManager.PERMISSION_GRANTED
+                        }
+                    )
+                }
 
                 val roleLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.StartActivityForResult()
@@ -97,17 +106,11 @@ class MainActivity : ComponentActivity() {
                 }
 
                 LaunchedEffect(Unit) {
-                    val allGranted = requiredPermissions.all { perm ->
-                        ContextCompat.checkSelfPermission(
-                            this@MainActivity,
-                            perm
-                        ) == PackageManager.PERMISSION_GRANTED
-                    }
-                    if (allGranted) {
-                        isPermissionsGranted = true
+                    if (isPermissionsGranted) {
                         requestDefaultDialerRole(roleLauncher)
                         viewModel.loadCallLogs()
                     } else {
+                        // System dialog only — custom screen stays as fallback if user denies
                         permissionLauncher.launch(requiredPermissions)
                     }
                 }

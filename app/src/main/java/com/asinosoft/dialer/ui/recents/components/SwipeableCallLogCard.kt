@@ -28,6 +28,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -40,6 +41,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -50,7 +52,6 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -66,7 +67,12 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.roundToInt
+
+private val SharedSimCardShape = SimCardShape(cutSizeDp = 2.5f)
+
+private val timeFormatter = ThreadLocal.withInitial {
+    SimpleDateFormat("HH:mm", Locale.getDefault())
+}
 
 class SimCardShape(private val cutSizeDp: Float = 2.5f) : Shape {
     override fun createOutline(
@@ -99,10 +105,49 @@ fun SwipeableCallLogCard(
     val coroutineScope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val offsetX = remember { Animatable(0f) }
+    var drawnOffset by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
     val thresholdPx = with(density) { 90.dp.toPx() }
     val maxDragPx = with(density) { 160.dp.toPx() }
     var hasVibratedThreshold by remember { mutableStateOf(false) }
+
+    val contactKey = remember(item.id, item.number) {
+        item.id.ifBlank { digitsOnlyPhone(item.number) }
+    }
+
+    // Defaults only at compose — SharedPreferences loaded on first drag (avoids scroll jank)
+    var rightVisuals by remember {
+        mutableStateOf(getSwipeBackgroundVisuals(null, defaultIsRight = true))
+    }
+    var leftVisuals by remember {
+        mutableStateOf(getSwipeBackgroundVisuals(null, defaultIsRight = false))
+    }
+    var customRightAction by remember { mutableStateOf<CustomSwipeAction?>(null) }
+    var customLeftAction by remember { mutableStateOf<CustomSwipeAction?>(null) }
+    var swipeActionsLoaded by remember(contactKey) { mutableStateOf(false) }
+
+    fun ensureSwipeActionsLoaded() {
+        if (swipeActionsLoaded) return
+        swipeActionsLoaded = true
+        customRightAction =
+            getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = item.number)
+        customLeftAction =
+            getCustomSwipeAction(context, contactKey, isRight = false, fallbackNumber = item.number)
+        rightVisuals = getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true)
+        leftVisuals = getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false)
+    }
+
+    val formattedNumber = remember(item.number) { formatPhoneNumber(item.number) }
+    val displayName = remember(item.name, item.number, item.count, formattedNumber) {
+        val baseName = item.name ?: formattedNumber
+        if (item.count > 1) "$baseName (${item.count})" else baseName
+    }
+    val subText = remember(item.name, formattedNumber) {
+        if (item.name != null) formattedNumber else "Не сохранено"
+    }
+    val timeText = remember(item.timestamp) { formatTimeOnly(item.timestamp) }
+    val avatarName = remember(item.name, formattedNumber) { item.name ?: formattedNumber }
+    val isMissed = item.type == CallType.MISSED || item.type == CallType.REJECTED
 
     Box(
         modifier = modifier
@@ -110,26 +155,8 @@ fun SwipeableCallLogCard(
             .height(70.dp)
             .clip(RoundedCornerShape(20.dp))
     ) {
-        val currentOffset = offsetX.value
-
-        val contactKey = remember(item.id, item.number) {
-            item.id.ifBlank { digitsOnlyPhone(item.number) }
-        }
-        val customRightAction = remember(contactKey, item.number) {
-            getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = item.number)
-        }
-        val customLeftAction = remember(contactKey, item.number) {
-            getCustomSwipeAction(context, contactKey, isRight = false, fallbackNumber = item.number)
-        }
-        val rightVisuals = remember(customRightAction) {
-            getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true)
-        }
-        val leftVisuals = remember(customLeftAction) {
-            getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false)
-        }
-
         Box(modifier = Modifier.fillMaxSize()) {
-            if (currentOffset > 0f) {
+            if (drawnOffset > 0f) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -157,7 +184,7 @@ fun SwipeableCallLogCard(
                 }
             }
 
-            if (currentOffset < 0f) {
+            if (drawnOffset < 0f) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -189,11 +216,11 @@ fun SwipeableCallLogCard(
         Surface(
             modifier = Modifier
                 .fillMaxSize()
-                .offset { IntOffset(currentOffset.roundToInt(), 0) }
+                .graphicsLayer { translationX = drawnOffset }
                 .pointerInput(item.id) {
                     detectTapGestures(
                         onTap = {
-                            if (kotlin.math.abs(offsetX.value) < 2f && onItemClick != null) {
+                            if (kotlin.math.abs(drawnOffset) < 2f && onItemClick != null) {
                                 onItemClick(item)
                             }
                         }
@@ -201,22 +228,17 @@ fun SwipeableCallLogCard(
                 }
                 .pointerInput(item.id) {
                     detectHorizontalDragGestures(
+                        onDragStart = { ensureSwipeActionsLoaded() },
                         onDragEnd = {
                             coroutineScope.launch {
-                                val finalOffset = offsetX.value
-                                val contactKey =
-                                    item.id.ifBlank { digitsOnlyPhone(item.number) }
+                                val finalOffset = drawnOffset
+                                ensureSwipeActionsLoaded()
                                 if (finalOffset > thresholdPx) {
-                                    val customAction = getCustomSwipeAction(
-                                        context,
-                                        contactKey,
-                                        isRight = true,
-                                        fallbackNumber = item.number
-                                    )
-                                    if (customAction != null) {
+                                    val action = customRightAction
+                                    if (action != null) {
                                         executeCustomSwipeAction(
                                             context,
-                                            customAction,
+                                            action,
                                             { num, _ -> onCall(num) },
                                             onSms
                                         )
@@ -224,16 +246,11 @@ fun SwipeableCallLogCard(
                                         onCall(item.number)
                                     }
                                 } else if (finalOffset < -thresholdPx) {
-                                    val customAction = getCustomSwipeAction(
-                                        context,
-                                        contactKey,
-                                        isRight = false,
-                                        fallbackNumber = item.number
-                                    )
-                                    if (customAction != null) {
+                                    val action = customLeftAction
+                                    if (action != null) {
                                         executeCustomSwipeAction(
                                             context,
-                                            customAction,
+                                            action,
                                             { num, _ -> onCall(num) },
                                             onSms
                                         )
@@ -241,28 +258,34 @@ fun SwipeableCallLogCard(
                                         onSms(item.number)
                                     }
                                 }
-                                offsetX.animateTo(0f, animationSpec = spring())
+                                offsetX.snapTo(drawnOffset)
+                                offsetX.animateTo(0f, animationSpec = spring()) {
+                                    drawnOffset = value
+                                }
+                                drawnOffset = 0f
                                 hasVibratedThreshold = false
                             }
                         },
                         onDragCancel = {
                             coroutineScope.launch {
-                                offsetX.animateTo(0f, animationSpec = spring())
+                                offsetX.snapTo(drawnOffset)
+                                offsetX.animateTo(0f, animationSpec = spring()) {
+                                    drawnOffset = value
+                                }
+                                drawnOffset = 0f
                                 hasVibratedThreshold = false
                             }
                         },
                         onHorizontalDrag = { change, dragAmount ->
                             change.consume()
-                            coroutineScope.launch {
-                                val newOffset =
-                                    (offsetX.value + dragAmount).coerceIn(-maxDragPx, maxDragPx)
-                                if (!hasVibratedThreshold && (newOffset > thresholdPx || newOffset < -thresholdPx)) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    hasVibratedThreshold = true
-                                } else if (hasVibratedThreshold && newOffset in -thresholdPx..thresholdPx) {
-                                    hasVibratedThreshold = false
-                                }
-                                offsetX.snapTo(newOffset)
+                            val newOffset =
+                                (drawnOffset + dragAmount).coerceIn(-maxDragPx, maxDragPx)
+                            drawnOffset = newOffset
+                            if (!hasVibratedThreshold && (newOffset > thresholdPx || newOffset < -thresholdPx)) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                hasVibratedThreshold = true
+                            } else if (hasVibratedThreshold && newOffset in -thresholdPx..thresholdPx) {
+                                hasVibratedThreshold = false
                             }
                         }
                     )
@@ -278,15 +301,11 @@ fun SwipeableCallLogCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 AvatarView(
-                    name = item.name ?: formatPhoneNumber(item.number),
+                    name = avatarName,
                     photoUri = item.photoUri
                 )
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
-                    val isMissed = item.type == CallType.MISSED || item.type == CallType.REJECTED
-                    val baseName = item.name ?: formatPhoneNumber(item.number)
-                    val displayName = if (item.count > 1) "$baseName (${item.count})" else baseName
-
                     Text(
                         text = displayName,
                         fontSize = 17.sp,
@@ -301,11 +320,6 @@ fun SwipeableCallLogCard(
                         Spacer(Modifier.width(5.dp))
                         SimBadge(simNumber = item.simNumber)
                         Spacer(Modifier.width(5.dp))
-                        val subText = if (item.name != null) {
-                            formatPhoneNumber(item.number)
-                        } else {
-                            "Не сохранено"
-                        }
                         Text(
                             text = subText,
                             fontSize = 13.sp,
@@ -317,7 +331,7 @@ fun SwipeableCallLogCard(
                 }
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = formatTimeOnly(item.timestamp),
+                    text = timeText,
                     fontSize = 13.sp,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     maxLines = 1
@@ -335,7 +349,7 @@ private fun SimBadge(simNumber: Int) {
         contentAlignment = Alignment.Center,
         modifier = Modifier
             .size(width = 10.dp, height = 12.dp)
-            .clip(SimCardShape(cutSizeDp = 2.5f))
+            .clip(SharedSimCardShape)
             .background(simBgColor)
     ) {
         Text(
@@ -377,7 +391,7 @@ private fun CallTypeIcon(type: CallType) {
 
 private fun formatTimeOnly(timestamp: Long): String {
     if (timestamp == 0L) return ""
-    return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))
+    return timeFormatter.get()!!.format(Date(timestamp))
 }
 
 private fun digitsOnlyPhone(number: String): String {

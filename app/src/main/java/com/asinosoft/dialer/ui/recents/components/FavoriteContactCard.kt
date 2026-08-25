@@ -36,7 +36,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.TransformOrigin
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -336,7 +335,7 @@ private fun FavoriteAvatar(
     val targetPx = with(density) { 72.dp.roundToPx() }.coerceAtLeast(1)
 
     var avatarBitmap by remember(photoUri) {
-        mutableStateOf(photoUri?.let { AvatarBitmapCache.get(it)?.asImageBitmap() })
+        mutableStateOf(photoUri?.let { AvatarBitmapCache.getImageBitmap(it) })
     }
 
     LaunchedEffect(photoUri, targetPx) {
@@ -344,9 +343,9 @@ private fun FavoriteAvatar(
             avatarBitmap = null
             return@LaunchedEffect
         }
-        val cached = AvatarBitmapCache.get(photoUri)
+        val cached = AvatarBitmapCache.getImageBitmap(photoUri)
         if (cached != null) {
-            avatarBitmap = cached.asImageBitmap()
+            avatarBitmap = cached
             return@LaunchedEffect
         }
         val decoded = AvatarBitmapCache.withDecodeSlot {
@@ -360,7 +359,7 @@ private fun FavoriteAvatar(
                 }
             }
         }
-        avatarBitmap = decoded?.asImageBitmap()
+        avatarBitmap = decoded?.let { AvatarBitmapCache.getImageBitmap(photoUri) }
     }
 
     val bitmap = avatarBitmap

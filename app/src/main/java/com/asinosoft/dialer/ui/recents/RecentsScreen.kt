@@ -56,6 +56,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -85,6 +86,7 @@ import com.asinosoft.dialer.ui.recents.components.FavoriteContactCard
 import com.asinosoft.dialer.ui.recents.components.FavoritesTopBar
 import com.asinosoft.dialer.ui.recents.components.SwipeableCallLogCard
 import com.asinosoft.dialer.ui.theme.SamsungGreen
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -127,7 +129,12 @@ fun RecentsScreen(
     var dragToIndex by remember { mutableIntStateOf(-1) }
     var dragOffset by remember { mutableStateOf(Offset.Zero) }
 
-    var favoritesBounds by remember { mutableStateOf(Rect.Zero) }
+    // Ref (not Compose state) — updating bounds during scroll must not recompose the screen
+    val favoritesBoundsRef = remember { object { var value: Rect = Rect.Zero } }
+
+    LaunchedEffect(isTopBarVisible) {
+        if (isTopBarVisible) favoritesBoundsRef.value = Rect.Zero
+    }
 
     val listState = rememberLazyListState()
 
@@ -186,6 +193,45 @@ fun RecentsScreen(
         listState.scrollToItem(target.coerceAtLeast(0), 0)
         initialScrollDone = true
         listReady = true
+    }
+
+    // Warm remaining avatars in the background so fling doesn't decode mid-scroll
+    LaunchedEffect(listReady, callLogs, favorites) {
+        if (!listReady) return@LaunchedEffect
+        val callLogAvatarPx = with(density) { 48.dp.roundToPx() }.coerceAtLeast(1)
+        val favoriteAvatarPx = with(density) { 72.dp.roundToPx() }.coerceAtLeast(1)
+        AvatarBitmapCache.prefetch(
+            context = context,
+            uris = favorites.map { it.photoUri },
+            targetPx = favoriteAvatarPx
+        )
+        AvatarBitmapCache.prefetch(
+            context = context,
+            uris = callLogs.map { it.photoUri },
+            targetPx = callLogAvatarPx
+        )
+    }
+
+    // Prefetch a window ahead of the visible range while scrolling
+    LaunchedEffect(listReady, callLogs) {
+        if (!listReady || callLogs.isEmpty()) return@LaunchedEffect
+        val callLogAvatarPx = with(density) { 48.dp.roundToPx() }.coerceAtLeast(1)
+        snapshotFlow {
+            val info = listState.layoutInfo
+            val first = info.visibleItemsInfo.firstOrNull()?.index ?: 0
+            val last = info.visibleItemsInfo.lastOrNull()?.index ?: first
+            first to last
+        }
+            .distinctUntilChanged()
+            .collect { (first, last) ->
+                // Approximate call-log indices (favorites/headers sit above)
+                val approxStart = (first - 30).coerceAtLeast(0)
+                val approxEnd = (last + 40).coerceAtMost(callLogs.lastIndex)
+                if (approxStart <= approxEnd) {
+                    val slice = callLogs.subList(approxStart, approxEnd + 1).map { it.photoUri }
+                    AvatarBitmapCache.prefetch(context, slice, callLogAvatarPx)
+                }
+            }
     }
 
     // Check if scrolled away by more than 33% of viewport / threshold
@@ -247,17 +293,15 @@ fun RecentsScreen(
             containerColor = MaterialTheme.colorScheme.background,
             modifier = Modifier.then(
                 if (isTopBarVisible) {
-                    Modifier.pointerInput(favoritesBounds) {
+                    Modifier.pointerInput(Unit) {
                         awaitPointerEventScope {
                             while (true) {
                                 val event = awaitPointerEvent(PointerEventPass.Initial)
                                 val down = event.changes.firstOrNull { it.changedToDown() }
                                 if (down != null) {
                                     val pos = down.position
-                                    if (favoritesBounds != Rect.Zero && !favoritesBounds.contains(
-                                            pos
-                                        )
-                                    ) {
+                                    val bounds = favoritesBoundsRef.value
+                                    if (bounds != Rect.Zero && !bounds.contains(pos)) {
                                         viewModel.clearFavoriteSelection()
                                     }
                                 }
@@ -494,15 +538,17 @@ fun RecentsScreen(
                             .fillMaxWidth()
                             .zIndex(6f)
                             .onGloballyPositioned { coordinates ->
+                                if (!isTopBarVisible) return@onGloballyPositioned
                                 val rect = coordinates.boundsInWindow()
-                                favoritesBounds = if (favoritesBounds == Rect.Zero) {
+                                val current = favoritesBoundsRef.value
+                                favoritesBoundsRef.value = if (current == Rect.Zero) {
                                     rect
                                 } else {
                                     Rect(
-                                        left = minOf(favoritesBounds.left, rect.left),
-                                        top = minOf(favoritesBounds.top, rect.top),
-                                        right = maxOf(favoritesBounds.right, rect.right),
-                                        bottom = maxOf(favoritesBounds.bottom, rect.bottom)
+                                        left = minOf(current.left, rect.left),
+                                        top = minOf(current.top, rect.top),
+                                        right = maxOf(current.right, rect.right),
+                                        bottom = maxOf(current.bottom, rect.bottom)
                                     )
                                 }
                             },
@@ -814,14 +860,21 @@ fun RecentsScreen(
     }
 }
 
+private val dateHeaderDayFormatter = ThreadLocal.withInitial {
+    SimpleDateFormat("d MMMM", Locale.forLanguageTag("ru"))
+}
+private val dateHeaderWeekdayFormatter = ThreadLocal.withInitial {
+    SimpleDateFormat("EEEE", Locale.forLanguageTag("ru"))
+}
+
 private fun formatDateHeader(timestamp: Long): String {
     if (timestamp == 0L) return ""
     if (DateUtils.isToday(timestamp)) return "Сегодня"
     if (DateUtils.isToday(timestamp + 24 * 3600 * 1000L)) return "Вчера"
 
     val ruLocale = Locale.forLanguageTag("ru")
-    val dateStr = SimpleDateFormat("d MMMM", ruLocale).format(Date(timestamp))
-    val dayOfWeek = SimpleDateFormat("EEEE", ruLocale).format(Date(timestamp))
+    val dateStr = dateHeaderDayFormatter.get()!!.format(Date(timestamp))
+    val dayOfWeek = dateHeaderWeekdayFormatter.get()!!.format(Date(timestamp))
         .replaceFirstChar { if (it.isLowerCase()) it.titlecase(ruLocale) else it.toString() }
 
     return "$dateStr, $dayOfWeek"

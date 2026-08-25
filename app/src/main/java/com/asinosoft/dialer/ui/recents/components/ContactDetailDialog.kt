@@ -3385,9 +3385,10 @@ private fun saveCustomSwipeAction(
     action: CustomSwipeAction?
 ) {
     try {
+        SwipeActionCache.clear()
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
         val keySuffix = if (isRight) "swipe_right_" else "swipe_left_"
-        val cleanNum = contactNumber.replace(Regex("[^0-9+]"), "")
+        val cleanNum = digitsOnlyPhoneFast(contactNumber)
 
         if (action == null) {
             prefs.edit { remove(keySuffix + contactKey) }
@@ -3414,22 +3415,58 @@ private fun saveCustomSwipeAction(
     }
 }
 
+internal object SwipeActionCache {
+    private val map = object : LinkedHashMap<String, CustomSwipeAction?>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CustomSwipeAction?>?): Boolean =
+            size > 256
+    }
+
+    @Synchronized
+    fun get(key: String): CustomSwipeAction? = if (map.containsKey(key)) map[key] else null
+
+    @Synchronized
+    fun contains(key: String): Boolean = map.containsKey(key)
+
+    @Synchronized
+    fun put(key: String, value: CustomSwipeAction?) {
+        map[key] = value
+    }
+
+    @Synchronized
+    fun clear() {
+        map.clear()
+    }
+}
+
+private fun digitsOnlyPhoneFast(number: String, keepPlus: Boolean = true): String {
+    val sb = StringBuilder(number.length)
+    for (c in number) {
+        if (c.isDigit() || (keepPlus && c == '+')) sb.append(c)
+    }
+    return sb.toString()
+}
+
 fun getCustomSwipeAction(
     context: Context,
     contactKey: String,
     isRight: Boolean,
     fallbackNumber: String? = null
 ): CustomSwipeAction? {
+    val keySuffix = if (isRight) "swipe_right_" else "swipe_left_"
+    val cacheKey = "$keySuffix|$contactKey|${fallbackNumber.orEmpty()}"
+    if (SwipeActionCache.contains(cacheKey)) {
+        return SwipeActionCache.get(cacheKey)
+    }
+
     try {
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
-        val keySuffix = if (isRight) "swipe_right_" else "swipe_left_"
 
         // 1. Try with contactKey
         var jsonString = prefs.getString(keySuffix + contactKey, null)
 
         // 2. Try with clean fallbackNumber
         if (jsonString.isNullOrEmpty() && !fallbackNumber.isNullOrBlank()) {
-            val cleanNum = fallbackNumber.replace(Regex("[^0-9+]"), "")
+            val cleanNum = digitsOnlyPhoneFast(fallbackNumber)
             if (cleanNum.isNotBlank()) {
                 jsonString = prefs.getString(keySuffix + cleanNum, null)
             }
@@ -3437,15 +3474,15 @@ fun getCustomSwipeAction(
 
         // 3. Fallback: match by last 7 digits of phone number across all saved keys
         if (jsonString.isNullOrEmpty()) {
-            val searchNum =
-                (if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey).replace(
-                    Regex("[^0-9]"), ""
-                )
+            val searchNum = digitsOnlyPhoneFast(
+                if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey,
+                keepPlus = false
+            )
             if (searchNum.length >= 7) {
                 val last7 = searchNum.takeLast(7)
                 val allKeys = prefs.all.keys.filter { it.startsWith(keySuffix) }
                 for (k in allKeys) {
-                    val cleanKeyDigits = k.replace(Regex("[^0-9]"), "")
+                    val cleanKeyDigits = digitsOnlyPhoneFast(k, keepPlus = false)
                     if (cleanKeyDigits.length >= 7 && cleanKeyDigits.takeLast(7) == last7) {
                         jsonString = prefs.getString(k, null)
                         if (!jsonString.isNullOrEmpty()) break
@@ -3454,10 +3491,13 @@ fun getCustomSwipeAction(
             }
         }
 
-        if (jsonString.isNullOrEmpty()) return null
+        if (jsonString.isNullOrEmpty()) {
+            SwipeActionCache.put(cacheKey, null)
+            return null
+        }
 
         val obj = JSONObject(jsonString)
-        return CustomSwipeAction(
+        val action = CustomSwipeAction(
             actionType = obj.getString("actionType"),
             targetValue = obj.getString("targetValue"),
             label = obj.getString("label"),
@@ -3468,7 +3508,10 @@ fun getCustomSwipeAction(
                 "messengerColorHex"
             ) else null
         )
+        SwipeActionCache.put(cacheKey, action)
+        return action
     } catch (_: Exception) {
+        SwipeActionCache.put(cacheKey, null)
         return null
     }
 }
