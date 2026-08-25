@@ -268,8 +268,20 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             val shouldShowLoading = showLoading && !_hasLoadedCallLogs.value
             if (shouldShowLoading) _isLoading.value = true
             try {
-                _rawCallLogs.value = repository.getCallLogs()
-                _favorites.value = favoritesRepository.getFavorites()
+                if (shouldShowLoading || _rawCallLogs.value.isEmpty()) {
+                    // Phase 1: fast window so startup time stays the same
+                    _rawCallLogs.value = repository.getCallLogs(CallLogRepository.DEFAULT_RECENTS_LIMIT)
+                    _favorites.value = favoritesRepository.getFavorites()
+                    _hasLoadedCallLogs.value = true
+                    _isLoading.value = false
+
+                    // Phase 2: full journal in background (photo cache already warm)
+                    _rawCallLogs.value = repository.getCallLogs(limit = null)
+                } else {
+                    // Silent refresh — full list, no spinner
+                    _rawCallLogs.value = repository.getCallLogs(limit = null)
+                    _favorites.value = favoritesRepository.getFavorites()
+                }
             } finally {
                 _hasLoadedCallLogs.value = true
                 // Ignore observer spam for a few seconds after cold start

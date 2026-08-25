@@ -15,6 +15,7 @@ import kotlinx.coroutines.withContext
 class CallLogRepository(private val context: Context) {
 
     companion object {
+        /** First paint window — keeps cold start fast; full list loads right after. */
         const val DEFAULT_RECENTS_LIMIT = 250
     }
 
@@ -24,7 +25,10 @@ class CallLogRepository(private val context: Context) {
     @Volatile
     private var cachedSubscriptions: List<SubscriptionInfo>? = null
 
-    suspend fun getCallLogs(limit: Int = DEFAULT_RECENTS_LIMIT): List<CallLogItem> =
+    /**
+     * @param limit max raw CallLog rows (newest first). Null = entire journal.
+     */
+    suspend fun getCallLogs(limit: Int? = DEFAULT_RECENTS_LIMIT): List<CallLogItem> =
         withContext(Dispatchers.IO) {
             val raw = queryCallLogs(
                 selection = null,

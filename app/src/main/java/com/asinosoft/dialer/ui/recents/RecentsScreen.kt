@@ -195,7 +195,7 @@ fun RecentsScreen(
         listReady = true
     }
 
-    // Warm remaining avatars in the background so fling doesn't decode mid-scroll
+    // Warm nearby avatars only — full journal can be huge; rest via scroll-window prefetch
     LaunchedEffect(listReady, callLogs, favorites) {
         if (!listReady) return@LaunchedEffect
         val callLogAvatarPx = with(density) { 48.dp.roundToPx() }.coerceAtLeast(1)
@@ -207,7 +207,7 @@ fun RecentsScreen(
         )
         AvatarBitmapCache.prefetch(
             context = context,
-            uris = callLogs.map { it.photoUri },
+            uris = callLogs.take(48).map { it.photoUri },
             targetPx = callLogAvatarPx
         )
     }
