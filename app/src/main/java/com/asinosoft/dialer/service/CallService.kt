@@ -51,7 +51,10 @@ class CallService : InCallService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
-            NotificationManager.ACTION_ANSWER -> CallManager.answer()
+            NotificationManager.ACTION_ANSWER -> {
+                CallManager.answer()
+                promoteToFullInCallUi()
+            }
             NotificationManager.ACTION_DISCONNECT -> CallManager.disconnect()
         }
         return super.onStartCommand(intent, flags, startId)
@@ -96,6 +99,8 @@ class CallService : InCallService() {
                     wasAnswered = true
                     ringtonePlayer.stop()
                     unregisterSilenceReceiver()
+                    // BT headset / external answer while floating popup is showing
+                    promoteToFullInCallUi()
                 } else {
                     unregisterSilenceReceiver()
                 }
@@ -221,6 +226,17 @@ class CallService : InCallService() {
             return true // Screen is unlocked -> Floating Call Pop-Up
         } catch (_: Exception) {
             return true
+        }
+    }
+
+    private fun promoteToFullInCallUi() {
+        try {
+            val intent = Intent(this, InCallActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            startActivity(intent)
+        } catch (_: Exception) {
+            // ignore
         }
     }
 

@@ -319,10 +319,15 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             val shouldShowLoading = showLoading && !_hasLoadedCallLogs.value
             if (shouldShowLoading) _isLoading.value = true
             try {
+                val favorites = withContext(Dispatchers.IO) {
+                    favoritesRepository.getFavorites()
+                }
+                seedCallLogPhotosFromFavorites(favorites)
+
                 if (shouldShowLoading || _rawCallLogs.value.isEmpty()) {
                     // Phase 1: fast window so startup time stays the same
                     _rawCallLogs.value = repository.getCallLogs(CallLogRepository.DEFAULT_RECENTS_LIMIT)
-                    _favorites.value = favoritesRepository.getFavorites()
+                    _favorites.value = favorites
                     _hasLoadedCallLogs.value = true
                     _isLoading.value = false
 
@@ -331,7 +336,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                 } else {
                     // Silent refresh — full list, no spinner
                     _rawCallLogs.value = repository.getCallLogs(limit = null)
-                    _favorites.value = favoritesRepository.getFavorites()
+                    _favorites.value = favorites
                 }
             } finally {
                 _hasLoadedCallLogs.value = true
@@ -340,6 +345,12 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                 _isLoading.value = false
             }
         }
+    }
+
+    private fun seedCallLogPhotosFromFavorites(favorites: List<FavoriteContact>) {
+        val byNumber = favorites.associate { it.number to it.photoUri }
+        val byName = favorites.associate { it.name to it.photoUri }
+        repository.seedPhotoCache(byNumber, byName)
     }
 
     private fun loadFavorites() {

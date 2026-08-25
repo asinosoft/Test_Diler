@@ -206,8 +206,11 @@ private fun IncomingCallPopupScreen(
 
         val callback = object : Call.Callback() {
             override fun onStateChanged(call: Call, state: Int) {
-                if (state == Call.STATE_DISCONNECTED) {
-                    onDismiss()
+                when (state) {
+                    // Answered from BT / notification / system — promote to full in-call UI
+                    Call.STATE_ACTIVE,
+                    Call.STATE_HOLDING -> onOpenFullScreen()
+                    Call.STATE_DISCONNECTED -> onDismiss()
                 }
             }
         }
