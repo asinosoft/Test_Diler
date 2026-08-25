@@ -3,6 +3,7 @@ package com.asinosoft.dialer.ui.incall
 import android.content.pm.ActivityInfo
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -25,10 +26,10 @@ class InCallActivity : ComponentActivity() {
             @Suppress("DEPRECATION")
             window.addFlags(
                 WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
-                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
+                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
             )
         }
+        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         // Intercept Back button: consume back press without closing or minimizing
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
@@ -48,6 +49,11 @@ class InCallActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (silenceRingerOnIncomingKey(event)) return true
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onDestroy() {

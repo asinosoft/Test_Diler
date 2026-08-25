@@ -9,9 +9,13 @@ import android.media.RingtoneManager
 class CallRingtonePlayer(private val context: Context) {
     private val audioManager: AudioManager? = context.getSystemService(AudioManager::class.java)
     private var ringtone: Ringtone? = null
+    private var silenced = false
+
+    val isPlaying: Boolean
+        get() = ringtone?.isPlaying == true
 
     fun start() {
-        if (ringtone != null) return
+        if (silenced || ringtone != null) return
 
         try {
             val uri = RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_RINGTONE)
@@ -20,6 +24,7 @@ class CallRingtonePlayer(private val context: Context) {
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .build()
+            @Suppress("DEPRECATION")
             nextRingtone.streamType = AudioManager.STREAM_RING
             ringtone = nextRingtone
             audioManager?.mode = AudioManager.MODE_RINGTONE
@@ -29,8 +34,23 @@ class CallRingtonePlayer(private val context: Context) {
         }
     }
 
+    /** Mute ringtone for the current incoming call (volume / power). */
+    fun silence() {
+        silenced = true
+        stopPlayback()
+    }
+
     fun stop() {
-        ringtone?.stop()
+        silenced = false
+        stopPlayback()
+    }
+
+    private fun stopPlayback() {
+        try {
+            ringtone?.stop()
+        } catch (_: Exception) {
+            // ignore
+        }
         ringtone = null
         try {
             audioManager?.mode = AudioManager.MODE_NORMAL

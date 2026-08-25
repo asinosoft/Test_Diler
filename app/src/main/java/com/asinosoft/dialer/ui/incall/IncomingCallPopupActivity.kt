@@ -9,6 +9,7 @@ import android.os.Bundle
 import android.provider.ContactsContract
 import android.telecom.Call
 import android.view.Gravity
+import android.view.KeyEvent
 import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -127,6 +128,11 @@ class IncomingCallPopupActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (silenceRingerOnIncomingKey(event)) return true
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onDestroy() {

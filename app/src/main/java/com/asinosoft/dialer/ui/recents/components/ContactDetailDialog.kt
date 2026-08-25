@@ -1904,7 +1904,7 @@ private fun SettingsTabContent(
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = "+ Создать новую",
+                                                text = "Создать новую",
                                                 fontWeight = FontWeight.Bold,
                                                 color = SamsungGreen
                                             )

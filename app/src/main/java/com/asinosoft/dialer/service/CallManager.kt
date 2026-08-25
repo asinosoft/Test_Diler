@@ -42,6 +42,10 @@ object CallManager {
         _currentCall.value?.disconnect()
     }
 
+    fun silenceRinger() {
+        inCallService?.silenceIncomingRinger()
+    }
+
     fun toggleMute() {
         val newMute = !_isMuted.value
         _isMuted.value = newMute
@@ -50,7 +54,11 @@ object CallManager {
 
     fun setAudioRoute(route: Int) {
         _audioRoute.value = route
-        inCallService?.setAudioRoute(route)
+        inCallService?.requestAudioRoute(route)
+    }
+
+    fun updateAudioRoute(route: Int) {
+        _audioRoute.value = route
     }
 
     fun toggleSpeaker() {

@@ -220,6 +220,8 @@ fun InCallScreen(
         }
     }
 
+    ProximityScreenOffEffect(callState = callState, audioRoute = audioRoute)
+
     // Auto-finish if no call
     LaunchedEffect(activeCall) {
         if (activeCall == null) {
