@@ -1,5 +1,9 @@
 package com.asinosoft.dialer.ui.recents.components
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -21,7 +25,13 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.automirrored.filled.CallReceived
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -36,6 +46,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Outline
@@ -47,14 +58,17 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.CallLogItem
 import com.asinosoft.dialer.data.model.CallType
 import com.asinosoft.dialer.ui.theme.IncomingGreen
@@ -98,7 +112,11 @@ fun SwipeableCallLogCard(
     item: CallLogItem,
     onCall: (String) -> Unit,
     onSms: (String) -> Unit,
+    onCallWithSim: (String, Int) -> Unit = { number, _ -> onCall(number) },
     onItemClick: ((CallLogItem) -> Unit)? = null,
+    onBlockNumber: (CallLogItem) -> Boolean = { false },
+    onDeleteGroup: (CallLogItem) -> Unit = {},
+    onClearContactCalls: (CallLogItem) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -110,6 +128,10 @@ fun SwipeableCallLogCard(
     val thresholdPx = with(density) { 90.dp.toPx() }
     val maxDragPx = with(density) { 160.dp.toPx() }
     var hasVibratedThreshold by remember { mutableStateOf(false) }
+
+    var menuExpanded by remember { mutableStateOf(false) }
+    var showDeleteSubmenu by remember { mutableStateOf(false) }
+    var menuOffset by remember { mutableStateOf(DpOffset.Zero) }
 
     val contactKey = remember(item.id, item.number) {
         item.id.ifBlank { digitsOnlyPhone(item.number) }
@@ -135,6 +157,11 @@ fun SwipeableCallLogCard(
             getCustomSwipeAction(context, contactKey, isRight = false, fallbackNumber = item.number)
         rightVisuals = getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true)
         leftVisuals = getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false)
+    }
+
+    fun dismissMenu() {
+        menuExpanded = false
+        showDeleteSubmenu = false
     }
 
     val formattedNumber = remember(item.number) { formatPhoneNumber(item.number) }
@@ -173,7 +200,7 @@ fun SwipeableCallLogCard(
                             tint = Color.White,
                             modifier = Modifier.size(28.dp)
                         )
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(modifier.width(12.dp))
                         Text(
                             rightVisuals.label,
                             color = Color.White,
@@ -201,7 +228,7 @@ fun SwipeableCallLogCard(
                             fontWeight = FontWeight.Bold,
                             fontSize = 16.sp
                         )
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(modifier.width(12.dp))
                         Icon(
                             imageVector = leftVisuals.icon,
                             contentDescription = leftVisuals.label,
@@ -219,6 +246,15 @@ fun SwipeableCallLogCard(
                 .graphicsLayer { translationX = drawnOffset }
                 .pointerInput(item.id) {
                     detectTapGestures(
+                        onLongPress = { offset: Offset ->
+                            if (kotlin.math.abs(drawnOffset) >= 2f) return@detectTapGestures
+                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                            menuOffset = with(density) {
+                                DpOffset(offset.x.toDp(), offset.y.toDp())
+                            }
+                            showDeleteSubmenu = false
+                            menuExpanded = true
+                        },
                         onTap = {
                             if (kotlin.math.abs(drawnOffset) < 2f && onItemClick != null) {
                                 onItemClick(item)
@@ -304,8 +340,8 @@ fun SwipeableCallLogCard(
                     name = avatarName,
                     photoUri = item.photoUri
                 )
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
+                Spacer(modifier.width(14.dp))
+                Column(modifier.weight(1f)) {
                     Text(
                         text = displayName,
                         fontSize = 17.sp,
@@ -314,12 +350,12 @@ fun SwipeableCallLogCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(2.dp))
+                    Spacer(modifier.height(2.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CallTypeIcon(item.type)
-                        Spacer(Modifier.width(5.dp))
+                        Spacer(modifier.width(5.dp))
                         SimBadge(simNumber = item.simNumber)
-                        Spacer(Modifier.width(5.dp))
+                        Spacer(modifier.width(5.dp))
                         Text(
                             text = subText,
                             fontSize = 13.sp,
@@ -329,7 +365,7 @@ fun SwipeableCallLogCard(
                         )
                     }
                 }
-                Spacer(Modifier.width(8.dp))
+                Spacer(modifier.width(8.dp))
                 Text(
                     text = timeText,
                     fontSize = 13.sp,
@@ -337,8 +373,137 @@ fun SwipeableCallLogCard(
                     maxLines = 1
                 )
             }
+
+            DropdownMenu(
+                expanded = menuExpanded,
+                onDismissRequest = { dismissMenu() },
+                offset = menuOffset
+            ) {
+                if (!showDeleteSubmenu) {
+                    DropdownMenuItem(
+                        text = { Text("Вызов через SIM1") },
+                        onClick = {
+                            dismissMenu()
+                            onCallWithSim(item.number, 1)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_sim1),
+                                contentDescription = null,
+                                tint = Color.Unspecified,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Вызов через SIM2") },
+                        onClick = {
+                            dismissMenu()
+                            onCallWithSim(item.number, 2)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                painter = painterResource(R.drawable.ic_sim2),
+                                contentDescription = null,
+                                tint = Color.Unspecified,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Копировать номер") },
+                        onClick = {
+                            dismissMenu()
+                            copyNumberToClipboard(context, item.number)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = null
+                            )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Заблокировать") },
+                        onClick = {
+                            dismissMenu()
+                            val ok = onBlockNumber(item)
+                            Toast.makeText(
+                                context,
+                                if (ok) "Номер заблокирован" else "Не удалось заблокировать",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Block,
+                                contentDescription = null
+                            )
+                        }
+                    )
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 4.dp),
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                "Удалить",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        onClick = { showDeleteSubmenu = true },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    )
+                } else {
+                    DropdownMenuItem(
+                        text = { Text("Удалить 1 элемент") },
+                        onClick = {
+                            dismissMenu()
+                            onDeleteGroup(item)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null
+                            )
+                        }
+                    )
+                    DropdownMenuItem(
+                        text = {
+                            Text(
+                                "Очистить контакт",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        },
+                        onClick = {
+                            dismissMenu()
+                            onClearContactCalls(item)
+                        },
+                        leadingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Delete,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    )
+                }
+            }
         }
     }
+}
+
+private fun copyNumberToClipboard(context: Context, number: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText("Phone Number", number))
+    Toast.makeText(context, "Номер скопирован", Toast.LENGTH_SHORT).show()
 }
 
 @Composable

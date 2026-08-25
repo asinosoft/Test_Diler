@@ -46,6 +46,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
@@ -75,6 +76,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.ui.components.LazyListVerticalScrollbar
 import com.asinosoft.dialer.ui.dialer.SearchDialerScreen
@@ -123,6 +127,20 @@ fun RecentsScreen(
     var showHint by remember { mutableStateOf(true) }
     var initialScrollDone by remember { mutableStateOf(false) }
     var listReady by remember { mutableStateOf(false) }
+
+    // After a call, MainActivity resumes — pull newest CallLog entries immediately
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME &&
+                viewModel.hasLoadedCallLogs.value
+            ) {
+                viewModel.loadCallLogs(showLoading = false)
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     var draggingContactId by remember { mutableStateOf<String?>(null) }
     var dragFromIndex by remember { mutableIntStateOf(-1) }
@@ -742,7 +760,11 @@ fun RecentsScreen(
                                 item = item,
                                 onCall = { num -> onCall(num, null) },
                                 onSms = onSms,
-                                onItemClick = { viewModel.openContactDetailFromCallLog(it) }
+                                onCallWithSim = { num, slot -> onCall(num, slot) },
+                                onItemClick = { viewModel.openContactDetailFromCallLog(it) },
+                                onBlockNumber = { viewModel.blockCallLogNumber(it) },
+                                onDeleteGroup = { viewModel.deleteCallLogGroup(it) },
+                                onClearContactCalls = { viewModel.clearContactCallLogs(it) }
                             )
                         }
                     }

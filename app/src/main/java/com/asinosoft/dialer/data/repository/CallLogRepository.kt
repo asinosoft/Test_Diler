@@ -1,12 +1,14 @@
 package com.asinosoft.dialer.data.repository
 
 import android.content.Context
+import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
 import android.provider.CallLog
 import android.provider.ContactsContract
 import android.telephony.SubscriptionInfo
 import android.telephony.SubscriptionManager
+import androidx.core.content.ContextCompat
 import com.asinosoft.dialer.data.model.CallLogItem
 import com.asinosoft.dialer.data.model.CallType
 import kotlinx.coroutines.Dispatchers
@@ -455,35 +457,191 @@ class CallLogRepository(private val context: Context) {
         }
     }
 
+    suspend fun deleteCallLogEntries(ids: Collection<String>): Int = withContext(Dispatchers.IO) {
+        deleteIdsInternal(ids.mapNotNull { it.toLongOrNull() })
+    }
+
+    /**
+     * Deletes all CallLog rows for a phone number.
+     * Matches by normalized digits (handles +7 / spaces / dashes in stored NUMBER).
+     */
+    suspend fun deleteCallLogsForNumber(phoneNumber: String): Int = withContext(Dispatchers.IO) {
+        val ids = findCallLogIdsForNumber(phoneNumber, limit = null)
+        if (ids.isEmpty()) return@withContext 0
+        deleteIdsInternal(ids)
+    }
+
+    /** Deletes up to [limit] newest CallLog rows matching [phoneNumber]. */
+    suspend fun deleteNewestCallLogsForNumber(phoneNumber: String, limit: Int): Int =
+        withContext(Dispatchers.IO) {
+            if (limit <= 0) return@withContext 0
+            val ids = findCallLogIdsForNumber(phoneNumber, limit = limit)
+            if (ids.isEmpty()) return@withContext 0
+            deleteIdsInternal(ids)
+        }
+
+    /** How many CallLog rows still match this number (digit suffix). */
+    suspend fun countCallLogsForNumber(phoneNumber: String): Int = withContext(Dispatchers.IO) {
+        findCallLogIdsForNumber(phoneNumber, limit = null).size
+    }
+
+    private fun deleteIdsInternal(longIds: Collection<Long>): Int {
+        val ids = longIds.distinct()
+        if (ids.isEmpty()) return 0
+        if (ContextCompat.checkSelfPermission(
+                context,
+                android.Manifest.permission.WRITE_CALL_LOG
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            return 0
+        }
+        var deleted = 0
+        val cr = context.contentResolver
+        try {
+            // CallLogProvider only allows DELETE on content://call_log/calls —
+            // content://call_log/calls/{id} throws UnsupportedOperationException.
+            for (chunk in ids.chunked(50)) {
+                val placeholders = chunk.joinToString(",") { "?" }
+                deleted += cr.delete(
+                    CallLog.Calls.CONTENT_URI,
+                    "${CallLog.Calls._ID} IN ($placeholders)",
+                    chunk.map { it.toString() }.toTypedArray()
+                )
+            }
+            if (deleted == 0) {
+                for (id in ids) {
+                    deleted += cr.delete(
+                        CallLog.Calls.CONTENT_URI,
+                        "${CallLog.Calls._ID}=?",
+                        arrayOf(id.toString())
+                    )
+                }
+            }
+        } catch (e: SecurityException) {
+            e.printStackTrace()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return deleted
+    }
+
+    /**
+     * Scans CallLog and matches by last 7/10 digits of the number
+     * (SQL LIKE fails when NUMBER contains spaces/dashes).
+     */
+    private fun findCallLogIdsForNumber(phoneNumber: String, limit: Int?): List<Long> {
+        val target = phoneNumber.filter { it.isDigit() }
+        if (target.length < 7) return emptyList()
+        val suffix7 = target.takeLast(7)
+        val suffix10 = target.takeLast(10)
+        val ids = mutableListOf<Long>()
+        try {
+            context.contentResolver.query(
+                CallLog.Calls.CONTENT_URI,
+                arrayOf(CallLog.Calls._ID, CallLog.Calls.NUMBER),
+                null,
+                null,
+                "${CallLog.Calls.DATE} DESC"
+            )?.use { c ->
+                val idIdx = c.getColumnIndex(CallLog.Calls._ID)
+                val numIdx = c.getColumnIndex(CallLog.Calls.NUMBER)
+                if (idIdx == -1) return@use
+                while (c.moveToNext()) {
+                    val number = if (numIdx != -1) c.getString(numIdx).orEmpty() else ""
+                    val digits = number.filter { it.isDigit() }
+                    if (digits.length < 7) continue
+                    val match = digits.takeLast(7) == suffix7 ||
+                            (digits.length >= 10 && digits.takeLast(10) == suffix10)
+                    if (!match) continue
+                    ids.add(c.getLong(idIdx))
+                    if (limit != null && ids.size >= limit) break
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+        return ids
+    }
+
+    fun blockNumber(phoneNumber: String): Boolean {
+        val number = phoneNumber.trim()
+        if (number.isEmpty()) return false
+        return try {
+            if (!android.provider.BlockedNumberContract.canCurrentUserBlockNumbers(context)) {
+                return false
+            }
+            val values = android.content.ContentValues().apply {
+                put(
+                    android.provider.BlockedNumberContract.BlockedNumbers.COLUMN_ORIGINAL_NUMBER,
+                    number
+                )
+            }
+            context.contentResolver.insert(
+                android.provider.BlockedNumberContract.BlockedNumbers.CONTENT_URI,
+                values
+            ) != null
+        } catch (e: Exception) {
+            e.printStackTrace()
+            false
+        }
+    }
+
     private fun groupConsecutiveCallLogs(logs: List<CallLogItem>): List<CallLogItem> {
         if (logs.isEmpty()) return emptyList()
+
+        val cal = java.util.Calendar.getInstance()
+        fun dayKey(timestamp: Long): Long {
+            if (timestamp <= 0L) return Long.MIN_VALUE
+            cal.timeInMillis = timestamp
+            return cal.get(java.util.Calendar.YEAR) * 10_000L +
+                    (cal.get(java.util.Calendar.MONTH) + 1) * 100L +
+                    cal.get(java.util.Calendar.DAY_OF_MONTH)
+        }
 
         val grouped = mutableListOf<CallLogItem>()
         var currentGroupItem: CallLogItem? = null
         var currentCount = 0
         var currentDigits = ""
+        var currentDayKey = Long.MIN_VALUE
+        var currentIds = mutableListOf<String>()
 
         for (item in logs) {
             val itemDigits = digitsOnly(item.number)
+            val itemDayKey = dayKey(item.timestamp)
             val isSameContact = currentGroupItem != null && (
                     (itemDigits.isNotEmpty() && itemDigits == currentDigits) ||
                             (item.name != null && item.name == currentGroupItem.name)
                     )
+            // Never merge across calendar days — otherwise yesterday's call lands under "Сегодня"
+            val isSameDay = currentGroupItem != null && itemDayKey == currentDayKey
 
-            if (isSameContact) {
+            if (isSameContact && isSameDay) {
                 currentCount++
+                currentIds.add(item.id)
             } else {
                 if (currentGroupItem != null) {
-                    grouped.add(currentGroupItem.copy(count = currentCount))
+                    grouped.add(
+                        currentGroupItem.copy(
+                            count = currentCount,
+                            groupedIds = currentIds.toList()
+                        )
+                    )
                 }
                 currentGroupItem = item
                 currentDigits = itemDigits
+                currentDayKey = itemDayKey
                 currentCount = 1
+                currentIds = mutableListOf(item.id)
             }
         }
 
         if (currentGroupItem != null) {
-            grouped.add(currentGroupItem.copy(count = currentCount))
+            grouped.add(
+                currentGroupItem.copy(
+                    count = currentCount,
+                    groupedIds = currentIds.toList()
+                )
+            )
         }
 
         return grouped

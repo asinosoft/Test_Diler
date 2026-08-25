@@ -202,6 +202,12 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     private var loadCallLogsJob: Job? = null
     private var suppressCallLogObserverUntilElapsed = 0L
     private var suppressContactsObserverUntilElapsed = 0L
+    /** Bumps to drop in-flight load results (prevents deleted rows from reappearing). */
+    private var callLogLoadGeneration = 0
+    /** CallLog _IDs removed in-app; filter them out of any subsequent loads. */
+    private val hiddenCallLogIds = mutableSetOf<String>()
+    /** last-7 phone digits → hide until elapsedRealtime (clear-contact grace). */
+    private val hiddenPhoneSuffixesUntil = mutableMapOf<String, Long>()
 
     init {
         loadTabs()
@@ -258,9 +264,56 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     private fun scheduleCallLogReload() {
         callLogReloadJob?.cancel()
         callLogReloadJob = viewModelScope.launch {
-            delay(400)
+            delay(150)
+            loadCallLogs(showLoading = false)
+            // Late system write after call end
+            delay(800)
             loadCallLogs(showLoading = false)
         }
+    }
+
+    private fun invalidateInFlightCallLogLoads() {
+        callLogLoadGeneration++
+        loadCallLogsJob?.cancel()
+        loadCallLogsJob = null
+        callLogReloadJob?.cancel()
+        callLogReloadJob = null
+    }
+
+    private fun phoneSuffix7(number: String): String? {
+        val digits = number.filter { it.isDigit() }
+        return if (digits.length >= 7) digits.takeLast(7) else null
+    }
+
+    private fun rememberDeletedIds(ids: Collection<String>) {
+        hiddenCallLogIds.addAll(ids.filter { it.isNotBlank() })
+    }
+
+    private fun rememberDeletedPhone(number: String, graceMs: Long = 45_000L) {
+        phoneSuffix7(number)?.let { suffix ->
+            hiddenPhoneSuffixesUntil[suffix] = SystemClock.elapsedRealtime() + graceMs
+        }
+    }
+
+    private fun applyTombstones(logs: List<CallLogItem>): List<CallLogItem> {
+        val now = SystemClock.elapsedRealtime()
+        hiddenPhoneSuffixesUntil.entries.removeAll { (_, until) -> until <= now }
+
+        val filtered = logs.filterNot { item ->
+            if (item.id in hiddenCallLogIds) return@filterNot true
+            if (item.allEntryIds().any { it in hiddenCallLogIds }) return@filterNot true
+            val suffix = phoneSuffix7(item.number)
+            suffix != null && (hiddenPhoneSuffixesUntil[suffix] ?: 0L) > now
+        }
+
+        // Drop id tombstones confirmed absent from Android snapshot
+        val presentIds = logs.asSequence()
+            .flatMap { sequenceOf(it.id) + it.allEntryIds().asSequence() }
+            .filter { it.isNotBlank() }
+            .toHashSet()
+        hiddenCallLogIds.removeAll { it !in presentIds }
+
+        return filtered
     }
 
     private fun scheduleContactsReload() {
@@ -377,6 +430,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             if (showLoading) return
             loadCallLogsJob?.cancel()
         }
+        val generation = ++callLogLoadGeneration
         loadCallLogsJob = viewModelScope.launch {
             val shouldShowLoading = showLoading && !_hasLoadedCallLogs.value
             if (shouldShowLoading) _isLoading.value = true
@@ -384,37 +438,34 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                 val favorites = withContext(Dispatchers.IO) {
                     favoritesRepository.getFavorites()
                 }
+                if (generation != callLogLoadGeneration) return@launch
                 seedCallLogCachesFromFavorites(favorites)
 
-                if (shouldShowLoading || _rawCallLogs.value.isEmpty()) {
-                    // Phase 1: fast window so startup time stays the same
-                    _rawCallLogs.value = applyFavoriteNames(
-                        repository.getCallLogs(CallLogRepository.DEFAULT_RECENTS_LIMIT),
-                        favorites
-                    )
+                suspend fun publish(logs: List<CallLogItem>) {
+                    if (generation != callLogLoadGeneration) return
+                    _rawCallLogs.value = applyTombstones(applyFavoriteNames(logs, favorites))
                     _favorites.value = favorites
+                }
+
+                if (shouldShowLoading || _rawCallLogs.value.isEmpty()) {
+                    publish(repository.getCallLogs(CallLogRepository.DEFAULT_RECENTS_LIMIT))
                     _hasLoadedCallLogs.value = true
                     _isLoading.value = false
 
-                    // Phase 2: full journal in background (photo cache already warm)
-                    _rawCallLogs.value = applyFavoriteNames(
-                        repository.getCallLogs(limit = null),
-                        favorites
-                    )
+                    publish(repository.getCallLogs(limit = null))
+                    suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 1_500L
                 } else {
-                    // Silent refresh — full list, no spinner
-                    _rawCallLogs.value = applyFavoriteNames(
-                        repository.getCallLogs(limit = null),
-                        favorites
-                    )
-                    _favorites.value = favorites
+                    publish(repository.getCallLogs(CallLogRepository.DEFAULT_RECENTS_LIMIT))
+                    publish(repository.getCallLogs(limit = null))
                 }
-                syncOpenContactDetail(favorites)
+                if (generation == callLogLoadGeneration) {
+                    syncOpenContactDetail(favorites)
+                }
             } finally {
-                _hasLoadedCallLogs.value = true
-                // Ignore observer spam for a few seconds after cold start
-                suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 3_000L
-                _isLoading.value = false
+                if (generation == callLogLoadGeneration) {
+                    _hasLoadedCallLogs.value = true
+                    _isLoading.value = false
+                }
             }
         }
     }
@@ -690,6 +741,67 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             photoUri = item.photoUri
         )
         openContactDetail(contact, initialTab = 1)
+    }
+
+    fun deleteCallLogGroup(item: CallLogItem) {
+        viewModelScope.launch {
+            invalidateInFlightCallLogLoads()
+            val ids = item.allEntryIds().filter { it.isNotBlank() }
+            rememberDeletedIds(ids)
+            _rawCallLogs.value = applyTombstones(_rawCallLogs.value)
+
+            suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 800L
+            withContext(Dispatchers.IO) {
+                val deleted = repository.deleteCallLogEntries(ids)
+                if (deleted < item.count) {
+                    repository.deleteNewestCallLogsForNumber(
+                        item.number,
+                        item.count - deleted
+                    )
+                }
+            }
+            loadCallLogs(showLoading = false)
+        }
+    }
+
+    fun clearContactCallLogs(item: CallLogItem) {
+        viewModelScope.launch {
+            invalidateInFlightCallLogLoads()
+
+            val matching = _rawCallLogs.value.filter { isSameCallLogContact(it, item) }
+            val idsFromUi = matching.flatMap { it.allEntryIds() }.filter { it.isNotBlank() }.distinct()
+            rememberDeletedIds(idsFromUi)
+            rememberDeletedPhone(item.number)
+            _rawCallLogs.value = applyTombstones(_rawCallLogs.value)
+
+            suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 800L
+            withContext(Dispatchers.IO) {
+                repository.deleteCallLogEntries(idsFromUi)
+                repository.deleteCallLogsForNumber(item.number)
+                // Second pass if provider still has rows (OEM race / partial delete)
+                if (repository.countCallLogsForNumber(item.number) > 0) {
+                    repository.deleteCallLogsForNumber(item.number)
+                }
+            }
+            loadCallLogs(showLoading = false)
+        }
+    }
+
+    /** Match by last 7–10 digits, or same display name when both named. */
+    private fun isSameCallLogContact(a: CallLogItem, b: CallLogItem): Boolean {
+        val da = a.number.filter { it.isDigit() }
+        val db = b.number.filter { it.isDigit() }
+        if (da.length >= 7 && db.length >= 7) {
+            if (da.takeLast(7) == db.takeLast(7)) return true
+            if (da.takeLast(10) == db.takeLast(10)) return true
+        }
+        val nameA = a.name?.trim().orEmpty()
+        val nameB = b.name?.trim().orEmpty()
+        return nameA.isNotEmpty() && nameA.equals(nameB, ignoreCase = true)
+    }
+
+    fun blockCallLogNumber(item: CallLogItem): Boolean {
+        return repository.blockNumber(item.number)
     }
 
     fun closeContactDetail() {
