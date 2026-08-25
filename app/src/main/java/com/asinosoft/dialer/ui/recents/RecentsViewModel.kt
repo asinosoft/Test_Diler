@@ -13,6 +13,8 @@ import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.data.repository.CallLogRepository
 import com.asinosoft.dialer.data.repository.FavoritesRepository
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -186,6 +188,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private lateinit var callLogObserver: ContentObserver
+    private var callLogReloadJob: Job? = null
 
     init {
         loadTabs()
@@ -197,7 +200,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         callLogObserver = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
                 super.onChange(selfChange)
-                loadCallLogs()
+                scheduleCallLogReload()
             }
         }
         try {
@@ -211,7 +214,16 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    private fun scheduleCallLogReload() {
+        callLogReloadJob?.cancel()
+        callLogReloadJob = viewModelScope.launch {
+            delay(400)
+            loadCallLogs(showLoading = false)
+        }
+    }
+
     override fun onCleared() {
+        callLogReloadJob?.cancel()
         try {
             getApplication<Application>().contentResolver.unregisterContentObserver(callLogObserver)
         } catch (_: Exception) {
@@ -242,12 +254,16 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun loadCallLogs() {
+    fun loadCallLogs(showLoading: Boolean = true) {
         viewModelScope.launch {
-            _isLoading.value = true
-            _rawCallLogs.value = repository.getCallLogs()
-            loadFavorites()
-            _isLoading.value = false
+            val shouldShowLoading = showLoading && _rawCallLogs.value.isEmpty()
+            if (shouldShowLoading) _isLoading.value = true
+            try {
+                _rawCallLogs.value = repository.getCallLogs()
+                loadFavorites()
+            } finally {
+                _isLoading.value = false
+            }
         }
     }
 

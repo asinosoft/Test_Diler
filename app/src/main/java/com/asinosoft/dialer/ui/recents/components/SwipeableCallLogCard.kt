@@ -112,17 +112,21 @@ fun SwipeableCallLogCard(
     ) {
         val currentOffset = offsetX.value
 
-        val contactKey = item.id.ifBlank { item.number.replace(Regex("[^0-9+]"), "") }
-
-        val customRightAction = if (currentOffset > 0f) {
+        val contactKey = remember(item.id, item.number) {
+            item.id.ifBlank { digitsOnlyPhone(item.number) }
+        }
+        val customRightAction = remember(contactKey, item.number) {
             getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = item.number)
-        } else null
-        val rightVisuals = getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true)
-
-        val customLeftAction = if (currentOffset < 0f) {
+        }
+        val customLeftAction = remember(contactKey, item.number) {
             getCustomSwipeAction(context, contactKey, isRight = false, fallbackNumber = item.number)
-        } else null
-        val leftVisuals = getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false)
+        }
+        val rightVisuals = remember(customRightAction) {
+            getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true)
+        }
+        val leftVisuals = remember(customLeftAction) {
+            getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false)
+        }
 
         Box(modifier = Modifier.fillMaxSize()) {
             if (currentOffset > 0f) {
@@ -201,7 +205,7 @@ fun SwipeableCallLogCard(
                             coroutineScope.launch {
                                 val finalOffset = offsetX.value
                                 val contactKey =
-                                    item.id.ifBlank { item.number.replace(Regex("[^0-9+]"), "") }
+                                    item.id.ifBlank { digitsOnlyPhone(item.number) }
                                 if (finalOffset > thresholdPx) {
                                     val customAction = getCustomSwipeAction(
                                         context,
@@ -374,4 +378,12 @@ private fun CallTypeIcon(type: CallType) {
 private fun formatTimeOnly(timestamp: Long): String {
     if (timestamp == 0L) return ""
     return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))
+}
+
+private fun digitsOnlyPhone(number: String): String {
+    val sb = StringBuilder(number.length)
+    for (c in number) {
+        if (c.isDigit() || c == '+') sb.append(c)
+    }
+    return sb.toString()
 }
