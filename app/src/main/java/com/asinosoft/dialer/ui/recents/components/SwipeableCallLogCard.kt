@@ -47,11 +47,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
@@ -59,13 +55,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntOffset
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asinosoft.dialer.R
@@ -75,6 +67,7 @@ import com.asinosoft.dialer.ui.components.OneUiPopupMenu
 import com.asinosoft.dialer.ui.components.OneUiPopupMenuDivider
 import com.asinosoft.dialer.ui.components.OneUiPopupMenuItem
 import com.asinosoft.dialer.ui.components.OneUiPopupMenuPainterItem
+import com.asinosoft.dialer.ui.components.SimIcon
 import com.asinosoft.dialer.ui.theme.IncomingGreen
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
@@ -87,29 +80,8 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
-private val SharedSimCardShape = SimCardShape(cutSizeDp = 2.5f)
-
 private val timeFormatter = ThreadLocal.withInitial {
     SimpleDateFormat("HH:mm", Locale.getDefault())
-}
-
-class SimCardShape(private val cutSizeDp: Float = 2.5f) : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density
-    ): Outline {
-        val cut = density.density * cutSizeDp
-        val path = Path().apply {
-            moveTo(0f, 0f)
-            lineTo(size.width - cut, 0f)
-            lineTo(size.width, cut)
-            lineTo(size.width, size.height)
-            lineTo(0f, size.height)
-            close()
-        }
-        return Outline.Generic(path)
-    }
 }
 
 @Composable
@@ -360,7 +332,7 @@ fun SwipeableCallLogCard(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         CallTypeIcon(item.type)
                         Spacer(modifier.width(5.dp))
-                        SimBadge(simNumber = item.simNumber)
+                        SimIcon(simNumber = item.simNumber, size = 12.dp)
                         Spacer(modifier.width(5.dp))
                         Text(
                             text = subText,
@@ -489,32 +461,6 @@ private fun copyNumberToClipboard(context: Context, number: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText("Phone Number", number))
     Toast.makeText(context, "Номер скопирован", Toast.LENGTH_SHORT).show()
-}
-
-@Composable
-private fun SimBadge(simNumber: Int) {
-    val simBgColor = if (simNumber == 2) SamsungGreen else SamsungSmsBlue
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(width = 10.dp, height = 12.dp)
-            .clip(SharedSimCardShape)
-            .background(simBgColor)
-    ) {
-        Text(
-            text = "$simNumber",
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Black,
-            color = Color.White,
-            style = TextStyle(
-                platformStyle = PlatformTextStyle(
-                    includeFontPadding = false
-                )
-            ),
-            modifier = Modifier.offset(y = (-0.5).dp)
-        )
-    }
 }
 
 @Composable

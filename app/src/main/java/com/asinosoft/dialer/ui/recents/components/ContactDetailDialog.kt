@@ -145,6 +145,7 @@ import com.asinosoft.dialer.ui.components.LazyListVerticalScrollbar
 import com.asinosoft.dialer.ui.components.OneUiPopupMenu
 import com.asinosoft.dialer.ui.components.OneUiPopupMenuDivider
 import com.asinosoft.dialer.ui.components.OneUiPopupMenuItem
+import com.asinosoft.dialer.ui.components.SimIcon
 import com.asinosoft.dialer.ui.theme.IncomingGreen
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
@@ -1003,7 +1004,7 @@ private fun ContactTabContent(
                                                 .align(Alignment.TopEnd)
                                                 .padding(top = 7.dp, end = 7.dp)
                                         ) {
-                                            SimCardBadge(simNumber = 1)
+                                            SimIcon(simNumber = 1, size = 11.dp)
                                         }
                                     }
                                 }
@@ -1036,7 +1037,7 @@ private fun ContactTabContent(
                                                 .align(Alignment.TopEnd)
                                                 .padding(top = 7.dp, end = 7.dp)
                                         ) {
-                                            SimCardBadge(simNumber = 2)
+                                            SimIcon(simNumber = 2, size = 11.dp)
                                         }
                                     }
                                 }
@@ -1746,7 +1747,7 @@ private fun HistoryCallRow(item: CallLogItem) {
                 Spacer(modifier = Modifier.height(3.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    SimCardBadge(simNumber = item.simNumber)
+                    SimIcon(simNumber = item.simNumber, size = 12.dp)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = formatPhoneNumber(item.number),
@@ -2112,7 +2113,7 @@ private fun SettingsTabContent(
                                         .align(Alignment.TopEnd)
                                         .padding(top = 7.dp, end = 7.dp)
                                 ) {
-                                    SimCardBadge(simNumber = rightVisuals.simNumber)
+                                    SimIcon(simNumber = rightVisuals.simNumber, size = 11.dp)
                                 }
                             }
                         } else {
@@ -2197,7 +2198,7 @@ private fun SettingsTabContent(
                                         .align(Alignment.TopEnd)
                                         .padding(top = 7.dp, end = 7.dp)
                                 ) {
-                                    SimCardBadge(simNumber = leftVisuals.simNumber)
+                                    SimIcon(simNumber = leftVisuals.simNumber, size = 11.dp)
                                 }
                             }
                         } else {
@@ -2506,51 +2507,6 @@ private fun getPhoneTypeLabel(type: Int, customLabel: String?): String {
         ContactsContract.CommonDataKinds.Phone.TYPE_OTHER -> "Другой"
         ContactsContract.CommonDataKinds.Phone.TYPE_CUSTOM -> customLabel ?: "Другой"
         else -> "Мобильный"
-    }
-}
-
-private class DetailSimCardShape(private val cutSizeDp: Float = 2.5f) : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density
-    ): Outline {
-        val cut = density.density * cutSizeDp
-        val path = Path().apply {
-            moveTo(0f, 0f)
-            lineTo(size.width - cut, 0f)
-            lineTo(size.width, cut)
-            lineTo(size.width, size.height)
-            lineTo(0f, size.height)
-            close()
-        }
-        return Outline.Generic(path)
-    }
-}
-
-@Composable
-private fun SimCardBadge(simNumber: Int) {
-    val simBgColor = if (simNumber == 2) SamsungGreen else SamsungSmsBlue
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(width = 10.dp, height = 12.dp)
-            .clip(DetailSimCardShape(cutSizeDp = 2.5f))
-            .background(simBgColor)
-    ) {
-        Text(
-            text = "$simNumber",
-            fontSize = 9.sp,
-            fontWeight = FontWeight.Black,
-            color = Color.White,
-            style = TextStyle(
-                platformStyle = PlatformTextStyle(
-                    includeFontPadding = false
-                )
-            ),
-            modifier = Modifier.offset(y = (-0.5).dp)
-        )
     }
 }
 
@@ -3837,7 +3793,7 @@ private fun SwipeActionPickerDialog(
                                                         .align(Alignment.TopEnd)
                                                         .padding(top = 7.dp, end = 7.dp)
                                                 ) {
-                                                    SimCardBadge(simNumber = 1)
+                                                    SimIcon(simNumber = 1, size = 11.dp)
                                                 }
                                             }
                                         }
@@ -3877,7 +3833,7 @@ private fun SwipeActionPickerDialog(
                                                         .align(Alignment.TopEnd)
                                                         .padding(top = 7.dp, end = 7.dp)
                                                 ) {
-                                                    SimCardBadge(simNumber = 2)
+                                                    SimIcon(simNumber = 2, size = 11.dp)
                                                 }
                                             }
                                         }

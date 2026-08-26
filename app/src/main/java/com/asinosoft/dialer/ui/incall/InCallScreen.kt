@@ -61,26 +61,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.Outline
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.asinosoft.dialer.service.CallManager
+import com.asinosoft.dialer.ui.components.SimIcon
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OneUIBgDark
 import com.asinosoft.dialer.ui.theme.SamsungGreen
@@ -92,25 +85,6 @@ import kotlinx.coroutines.withContext
 import java.util.Locale
 import androidx.core.net.toUri
 import kotlin.time.Duration.Companion.milliseconds
-
-class SimCardShape(private val cutSizeDp: Float = 3f) : Shape {
-    override fun createOutline(
-        size: Size,
-        layoutDirection: LayoutDirection,
-        density: Density
-    ): Outline {
-        val cut = density.density * cutSizeDp
-        val path = Path().apply {
-            moveTo(0f, 0f)
-            lineTo(size.width - cut, 0f)
-            lineTo(size.width, cut)
-            lineTo(size.width, size.height)
-            lineTo(0f, size.height)
-            close()
-        }
-        return Outline.Generic(path)
-    }
-}
 
 @Composable
 fun InCallScreen(
@@ -341,7 +315,7 @@ fun InCallScreen(
                             .background(Color.White.copy(alpha = 0.12f))
                             .padding(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        InCallSimBadge(simNumber = simNumber)
+                        SimIcon(simNumber = simNumber, size = 14.dp)
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
                             text = "СИМ $simNumber",
@@ -639,32 +613,6 @@ private fun InCallKeypadSheet(
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun InCallSimBadge(simNumber: Int) {
-    val simBgColor = if (simNumber == 2) SamsungGreen else SamsungSmsBlue
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(width = 12.dp, height = 15.dp)
-            .clip(SimCardShape(cutSizeDp = 3f))
-            .background(simBgColor)
-    ) {
-        Text(
-            text = "$simNumber",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Black,
-            color = Color.White,
-            style = TextStyle(
-                platformStyle = PlatformTextStyle(
-                    includeFontPadding = false
-                )
-            ),
-            modifier = Modifier.offset(y = (-0.5).dp)
-        )
     }
 }
 
