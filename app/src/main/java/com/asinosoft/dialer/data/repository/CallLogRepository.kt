@@ -1,9 +1,12 @@
 package com.asinosoft.dialer.data.repository
 
+import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
+import android.os.Build
+import android.os.Bundle
 import android.provider.CallLog
 import android.provider.ContactsContract
 import android.telephony.SubscriptionInfo
@@ -126,19 +129,35 @@ class CallLogRepository(private val context: Context) {
                 CallLog.Calls.PHONE_ACCOUNT_ID
             )
 
-            val sortOrder = if (limit != null) {
-                "${CallLog.Calls.DATE} DESC LIMIT $limit"
-            } else {
-                "${CallLog.Calls.DATE} DESC"
-            }
+            val cursor = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val args = Bundle().apply {
+                    putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, selectionArgs)
+                    putStringArray(ContentResolver.QUERY_ARG_SORT_COLUMNS, arrayOf(CallLog.Calls.DATE))
+                    putInt(ContentResolver.QUERY_ARG_SORT_DIRECTION, ContentResolver.QUERY_SORT_DIRECTION_DESCENDING)
+                    limit?.let { putInt(ContentResolver.QUERY_ARG_LIMIT, it) }
+                }
 
-            val cursor = context.contentResolver.query(
-                CallLog.Calls.CONTENT_URI,
-                projection,
-                selection,
-                selectionArgs,
-                sortOrder
-            )
+                context.contentResolver.query(
+                    CallLog.Calls.CONTENT_URI,
+                    projection,
+                    args,
+                    null
+                )
+            } else {
+                val sortOrder = if (limit != null) {
+                    "${CallLog.Calls.DATE} DESC LIMIT $limit"
+                } else {
+                    "${CallLog.Calls.DATE} DESC"
+                }
+
+                context.contentResolver.query(
+                    CallLog.Calls.CONTENT_URI,
+                    projection,
+                    selection,
+                    selectionArgs,
+                    sortOrder
+                )
+            }
 
             cursor?.use { c ->
                 val idIndex = c.getColumnIndex(CallLog.Calls._ID)
