@@ -142,6 +142,9 @@ import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.data.repository.CallLogRepository
 import com.asinosoft.dialer.data.repository.ContactsRepository
 import com.asinosoft.dialer.ui.components.LazyListVerticalScrollbar
+import com.asinosoft.dialer.ui.components.OneUiPopupMenu
+import com.asinosoft.dialer.ui.components.OneUiPopupMenuDivider
+import com.asinosoft.dialer.ui.components.OneUiPopupMenuItem
 import com.asinosoft.dialer.ui.theme.IncomingGreen
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
@@ -647,24 +650,14 @@ fun ContactDetailDialog(
                             )
                         }
 
-                        DropdownMenu(
+                        OneUiPopupMenu(
                             expanded = topMenuExpanded,
-                            onDismissRequest = { topMenuExpanded = false }
+                            onDismissRequest = { topMenuExpanded = false },
+                            alignEnd = true
                         ) {
-                            // 1. Поделиться
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.Share,
-                                            contentDescription = "Поделиться",
-                                            tint = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text("Поделиться", fontSize = 14.sp)
-                                    }
-                                },
+                            OneUiPopupMenuItem(
+                                icon = Icons.Default.Share,
+                                label = "Поделиться",
                                 onClick = {
                                     topMenuExpanded = false
                                     try {
@@ -689,47 +682,19 @@ fun ContactDetailDialog(
                                     }
                                 }
                             )
-
-                            // 2. Изменить
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.Edit,
-                                            contentDescription = "Изменить",
-                                            tint = MaterialTheme.colorScheme.onSurface,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text("Изменить", fontSize = 14.sp)
-                                    }
-                                },
+                            OneUiPopupMenuItem(
+                                icon = Icons.Default.Edit,
+                                label = "Изменить",
                                 onClick = {
                                     topMenuExpanded = false
                                     showEditContactDialog = true
                                 }
                             )
-
-                            HorizontalDivider()
-
-                            // 3. Удалить
-                            DropdownMenuItem(
-                                text = {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = "Удалить",
-                                            tint = MaterialTheme.colorScheme.error,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(
-                                            "Удалить",
-                                            fontSize = 14.sp,
-                                            color = MaterialTheme.colorScheme.error
-                                        )
-                                    }
-                                },
+                            OneUiPopupMenuDivider()
+                            OneUiPopupMenuItem(
+                                icon = Icons.Default.Delete,
+                                label = "Удалить",
+                                destructive = true,
                                 onClick = {
                                     topMenuExpanded = false
                                     onDismiss()

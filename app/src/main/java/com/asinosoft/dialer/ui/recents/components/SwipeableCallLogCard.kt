@@ -7,8 +7,10 @@ import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +24,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.automirrored.filled.CallReceived
@@ -29,9 +32,6 @@ import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -64,13 +64,17 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.CallLogItem
 import com.asinosoft.dialer.data.model.CallType
+import com.asinosoft.dialer.ui.components.OneUiPopupMenu
+import com.asinosoft.dialer.ui.components.OneUiPopupMenuDivider
+import com.asinosoft.dialer.ui.components.OneUiPopupMenuItem
+import com.asinosoft.dialer.ui.components.OneUiPopupMenuPainterItem
 import com.asinosoft.dialer.ui.theme.IncomingGreen
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
@@ -81,6 +85,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.roundToInt
 
 private val SharedSimCardShape = SimCardShape(cutSizeDp = 2.5f)
 
@@ -131,7 +136,7 @@ fun SwipeableCallLogCard(
 
     var menuExpanded by remember { mutableStateOf(false) }
     var showDeleteSubmenu by remember { mutableStateOf(false) }
-    var menuOffset by remember { mutableStateOf(DpOffset.Zero) }
+    var menuPopupOffset by remember { mutableStateOf(IntOffset.Zero) }
 
     val contactKey = remember(item.id, item.number) {
         item.id.ifBlank { digitsOnlyPhone(item.number) }
@@ -249,9 +254,10 @@ fun SwipeableCallLogCard(
                         onLongPress = { offset: Offset ->
                             if (kotlin.math.abs(drawnOffset) >= 2f) return@detectTapGestures
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            menuOffset = with(density) {
-                                DpOffset(offset.x.toDp(), offset.y.toDp())
-                            }
+                            menuPopupOffset = IntOffset(
+                                offset.x.roundToInt().coerceAtLeast(0),
+                                offset.y.roundToInt().coerceAtLeast(0)
+                            )
                             showDeleteSubmenu = false
                             menuExpanded = true
                         },
@@ -373,58 +379,45 @@ fun SwipeableCallLogCard(
                     maxLines = 1
                 )
             }
+        }
 
-            DropdownMenu(
-                expanded = menuExpanded,
+        if (menuExpanded) {
+            OneUiPopupMenu(
+                expanded = true,
                 onDismissRequest = { dismissMenu() },
-                offset = menuOffset
+                pressOffset = menuPopupOffset,
+                preferBelowAnchor = false
             ) {
                 if (!showDeleteSubmenu) {
-                    DropdownMenuItem(
-                        text = { Text("Вызов через SIM1") },
+                    OneUiPopupMenuPainterItem(
+                        painter = painterResource(R.drawable.ic_sim1),
+                        label = "Вызов через SIM1",
+                        iconBackground = SamsungSmsBlue.copy(alpha = 0.12f),
                         onClick = {
                             dismissMenu()
                             onCallWithSim(item.number, 1)
-                        },
-                        leadingIcon = {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_sim1),
-                                contentDescription = null,
-                                tint = Color.Unspecified,
-                                modifier = Modifier.size(20.dp)
-                            )
                         }
                     )
-                    DropdownMenuItem(
-                        text = { Text("Вызов через SIM2") },
+                    OneUiPopupMenuPainterItem(
+                        painter = painterResource(R.drawable.ic_sim2),
+                        label = "Вызов через SIM2",
+                        iconBackground = SamsungGreen.copy(alpha = 0.12f),
                         onClick = {
                             dismissMenu()
                             onCallWithSim(item.number, 2)
-                        },
-                        leadingIcon = {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_sim2),
-                                contentDescription = null,
-                                tint = Color.Unspecified,
-                                modifier = Modifier.size(20.dp)
-                            )
                         }
                     )
-                    DropdownMenuItem(
-                        text = { Text("Копировать номер") },
+                    OneUiPopupMenuItem(
+                        icon = Icons.Default.ContentCopy,
+                        label = "Копировать номер",
                         onClick = {
                             dismissMenu()
                             copyNumberToClipboard(context, item.number)
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.ContentCopy,
-                                contentDescription = null
-                            )
                         }
                     )
-                    DropdownMenuItem(
-                        text = { Text("Заблокировать") },
+                    OneUiPopupMenuItem(
+                        icon = Icons.Default.Block,
+                        label = "Заблокировать",
                         onClick = {
                             dismissMenu()
                             val ok = onBlockNumber(item)
@@ -433,65 +426,57 @@ fun SwipeableCallLogCard(
                                 if (ok) "Номер заблокирован" else "Не удалось заблокировать",
                                 Toast.LENGTH_SHORT
                             ).show()
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Block,
-                                contentDescription = null
-                            )
                         }
                     )
-                    HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 4.dp),
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
-                    )
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                "Удалить",
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        },
-                        onClick = { showDeleteSubmenu = true },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error
-                            )
-                        }
+                    OneUiPopupMenuDivider()
+                    OneUiPopupMenuItem(
+                        icon = Icons.Default.Delete,
+                        label = "Удалить",
+                        destructive = true,
+                        onClick = { showDeleteSubmenu = true }
                     )
                 } else {
-                    DropdownMenuItem(
-                        text = { Text("Удалить 1 элемент") },
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { showDeleteSubmenu = false }
+                            )
+                            .padding(horizontal = 10.dp, vertical = 7.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Назад",
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Удалить",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                        )
+                    }
+                    OneUiPopupMenuDivider()
+                    OneUiPopupMenuItem(
+                        icon = Icons.Default.Delete,
+                        label = "Удалить 1 элемент",
                         onClick = {
                             dismissMenu()
                             onDeleteGroup(item)
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = null
-                            )
                         }
                     )
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                "Очистить контакт",
-                                color = MaterialTheme.colorScheme.error
-                            )
-                        },
+                    OneUiPopupMenuItem(
+                        icon = Icons.Default.Delete,
+                        label = "Очистить контакт",
+                        destructive = true,
                         onClick = {
                             dismissMenu()
                             onClearContactCalls(item)
-                        },
-                        leadingIcon = {
-                            Icon(
-                                imageVector = Icons.Default.Delete,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.error
-                            )
                         }
                     )
                 }
