@@ -65,6 +65,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import com.asinosoft.dialer.service.CallManager
 import com.asinosoft.dialer.data.model.CallState
+import com.asinosoft.dialer.ui.components.SimIcon
 import com.asinosoft.dialer.ui.theme.DialerTheme
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.SamsungGreen
@@ -288,7 +289,7 @@ private fun IncomingCallPopupScreen(
                         Row(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            InCallSimBadge(call.simNumber)
+                            SimIcon(simNumber = call.simNumber, size = 14.dp)
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 text = "Входящие вызовы",
@@ -444,31 +445,5 @@ private suspend fun lookupContactInfo(
         PopupContactLookupResult(contactName, contactPhotoUri)
     } catch (_: Exception) {
         PopupContactLookupResult(null, null)
-    }
-}
-
-@Composable
-private fun InCallSimBadge(simNumber: Int) {
-    val simBgColor = if (simNumber == 2) SamsungGreen else SamsungSmsBlue
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(width = 12.dp, height = 15.dp)
-            .clip(SimCardShape(cutSizeDp = 3f))
-            .background(simBgColor)
-    ) {
-        Text(
-            text = "$simNumber",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Black,
-            color = Color.White,
-            style = TextStyle(
-                platformStyle = PlatformTextStyle(
-                    includeFontPadding = false
-                )
-            ),
-            modifier = Modifier.offset(y = (-0.5).dp)
-        )
     }
 }

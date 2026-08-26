@@ -94,6 +94,7 @@ import com.asinosoft.dialer.ui.recents.SearchDialerItem
 import com.asinosoft.dialer.ui.recents.components.executeCustomSwipeAction
 import com.asinosoft.dialer.ui.recents.components.getCustomSwipeAction
 import com.asinosoft.dialer.ui.recents.components.getSwipeBackgroundVisuals
+import com.asinosoft.dialer.ui.components.SimIcon
 import com.asinosoft.dialer.ui.theme.IncomingGreen
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
@@ -781,7 +782,7 @@ private fun SwipeableSearchDialerCard(
                         }
 
                         if (item.simSlot != null) {
-                            InCallSimBadge(simNumber = item.simSlot)
+                            SimIcon(simNumber = item.simSlot, size = 12.dp)
                             Spacer(modifier = Modifier.width(6.dp))
                         }
 
@@ -883,30 +884,4 @@ private fun formatCallTime(timestamp: Long): String {
     if (timestamp == 0L) return ""
     val date = Date(timestamp)
     return SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
-}
-
-@Composable
-private fun InCallSimBadge(simNumber: Int) {
-    val simBgColor = if (simNumber == 2) SamsungGreen else SamsungSmsBlue
-
-    Box(
-        contentAlignment = Alignment.Center,
-        modifier = Modifier
-            .size(width = 12.dp, height = 15.dp)
-            .clip(com.asinosoft.dialer.ui.recents.components.SimCardShape(cutSizeDp = 3f))
-            .background(simBgColor)
-    ) {
-        Text(
-            text = "$simNumber",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Black,
-            color = Color.White,
-            style = androidx.compose.ui.text.TextStyle(
-                platformStyle = androidx.compose.ui.text.PlatformTextStyle(
-                    includeFontPadding = false
-                )
-            ),
-            modifier = Modifier.offset(y = (-0.5).dp)
-        )
-    }
 }
