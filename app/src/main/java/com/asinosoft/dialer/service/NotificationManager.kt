@@ -26,13 +26,8 @@ import com.asinosoft.dialer.ui.incall.InCallActivity
 import com.asinosoft.dialer.util.formatPhoneNumber
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import android.provider.CallLog
-import android.telecom.TelecomManager
-import android.content.ContentValues
-import android.content.pm.PackageManager
 
 class NotificationManager(val service: Service) {
     companion object {
@@ -344,61 +339,7 @@ class NotificationManager(val service: Service) {
             }
 
             notificationManager.notify(notificationId, notificationBuilder.build())
-            // Система часто постит своё уведомление после disconnect — гасим сразу и с ретраями
-            suppressSystemMissedCallNotification()
-        }
-    }
-
-    /**
-     * Гасит системное/OEM-уведомление о пропущенном.
-     * CallStyle/Telecom и Samsung Dialer часто публикуют его с задержкой после disconnect,
-     * поэтому cancel + mark-as-read повторяем несколько раз.
-     */
-    fun suppressSystemMissedCallNotification() {
-        clearSystemMissedCallOnce()
-        serviceScope.launch(Dispatchers.IO) {
-            for (waitMs in longArrayOf(400L, 1_000L, 2_000L, 4_000L)) {
-                delay(waitMs)
-                clearSystemMissedCallOnce()
-            }
-        }
-    }
-
-    private fun clearSystemMissedCallOnce() {
-        try {
-            val telecomManager =
-                service.getSystemService(TELECOM_SERVICE) as? TelecomManager
-            @Suppress("MissingPermission")
-            telecomManager?.cancelMissedCallsNotification()
-        } catch (_: Exception) {
-            // ignore
-        }
-
-        markUnreadMissedCallsAsRead()
-    }
-
-    private fun markUnreadMissedCallsAsRead() {
-        if (ContextCompat.checkSelfPermission(
-                service,
-                android.Manifest.permission.WRITE_CALL_LOG
-            ) != PackageManager.PERMISSION_GRANTED
-        ) {
-            return
-        }
-        try {
-            val values = ContentValues().apply {
-                put(CallLog.Calls.NEW, 0)
-                put(CallLog.Calls.IS_READ, 1)
-            }
-            // Все непрочитанные пропущенные — Samsung/AOSP Dialer снимают баннер по NEW/IS_READ
-            service.contentResolver.update(
-                CallLog.Calls.CONTENT_URI,
-                values,
-                "${CallLog.Calls.TYPE}=? AND (${CallLog.Calls.NEW}=1 OR ${CallLog.Calls.IS_READ}=0)",
-                arrayOf(CallLog.Calls.MISSED_TYPE.toString())
-            )
-        } catch (_: Exception) {
-            // ignore
+            suppressSystemMissedCallNotification(service, rawNumber)
         }
     }
 
@@ -463,6 +404,41 @@ class NotificationManager(val service: Service) {
             return bitmap
         } catch (_: Exception) {
             return null
+        }
+    }
+
+    private fun suppressSystemMissedCallNotification(service:Service, rawNumber: String) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val telecomManager =
+                    service.getSystemService(TELECOM_SERVICE) as? android.telecom.TelecomManager
+                @Suppress("MissingPermission")
+                telecomManager?.cancelMissedCallsNotification()
+            }
+        } catch (_: Exception) {
+            // ignore
+        }
+
+        try {
+            if (ContextCompat.checkSelfPermission(
+                    service,
+                    android.Manifest.permission.WRITE_CALL_LOG
+                ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            ) {
+                val values = android.content.ContentValues().apply {
+                    put(android.provider.CallLog.Calls.NUMBER, rawNumber)
+                    put(
+                        android.provider.CallLog.Calls.TYPE,
+                        android.provider.CallLog.Calls.MISSED_TYPE
+                    )
+                    put(android.provider.CallLog.Calls.DATE, System.currentTimeMillis())
+                    put(android.provider.CallLog.Calls.NEW, 0)
+                    put(android.provider.CallLog.Calls.IS_READ, 1)
+                }
+                service.contentResolver.insert(android.provider.CallLog.Calls.CONTENT_URI, values)
+            }
+        } catch (_: Exception) {
+            // ignore
         }
     }
 

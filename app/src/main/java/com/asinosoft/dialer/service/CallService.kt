@@ -110,8 +110,6 @@ class CallService : InCallService() {
                     unregisterSilenceReceiver()
                     stopForeground(true)
                     if (wasRinging && !wasAnswered && rawNumber.isNotBlank()) {
-                        // Сразу гасим системный баннер — он часто появляется до нашего notify
-                        notification.suppressSystemMissedCallNotification()
                         notification.showMissedCallNotification(rawNumber)
                     }
                 } else {
