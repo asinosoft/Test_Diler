@@ -10,6 +10,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.asinosoft.dialer.data.model.CallLogItem
 import com.asinosoft.dialer.data.model.CallType
+import com.asinosoft.dialer.data.model.DialerOpenMode
 import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.data.repository.CallLogRepository
@@ -81,6 +82,11 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     private val _favoriteRowsCount = MutableStateFlow(prefs.getInt("favorite_rows_count", 3))
     val favoriteRowsCount: StateFlow<Int> = _favoriteRowsCount.asStateFlow()
+
+    private val _dialerOpenMode = MutableStateFlow(
+        DialerOpenMode.fromStorageKey(prefs.getString("dialer_open_mode", null))
+    )
+    val dialerOpenMode: StateFlow<DialerOpenMode> = _dialerOpenMode.asStateFlow()
 
     private val _isAppSettingsOpen = MutableStateFlow(false)
     val isAppSettingsOpen: StateFlow<Boolean> = _isAppSettingsOpen.asStateFlow()
@@ -591,6 +597,11 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         val validCount = count.coerceIn(1, 8)
         _favoriteRowsCount.value = validCount
         prefs.edit { putInt("favorite_rows_count", validCount) }
+    }
+
+    fun setDialerOpenMode(mode: DialerOpenMode) {
+        _dialerOpenMode.value = mode
+        prefs.edit { putString("dialer_open_mode", mode.storageKey) }
     }
 
     fun openAppSettings() {

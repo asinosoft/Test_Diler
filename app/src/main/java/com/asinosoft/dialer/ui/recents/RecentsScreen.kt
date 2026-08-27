@@ -80,6 +80,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.asinosoft.dialer.data.model.FavoriteTab
+import com.asinosoft.dialer.ui.components.FloatingStickyDateHeader
 import com.asinosoft.dialer.ui.components.LazyListVerticalScrollbar
 import com.asinosoft.dialer.ui.dialer.SearchDialerScreen
 import com.asinosoft.dialer.ui.recents.components.AddFavoriteDialog
@@ -275,29 +276,38 @@ fun RecentsScreen(
 
     var lastTapTimestamp by remember { mutableLongStateOf(0L) }
     var lastTapPosition by remember { mutableStateOf(Offset.Zero) }
+    val dialerOpenMode by viewModel.dialerOpenMode.collectAsState()
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        val event = awaitPointerEvent(PointerEventPass.Initial)
-                        val down = event.changes.firstOrNull { it.changedToDown() }
-                        if (down != null) {
-                            val now = System.currentTimeMillis()
-                            val pos = down.position
-                            if (now - lastTapTimestamp < 380L && (pos - lastTapPosition).getDistance() < 120f) {
-                                viewModel.openSearchDialer()
-                                lastTapTimestamp = 0L
-                            } else {
-                                lastTapTimestamp = now
-                                lastTapPosition = pos
+            .then(
+                if (dialerOpenMode.allowsDoubleTap) {
+                    Modifier.pointerInput(dialerOpenMode) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent(PointerEventPass.Initial)
+                                val down = event.changes.firstOrNull { it.changedToDown() }
+                                if (down != null) {
+                                    val now = System.currentTimeMillis()
+                                    val pos = down.position
+                                    if (now - lastTapTimestamp < 380L &&
+                                        (pos - lastTapPosition).getDistance() < 120f
+                                    ) {
+                                        viewModel.openSearchDialer()
+                                        lastTapTimestamp = 0L
+                                    } else {
+                                        lastTapTimestamp = now
+                                        lastTapPosition = pos
+                                    }
+                                }
                             }
                         }
                     }
+                } else {
+                    Modifier
                 }
-            }
+            )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -737,18 +747,8 @@ fun RecentsScreen(
                 } else {
                     groupedCallLogs.forEach { (dateHeader, logsInDay) ->
                         if (dateHeader.isNotEmpty()) {
-                            item(key = "header_$dateHeader") {
-                                Text(
-                                    text = dateHeader,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                                    modifier = Modifier.padding(
-                                        start = 4.dp,
-                                        top = 0.dp,
-                                        bottom = 2.dp
-                                    )
-                                )
+                            stickyHeader(key = "header_$dateHeader") { _ ->
+                                FloatingStickyDateHeader(text = dateHeader)
                             }
                         }
 
@@ -807,8 +807,12 @@ fun RecentsScreen(
                 selectedRowsCount = favoriteRowsCount,
                 maxPossibleRows = 8,
                 tabs = tabs,
+                dialerOpenMode = dialerOpenMode,
                 onRowsCountSelected = { count ->
                     viewModel.setFavoriteRowsCount(count)
+                },
+                onDialerOpenModeSelected = { mode ->
+                    viewModel.setDialerOpenMode(mode)
                 },
                 onAddTab = { viewModel.addTab(it) },
                 onRenameTab = { id, name -> viewModel.renameTab(id, name) },
@@ -865,7 +869,7 @@ fun RecentsScreen(
         }
 
         // Floating Dialpad Button (Only show on main screen when search dialer is closed)
-        if (!isSearchDialerOpen) {
+        if (!isSearchDialerOpen && dialerOpenMode.showsFab) {
             FloatingActionButton(
                 onClick = { viewModel.openSearchDialer() },
                 containerColor = SamsungGreen,
