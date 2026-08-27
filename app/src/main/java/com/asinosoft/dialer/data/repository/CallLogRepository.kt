@@ -36,33 +36,62 @@ class CallLogRepository(private val context: Context) {
     @Volatile
     private var cachedSubscriptions: List<SubscriptionInfo>? = null
 
-    /**
-     * Prefill photo cache from favorites (or other known contacts) so call-log rows
-     * without CACHED_PHOTO_URI still show the same avatar.
-     */
-    fun seedPhotoCache(numberToPhoto: Map<String, String?>, nameToPhoto: Map<String, String?> = emptyMap()) {
-        for ((number, uri) in numberToPhoto) {
-            if (uri.isNullOrEmpty()) continue
-            val key = photoCacheKey(number)
-            if (key.isNotEmpty()) photoCache[key] = uri
-        }
-        for ((name, uri) in nameToPhoto) {
-            if (uri.isNullOrEmpty()) continue
-            val key = name.trim().lowercase()
-            if (key.isNotEmpty()) photoByNameCache[key] = uri
-        }
-    }
-
-    fun seedNameCache(numberToName: Map<String, String?>) {
-        for ((number, name) in numberToName) {
-            if (name.isNullOrBlank()) continue
-            val key = photoCacheKey(number)
-            if (key.isNotEmpty()) nameCache[key] = name
-        }
-    }
-
-    fun clearNameCache() {
+    fun resetCache() {
         nameCache.clear()
+        photoCache.clear()
+        photoByNameCache.clear()
+    }
+
+    /**
+     * Seed `photoCache`, `photoByNameCache` and `nameCache` from all contacts on the device.
+     * This performs a read of the Contacts Phone table and populates caches for faster
+     * call-log rendering. Call from a background thread or use the async wrapper.
+     */
+    suspend fun seedCachesFromContacts() = withContext(Dispatchers.IO) {
+        try {
+            val projection = arrayOf(
+                ContactsContract.CommonDataKinds.Phone.NUMBER,
+                ContactsContract.CommonDataKinds.Phone.PHOTO_URI,
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME
+            )
+
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                projection,
+                null,
+                null,
+                null
+            )?.use { c ->
+                val numIdx = c.getColumnIndex(projection[0])
+                val photoIdx = c.getColumnIndex(projection[1])
+                val nameIdx = c.getColumnIndex(projection[2])
+
+                while (c.moveToNext()) {
+                    val number = if (numIdx != -1) c.getString(numIdx).orEmpty() else ""
+                    val photo = if (photoIdx != -1) c.getString(photoIdx) else null
+                    val name = if (nameIdx != -1) c.getString(nameIdx) else null
+
+                    val key = photoCacheKey(number)
+                    if (key.isNotEmpty()) {
+                        if (!photo.isNullOrEmpty() && !photoCache.containsKey(key)) {
+                            photoCache[key] = photo
+                        }
+                        if (!name.isNullOrBlank() && !nameCache.containsKey(key)) {
+                            nameCache[key] = name
+                        }
+                    }
+
+                    if (!name.isNullOrBlank() && !photo.isNullOrEmpty()) {
+                        val nameKey = name.trim().lowercase()
+                        if (nameKey.isNotEmpty() && !photoByNameCache.containsKey(nameKey)) {
+                            photoByNameCache[nameKey] = photo
+                        }
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     /**
@@ -70,6 +99,10 @@ class CallLogRepository(private val context: Context) {
      */
     suspend fun getCallLogs(limit: Int? = DEFAULT_RECENTS_LIMIT): List<CallLogItem> =
         withContext(Dispatchers.IO) {
+            if (photoCache.isEmpty() and nameCache.isEmpty()) {
+                seedCachesFromContacts()
+            }
+
             val raw = queryCallLogs(
                 selection = null,
                 selectionArgs = null,
@@ -226,22 +259,6 @@ class CallLogRepository(private val context: Context) {
     private fun enrichNames(logs: List<CallLogItem>): List<CallLogItem> {
         if (logs.isEmpty()) return logs
 
-        val numbersNeedingLookup = LinkedHashSet<String>()
-        for (item in logs) {
-            if (item.number.isBlank()) continue
-            val key = photoCacheKey(item.number)
-            if (key.isEmpty() || nameCache.containsKey(key)) continue
-            numbersNeedingLookup.add(item.number)
-        }
-
-        for (number in numbersNeedingLookup) {
-            val name = lookupContactDisplayName(number)
-            if (!name.isNullOrBlank()) {
-                val key = photoCacheKey(number)
-                if (key.isNotEmpty()) nameCache[key] = name
-            }
-        }
-
         return logs.map { item ->
             val key = photoCacheKey(item.number)
             val live = if (key.isNotEmpty()) nameCache[key] else null
@@ -291,46 +308,6 @@ class CallLogRepository(private val context: Context) {
     private fun enrichPhotos(logs: List<CallLogItem>): List<CallLogItem> {
         if (logs.isEmpty()) return logs
 
-        // Seed from rows that already have a cached photo
-        for (item in logs) {
-            if (item.photoUri.isNullOrEmpty()) continue
-            if (item.number.isNotBlank()) {
-                val key = photoCacheKey(item.number)
-                if (key.isNotEmpty()) photoCache[key] = item.photoUri
-            }
-            item.name?.trim()?.lowercase()?.takeIf { it.isNotEmpty() }?.let { nameKey ->
-                photoByNameCache[nameKey] = item.photoUri
-            }
-        }
-
-        val numbersNeedingLookup = LinkedHashSet<String>()
-        val namesNeedingLookup = LinkedHashSet<String>()
-        for (item in logs) {
-            if (!item.photoUri.isNullOrEmpty()) continue
-            val key = photoCacheKey(item.number)
-            if (key.isNotEmpty() && photoCache.containsKey(key)) continue
-            if (item.number.isNotBlank()) numbersNeedingLookup.add(item.number)
-            val nameKey = item.name?.trim()?.lowercase().orEmpty()
-            if (nameKey.isNotEmpty() && !photoByNameCache.containsKey(nameKey)) {
-                namesNeedingLookup.add(item.name!!.trim())
-            }
-        }
-
-        for (number in numbersNeedingLookup) {
-            val uri = lookupContactPhotoUri(number)
-            if (!uri.isNullOrEmpty()) {
-                val key = photoCacheKey(number)
-                if (key.isNotEmpty()) photoCache[key] = uri
-            }
-        }
-
-        for (name in namesNeedingLookup) {
-            val uri = lookupContactPhotoByName(name)
-            if (!uri.isNullOrEmpty()) {
-                photoByNameCache[name.trim().lowercase()] = uri
-            }
-        }
-
         return logs.map { item ->
             if (!item.photoUri.isNullOrEmpty()) return@map item
 
@@ -347,17 +324,6 @@ class CallLogRepository(private val context: Context) {
     private fun photoCacheKey(number: String): String {
         val digits = digitsOnly(number).filter { it.isDigit() }
         return if (digits.length >= 7) digits.takeLast(10) else digits
-    }
-
-    private fun lookupContactPhotoUri(phoneNumber: String): String? {
-        if (phoneNumber.isBlank()) return null
-
-        // Try several number shapes — CallLog and Contacts often differ (+7 / 8 / local)
-        val candidates = numberLookupCandidates(phoneNumber)
-        for (candidate in candidates) {
-            lookupPhotoViaPhoneLookup(candidate)?.let { return it }
-        }
-        return lookupPhotoViaPhoneTable(phoneNumber)
     }
 
     private fun numberLookupCandidates(phoneNumber: String): List<String> {
@@ -383,97 +349,6 @@ class CallLogRepository(private val context: Context) {
             result.add(digits.takeLast(10))
         }
         return result.toList()
-    }
-
-    private fun lookupPhotoViaPhoneLookup(phoneNumber: String): String? {
-        return try {
-            val uri = Uri.withAppendedPath(
-                ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
-                Uri.encode(phoneNumber)
-            )
-            val projection = arrayOf(
-                ContactsContract.PhoneLookup.PHOTO_URI,
-                ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI
-            )
-            context.contentResolver.query(uri, projection, null, null, null)?.use { c ->
-                if (!c.moveToFirst()) return@use null
-                val fullIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
-                val thumbIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI)
-                val full = if (fullIndex != -1) c.getString(fullIndex) else null
-                when {
-                    !full.isNullOrEmpty() -> full
-                    thumbIndex != -1 -> c.getString(thumbIndex)?.takeIf { it.isNotEmpty() }
-                    else -> null
-                }
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    /** Match by last 7 digits in Phone table — works when PhoneLookup format fails. */
-    private fun lookupPhotoViaPhoneTable(phoneNumber: String): String? {
-        val needle = phoneNumber.filter { it.isDigit() }.takeLast(7)
-        if (needle.length < 7) return null
-        return try {
-            context.contentResolver.query(
-                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
-                arrayOf(
-                    ContactsContract.CommonDataKinds.Phone.NUMBER,
-                    ContactsContract.CommonDataKinds.Phone.PHOTO_URI,
-                    ContactsContract.CommonDataKinds.Phone.PHOTO_THUMBNAIL_URI
-                ),
-                null,
-                null,
-                null
-            )?.use { c ->
-                val numberIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
-                val photoIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
-                val thumbIdx =
-                    c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_THUMBNAIL_URI)
-                while (c.moveToNext()) {
-                    val num = if (numberIdx != -1) c.getString(numberIdx).orEmpty() else ""
-                    val digits = num.filter { it.isDigit() }
-                    if (digits.length >= 7 && digits.takeLast(7) == needle) {
-                        val photo = if (photoIdx != -1) c.getString(photoIdx) else null
-                        if (!photo.isNullOrEmpty()) return@use photo
-                        val thumb = if (thumbIdx != -1) c.getString(thumbIdx) else null
-                        if (!thumb.isNullOrEmpty()) return@use thumb
-                    }
-                }
-                null
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
-
-    private fun lookupContactPhotoByName(displayName: String): String? {
-        if (displayName.isBlank()) return null
-        return try {
-            context.contentResolver.query(
-                ContactsContract.Contacts.CONTENT_URI,
-                arrayOf(
-                    ContactsContract.Contacts.PHOTO_URI,
-                    ContactsContract.Contacts.PHOTO_THUMBNAIL_URI
-                ),
-                "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY} = ?",
-                arrayOf(displayName),
-                null
-            )?.use { c ->
-                if (!c.moveToFirst()) return@use null
-                val fullIdx = c.getColumnIndex(ContactsContract.Contacts.PHOTO_URI)
-                val thumbIdx = c.getColumnIndex(ContactsContract.Contacts.PHOTO_THUMBNAIL_URI)
-                val full = if (fullIdx != -1) c.getString(fullIdx) else null
-                when {
-                    !full.isNullOrEmpty() -> full
-                    thumbIdx != -1 -> c.getString(thumbIdx)?.takeIf { it.isNotEmpty() }
-                    else -> null
-                }
-            }
-        } catch (_: Exception) {
-            null
-        }
     }
 
     suspend fun deleteCallLogEntries(ids: Collection<String>): Int = withContext(Dispatchers.IO) {

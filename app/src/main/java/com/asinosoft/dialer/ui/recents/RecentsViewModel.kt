@@ -164,7 +164,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private var openContactDetailJob: kotlinx.coroutines.Job? = null
+    private var openContactDetailJob: Job? = null
 
     fun openSearchDialer(initialQuery: String = "") {
         openContactDetailJob?.cancel()
@@ -264,10 +264,10 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     private fun scheduleCallLogReload() {
         callLogReloadJob?.cancel()
         callLogReloadJob = viewModelScope.launch {
-            delay(150)
+            delay(150.milliseconds)
             loadCallLogs(showLoading = false)
             // Late system write after call end
-            delay(800)
+            delay(800.milliseconds)
             loadCallLogs(showLoading = false)
         }
     }
@@ -319,12 +319,11 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     private fun scheduleContactsReload() {
         contactsReloadJob?.cancel()
         contactsReloadJob = viewModelScope.launch {
-            delay(500)
-            repository.clearNameCache()
+            delay(500.milliseconds)
+            repository.resetCache()
             val favorites = withContext(Dispatchers.IO) {
                 favoritesRepository.getFavorites()
             }
-            seedCallLogCachesFromFavorites(favorites)
             _favorites.value = favorites
             // Instant UI: prefs may have been refreshed from Android already
             _rawCallLogs.value = applyFavoriteNames(_rawCallLogs.value, favorites)
@@ -439,9 +438,8 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     favoritesRepository.getFavorites()
                 }
                 if (generation != callLogLoadGeneration) return@launch
-                seedCallLogCachesFromFavorites(favorites)
 
-                suspend fun publish(logs: List<CallLogItem>) {
+                fun publish(logs: List<CallLogItem>) {
                     if (generation != callLogLoadGeneration) return
                     _rawCallLogs.value = applyTombstones(applyFavoriteNames(logs, favorites))
                     _favorites.value = favorites
@@ -468,13 +466,6 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
         }
-    }
-
-    private fun seedCallLogCachesFromFavorites(favorites: List<FavoriteContact>) {
-        val byNumber = favorites.associate { it.number to it.photoUri }
-        val byName = favorites.associate { it.name to it.photoUri }
-        repository.seedPhotoCache(byNumber, byName)
-        repository.seedNameCache(favorites.associate { it.number to it.name })
     }
 
     /** Prefer favorite display names over stale CallLog.CACHED_NAME. */
@@ -714,7 +705,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         if (_isSearchDialerOpen.value) return
         openContactDetailJob?.cancel()
         openContactDetailJob = viewModelScope.launch {
-            kotlinx.coroutines.delay(200.milliseconds)
+            delay(200.milliseconds)
             if (!_isSearchDialerOpen.value) {
                 val isFav = withContext(Dispatchers.IO) {
                     favoritesRepository.isFavorite(contact)
