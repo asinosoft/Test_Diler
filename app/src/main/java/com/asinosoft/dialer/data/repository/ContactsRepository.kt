@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
-import android.util.Log
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.capitalize
 import androidx.compose.ui.text.intl.Locale
@@ -38,8 +37,6 @@ class ContactsRepository(private val context: Context) {
 
     fun getMessengerActions(contact: FavoriteContact): List<ContactMessengerAction> {
         val contactId = getContactId(contact)
-        val cleanNumber = contact.number.replace(Regex("[^0-9+]+"), "")
-        Log.i("contacts", "ID $cleanNumber -> $contactId")
         return if (null != contactId)
             getContactActions(contactId)
         else
@@ -50,6 +47,7 @@ class ContactsRepository(private val context: Context) {
         val cursor = context.contentResolver.query(
             ContactsContract.Data.CONTENT_URI,
             arrayOf(
+                ContactsContract.RawContacts._ID,
                 ContactsContract.RawContacts.ACCOUNT_TYPE,
                 ContactsContract.Data.MIMETYPE,
                 ContactsContract.Data.DATA1,
@@ -65,14 +63,15 @@ class ContactsRepository(private val context: Context) {
         val actions = mutableMapOf<String, ContactMessengerAction>()
 
         cursor?.use { cursor ->
+            val cId = cursor.getColumnIndex(ContactsContract.Data._ID)
             val cPkg = cursor.getColumnIndex(ContactsContract.RawContacts.ACCOUNT_TYPE)
             val cMimeType = cursor.getColumnIndex(ContactsContract.Data.MIMETYPE)
             val c1 = cursor.getColumnIndex(ContactsContract.Data.DATA1)
             val c2 = cursor.getColumnIndex(ContactsContract.Data.DATA2)
             val c3 = cursor.getColumnIndex(ContactsContract.Data.DATA3)
-            val c4 = cursor.getColumnIndex(ContactsContract.Data.DATA4)
 
             while (cursor.moveToNext()) {
+                val id = cursor.getLong(cId)
                 val pkg = cursor.getString(cPkg)
                 val mimetype = cursor.getString(cMimeType)
                 val data1 = cursor.getString(c1)
@@ -80,19 +79,21 @@ class ContactsRepository(private val context: Context) {
                 val data3 = cursor.getString(c3)
                 val app = pkg.substringAfter('.').substringBefore('.')
 
-                var action = actions[pkg] ?: ContactMessengerAction(
-                    id = pkg,
+                val key = "$pkg:$data1"
+                var action = actions[key] ?: ContactMessengerAction(
+                    id = key,
                     packageName = pkg,
                     messengerName = app.capitalize(Locale.current),
-                    accountDetail = data3 ?: data2 ?: data1 ?: pkg,
+                    accountDetail = data1 ?: data2 ?: data3 ?: pkg,
                     brandColor = colors.getOrDefault(app, Color.Red),
                     chatIntent = null,
                 )
 
                 val contactUri =
-                    ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId)
+                    ContentUris.withAppendedId(ContactsContract.Data.CONTENT_URI, id)
                 val intent = Intent(Intent.ACTION_VIEW).apply {
                     setDataAndType(contactUri, mimetype)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     `package` = pkg
                 }
 
@@ -108,7 +109,7 @@ class ContactsRepository(private val context: Context) {
                     continue
                 }
 
-                actions[pkg] = action
+                actions[key] = action
             }
         }
 
