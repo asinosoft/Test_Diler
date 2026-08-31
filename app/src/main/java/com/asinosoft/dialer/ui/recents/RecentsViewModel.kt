@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.core.content.edit
+import com.asinosoft.dialer.data.repository.ContactsRepository
 import kotlin.time.Duration.Companion.milliseconds
 data class ContactDetailState(
     val contact: FavoriteContact,
@@ -51,9 +52,13 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     private val repository = CallLogRepository(application)
     private val favoritesRepository = FavoritesRepository(application)
+
+    private val contactsRepository = ContactsRepository(application)
     private val contactsWriteRepository = ContactsWriteRepository(application)
 
     private val _rawCallLogs = MutableStateFlow<List<CallLogItem>>(emptyList())
+
+    private val _contacts = MutableStateFlow<List<SearchDialerItem>>(emptyList())
 
     private val _favorites = MutableStateFlow<List<FavoriteContact>>(emptyList())
     val favorites: StateFlow<List<FavoriteContact>> = _favorites.asStateFlow()
@@ -104,9 +109,9 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     val filteredDialerResults: StateFlow<List<SearchDialerItem>> = combine(
         _rawCallLogs,
-        _favorites,
+        _contacts,
         _searchQuery
-    ) { logs, favs, query ->
+    ) { logs, contacts, query ->
         val cleanQuery = query.lowercase().trim()
         if (cleanQuery.isBlank()) {
             logs.map { log ->
@@ -118,14 +123,14 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     timestamp = log.timestamp,
                     simSlot = log.simNumber,
                     callType = log.type,
-                    isFavorite = favs.any { it.number == log.number }
+                    isFavorite = contacts.any { it.number == log.number }
                 )
             }.distinctBy { it.number }
         } else {
-            val matchedFavs = favs.filter { fav ->
-                fav.name.lowercase().contains(cleanQuery) ||
-                        fav.number.contains(cleanQuery) ||
-                        fav.name.toT9Digits().contains(cleanQuery)
+            val matchedContacts = contacts.filter { contact ->
+                contact.name.lowercase().contains(cleanQuery) ||
+                        contact.number.contains(cleanQuery) ||
+                        contact.name.toT9Digits().contains(cleanQuery)
             }.map { fav ->
                 SearchDialerItem(
                     id = "fav_${fav.id}",
@@ -137,6 +142,9 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     callType = null,
                     isFavorite = true
                 )
+            }.sortedBy { contact ->
+                val position = contact.name.lowercase().indexOf(cleanQuery)
+                if (-1 == position) Int.MAX_VALUE else position
             }
 
             val matchedLogs = logs.filter { log ->
@@ -152,11 +160,11 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     timestamp = log.timestamp,
                     simSlot = log.simNumber,
                     callType = log.type,
-                    isFavorite = favs.any { it.number == log.number }
+                    isFavorite = contacts.any { it.number == log.number }
                 )
-            }
+            }.distinctBy { it.number }
 
-            (matchedFavs + matchedLogs).distinctBy { it.number }
+            matchedContacts + matchedLogs
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
@@ -292,6 +300,9 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         contactsReloadJob = viewModelScope.launch {
             delay(500.milliseconds)
             repository.resetCache()
+            _contacts.value = withContext(Dispatchers.IO) {
+                contactsRepository.getContacts()
+            }
             val favorites = withContext(Dispatchers.IO) {
                 favoritesRepository.getFavorites()
             }
@@ -404,6 +415,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         loadCallLogsJob = viewModelScope.launch {
             val shouldShowLoading = showLoading && !_hasLoadedCallLogs.value
             try {
+                _contacts.value = withContext(Dispatchers.IO) { contactsRepository.getContacts() }
                 val favorites = withContext(Dispatchers.IO) {
                     favoritesRepository.getFavorites()
                 }

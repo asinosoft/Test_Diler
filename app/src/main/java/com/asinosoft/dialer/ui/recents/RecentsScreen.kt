@@ -526,7 +526,7 @@ fun RecentsScreen(
 
 
                 if (searchQuery.text.isNotEmpty()) {
-                    items(filteredContacts) { contact ->
+                    items(filteredContacts, key = { "filtered_${it.id}" }) { contact ->
                         SwipeableSearchDialerCard(
                             item = contact,
                             context = context,

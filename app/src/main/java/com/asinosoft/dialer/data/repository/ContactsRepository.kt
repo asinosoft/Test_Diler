@@ -10,6 +10,7 @@ import androidx.compose.ui.text.capitalize
 import androidx.compose.ui.text.intl.Locale
 import androidx.core.net.toUri
 import com.asinosoft.dialer.data.model.FavoriteContact
+import com.asinosoft.dialer.ui.recents.SearchDialerItem
 
 data class ContactMessengerAction(
     val id: String,
@@ -34,6 +35,50 @@ class ContactsRepository(private val context: Context) {
         "viber" to Color(0xFF7360F2),
         "vk" to Color(0xFF0077FF),
     )
+
+    fun getContacts(): List<SearchDialerItem> {
+        val cursor = context.contentResolver.query(
+            ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+            arrayOf(
+                ContactsContract.CommonDataKinds.Phone.CONTACT_ID,
+                ContactsContract.CommonDataKinds.Phone._ID,
+                ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME,
+                ContactsContract.CommonDataKinds.Phone.NUMBER,
+                ContactsContract.CommonDataKinds.Phone.PHOTO_URI
+            ),
+            null,
+            null,
+            null
+        )
+
+        return cursor?.use { cursor ->
+            val cContactId = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.CONTACT_ID)
+            val cId = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone._ID)
+            val cName = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME)
+            val cPhone = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+            val cPhoto = cursor.getColumnIndex(ContactsContract.CommonDataKinds.Phone.PHOTO_URI)
+
+            val contacts = mutableMapOf<Long,SearchDialerItem>()
+
+            while(cursor.moveToNext()) {
+                val contactId = cursor.getLong(cContactId)
+                val id = cursor.getLong(cId)
+                val name = cursor.getString(cName)
+                val number = cursor.getString(cPhone)
+                val photoUri = cursor.getString(cPhoto)
+
+                contacts[contactId] =
+                SearchDialerItem(
+                    id = "contact_$id",
+                    name = name,
+                    number = number,
+                    photoUri = photoUri,
+                )
+            }
+
+            contacts.values.toList().sortedBy { it.name }
+        } ?: listOf()
+    }
 
     fun getMessengerActions(contact: FavoriteContact): List<ContactMessengerAction> {
         val contactId = getContactId(contact)
