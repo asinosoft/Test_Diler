@@ -36,12 +36,15 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.automirrored.filled.CallReceived
-import androidx.compose.material.icons.filled.Backspace
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Clear
@@ -117,7 +120,7 @@ fun SearchDialerScreen(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
-    val dialerQuery by viewModel.dialerQuery.collectAsState()
+    val searchQuery = rememberTextFieldState()
     val results by viewModel.filteredDialerResults.collectAsState()
 
     val defaultSimSlot = remember(context) {
@@ -143,10 +146,11 @@ fun SearchDialerScreen(
 
     val listState = rememberLazyListState()
 
-    LaunchedEffect(dialerQuery) {
+    LaunchedEffect(searchQuery.text) {
         if (results.isNotEmpty()) {
             listState.scrollToItem(0)
         }
+        viewModel.setSearchQuery(searchQuery.text.toString())
     }
 
     val targetSimBgColor = if (selectedSimSlot == 1) SamsungSmsBlue else SamsungGreen
@@ -157,6 +161,7 @@ fun SearchDialerScreen(
     )
 
     BackHandler {
+        viewModel.setSearchQuery("")
         onClose()
     }
 
@@ -187,8 +192,7 @@ fun SearchDialerScreen(
                 Spacer(modifier = Modifier.width(4.dp))
 
                 OutlinedTextField(
-                    value = dialerQuery,
-                    onValueChange = { viewModel.onDialerQueryChange(it) },
+                    state = searchQuery,
                     placeholder = {
                         Text(
                             text = "Поиск...",
@@ -204,8 +208,8 @@ fun SearchDialerScreen(
                         )
                     },
                     trailingIcon = {
-                        if (dialerQuery.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.clearDialerQuery() }) {
+                        if (searchQuery.text.isNotEmpty()) {
+                            IconButton(onClick = { searchQuery.setTextAndPlaceCursorAtEnd("") }) {
                                 Icon(
                                     imageVector = Icons.Default.Clear,
                                     contentDescription = "Очистить"
@@ -213,8 +217,7 @@ fun SearchDialerScreen(
                             }
                         }
                     },
-                    singleLine = false,
-                    maxLines = 3,
+                    lineLimits = TextFieldLineLimits.MultiLine(1, 3),
                     shape = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = SamsungGreen,
@@ -248,7 +251,7 @@ fun SearchDialerScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = if (dialerQuery.isBlank()) "Введите номер или имя" else "Контакты не найдены",
+                            text = if (searchQuery.text.isEmpty()) "Введите номер или имя" else "Контакты не найдены",
                             fontSize = 15.sp,
                             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                         )
@@ -267,7 +270,7 @@ fun SearchDialerScreen(
                             SwipeableSearchDialerCard(
                                 item = item,
                                 context = context,
-                                query = dialerQuery,
+                                query = searchQuery.text.toString(),
                                 selectedSimSlot = selectedSimSlot,
                                 onCall = onCall,
                                 onSms = onSms
@@ -357,10 +360,10 @@ fun SearchDialerScreen(
                                                 .clip(RoundedCornerShape(20.dp))
                                                 .pointerInput(digit) {
                                                     detectTapGestures(
-                                                        onTap = { viewModel.appendDialerDigit(digit) },
+                                                        onTap = { searchQuery.setTextAndPlaceCursorAtEnd( searchQuery.text.toString() + digit) },
                                                         onLongPress = {
                                                             if (digit == "0") {
-                                                                viewModel.appendDialerDigit("+")
+                                                                searchQuery.setTextAndPlaceCursorAtEnd( searchQuery.text.toString() + "+")
                                                             } else if (digit == "1") {
                                                                 onCall("121", selectedSimSlot)
                                                             }
@@ -455,8 +458,8 @@ fun SearchDialerScreen(
                             // Center: Green Call FAB Button
                             FloatingActionButton(
                                 onClick = {
-                                    if (dialerQuery.isNotBlank()) {
-                                        onCall(dialerQuery, selectedSimSlot)
+                                    if (searchQuery.text.isNotBlank()) {
+                                        onCall(searchQuery.text.toString(), selectedSimSlot)
                                     }
                                 },
                                 containerColor = SamsungGreen,
@@ -478,16 +481,18 @@ fun SearchDialerScreen(
                                     .clip(CircleShape)
                                     .pointerInput(Unit) {
                                         detectTapGestures(
-                                            onTap = { viewModel.deleteDialerDigit() },
-                                            onLongPress = { viewModel.clearDialerQuery() }
+                                            onTap = {
+                                                searchQuery.setTextAndPlaceCursorAtEnd( searchQuery.text.dropLast(1).toString() )
+                                            },
+                                            onLongPress = { searchQuery.setTextAndPlaceCursorAtEnd("") }
                                         )
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Backspace,
+                                    imageVector = Icons.AutoMirrored.Filled.Backspace,
                                     contentDescription = "Удалить",
-                                    tint = if (dialerQuery.isNotEmpty()) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(
+                                    tint = if (searchQuery.text.isNotEmpty()) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(
                                         alpha = 0.3f
                                     ),
                                     modifier = Modifier.size(24.dp)
@@ -502,7 +507,7 @@ fun SearchDialerScreen(
 }
 
 @Composable
-private fun SwipeableSearchDialerCard(
+fun SwipeableSearchDialerCard(
     item: SearchDialerItem,
     context: Context,
     query: String,

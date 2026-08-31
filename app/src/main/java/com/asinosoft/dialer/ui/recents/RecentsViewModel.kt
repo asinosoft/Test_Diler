@@ -95,27 +95,17 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     val contactDetailToShow: StateFlow<ContactDetailState?> = _contactDetailToShow.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
-    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     private val _showOnlyMissed = MutableStateFlow(false)
     val showOnlyMissed: StateFlow<Boolean> = _showOnlyMissed.asStateFlow()
 
-    private val _isLoading = MutableStateFlow(true)
-    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
-
     private val _hasLoadedCallLogs = MutableStateFlow(false)
     val hasLoadedCallLogs: StateFlow<Boolean> = _hasLoadedCallLogs.asStateFlow()
-
-    private val _isSearchDialerOpen = MutableStateFlow(false)
-    val isSearchDialerOpen: StateFlow<Boolean> = _isSearchDialerOpen.asStateFlow()
-
-    private val _dialerQuery = MutableStateFlow("")
-    val dialerQuery: StateFlow<String> = _dialerQuery.asStateFlow()
 
     val filteredDialerResults: StateFlow<List<SearchDialerItem>> = combine(
         _rawCallLogs,
         _favorites,
-        _dialerQuery
+        _searchQuery
     ) { logs, favs, query ->
         val cleanQuery = query.lowercase().trim()
         if (cleanQuery.isBlank()) {
@@ -172,33 +162,8 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     private var openContactDetailJob: Job? = null
 
-    fun openSearchDialer(initialQuery: String = "") {
-        openContactDetailJob?.cancel()
-        _contactDetailToShow.value = null
-        clearFavoriteSelection()
-        _dialerQuery.value = initialQuery
-        _isSearchDialerOpen.value = true
-    }
-
-    fun closeSearchDialer() {
-        _isSearchDialerOpen.value = false
-        _dialerQuery.value = ""
-    }
-
-    fun onDialerQueryChange(newQuery: String) {
-        _dialerQuery.value = newQuery
-    }
-
-    fun appendDialerDigit(digit: String) {
-        _dialerQuery.update { it + digit }
-    }
-
-    fun deleteDialerDigit() {
-        _dialerQuery.update { if (it.isNotEmpty()) it.dropLast(1) else "" }
-    }
-
-    fun clearDialerQuery() {
-        _dialerQuery.value = ""
+    fun setSearchQuery(value: String) {
+        _searchQuery.value = value
     }
 
     private lateinit var callLogObserver: ContentObserver
@@ -438,7 +403,6 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         val generation = ++callLogLoadGeneration
         loadCallLogsJob = viewModelScope.launch {
             val shouldShowLoading = showLoading && !_hasLoadedCallLogs.value
-            if (shouldShowLoading) _isLoading.value = true
             try {
                 val favorites = withContext(Dispatchers.IO) {
                     favoritesRepository.getFavorites()
@@ -454,7 +418,6 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                 if (shouldShowLoading || _rawCallLogs.value.isEmpty()) {
                     publish(repository.getCallLogs(CallLogRepository.DEFAULT_RECENTS_LIMIT))
                     _hasLoadedCallLogs.value = true
-                    _isLoading.value = false
 
                     publish(repository.getCallLogs(limit = null))
                     suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 1_500L
@@ -468,7 +431,6 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             } finally {
                 if (generation == callLogLoadGeneration) {
                     _hasLoadedCallLogs.value = true
-                    _isLoading.value = false
                 }
             }
         }
@@ -713,16 +675,13 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun openContactDetail(contact: FavoriteContact, initialTab: Int = 0) {
-        if (_isSearchDialerOpen.value) return
         openContactDetailJob?.cancel()
         openContactDetailJob = viewModelScope.launch {
             delay(200.milliseconds)
-            if (!_isSearchDialerOpen.value) {
-                val isFav = withContext(Dispatchers.IO) {
-                    favoritesRepository.isFavorite(contact)
-                }
-                _contactDetailToShow.value = ContactDetailState(contact, initialTab, isFav)
+            val isFav = withContext(Dispatchers.IO) {
+                favoritesRepository.isFavorite(contact)
             }
+            _contactDetailToShow.value = ContactDetailState(contact, initialTab, isFav)
         }
     }
 
@@ -809,10 +768,6 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     fun closeContactDetail() {
         openContactDetailJob?.cancel()
         _contactDetailToShow.value = null
-    }
-
-    fun onSearchQueryChange(newQuery: String) {
-        _searchQuery.value = newQuery
     }
 
     fun setShowOnlyMissed(missedOnly: Boolean) {

@@ -1,5 +1,6 @@
 package com.asinosoft.dialer.ui.recents
 
+import android.annotation.SuppressLint
 import android.text.format.DateUtils
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -26,6 +27,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.input.TextFieldLineLimits
+import androidx.compose.foundation.text.input.rememberTextFieldState
+import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Dialpad
@@ -49,7 +53,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -83,6 +86,7 @@ import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.ui.components.FloatingStickyDateHeader
 import com.asinosoft.dialer.ui.components.LazyListVerticalScrollbar
 import com.asinosoft.dialer.ui.dialer.SearchDialerScreen
+import com.asinosoft.dialer.ui.dialer.SwipeableSearchDialerCard
 import com.asinosoft.dialer.ui.recents.components.AddFavoriteDialog
 import com.asinosoft.dialer.ui.recents.components.AppSettingsDialog
 import com.asinosoft.dialer.ui.recents.components.AvatarBitmapCache
@@ -96,9 +100,9 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
+@SuppressLint("FrequentlyChangingValue")
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecentsScreen(
@@ -121,9 +125,12 @@ fun RecentsScreen(
     val favoriteRowsCount by viewModel.favoriteRowsCount.collectAsState()
     val contactDetailToShow by viewModel.contactDetailToShow.collectAsState()
 
-    val searchQuery by viewModel.searchQuery.collectAsState()
+    val searchQuery = rememberTextFieldState()
+    LaunchedEffect(searchQuery.text) {
+        viewModel.setSearchQuery(searchQuery.text.toString())
+    }
+
     val showOnlyMissed by viewModel.showOnlyMissed.collectAsState()
-    val isLoading by viewModel.isLoading.collectAsState()
     val hasLoadedCallLogs by viewModel.hasLoadedCallLogs.collectAsState()
     var showHint by remember { mutableStateOf(true) }
     var initialScrollDone by remember { mutableStateOf(false) }
@@ -253,21 +260,15 @@ fun RecentsScreen(
             }
     }
 
-    // Check if scrolled away by more than 33% of viewport / threshold
-    val isScrolledFar by remember(initialItemIndex) {
-        derivedStateOf {
-            val currentIndex = listState.firstVisibleItemIndex
-            val offset = listState.firstVisibleItemScrollOffset
-            val indexDiff = abs(currentIndex - initialItemIndex)
-            indexDiff >= 2 || (indexDiff == 1 && offset > 200)
-        }
-    }
-
     // Handle system Back button: return to initial startup scroll position if scrolled far
-    BackHandler(enabled = isScrolledFar) {
+    BackHandler(enabled = listState.firstVisibleItemScrollOffset > 0) {
         coroutineScope.launch {
             listState.animateScrollToItem(initialItemIndex, 0)
         }
+    }
+
+    BackHandler(enabled = searchQuery.text.isNotEmpty()) {
+        searchQuery.setTextAndPlaceCursorAtEnd("")
     }
 
     val groupedCallLogs = remember(callLogs) {
@@ -277,6 +278,11 @@ fun RecentsScreen(
     var lastTapTimestamp by remember { mutableLongStateOf(0L) }
     var lastTapPosition by remember { mutableStateOf(Offset.Zero) }
     val dialerOpenMode by viewModel.dialerOpenMode.collectAsState()
+
+    // Search & Dialpad Screen Overlay
+    var isSearchDialerOpen by remember { mutableStateOf(false) }
+
+    val filteredContacts by viewModel.filteredDialerResults.collectAsState()
 
     Box(
         modifier = Modifier
@@ -294,7 +300,7 @@ fun RecentsScreen(
                                     if (now - lastTapTimestamp < 380L &&
                                         (pos - lastTapPosition).getDistance() < 120f
                                     ) {
-                                        viewModel.openSearchDialer()
+                                        isSearchDialerOpen = true
                                         lastTapTimestamp = 0L
                                     } else {
                                         lastTapTimestamp = now
@@ -394,17 +400,13 @@ fun RecentsScreen(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { viewModel.openSearchDialer(searchQuery) },
+                            .clickable { isSearchDialerOpen = true },
                         shape = RoundedCornerShape(24.dp),
                         color = MaterialTheme.colorScheme.surface,
                         tonalElevation = 2.dp
                     ) {
                         TextField(
-                            value = searchQuery,
-                            onValueChange = {
-                                viewModel.onSearchQueryChange(it)
-                                viewModel.openSearchDialer(it)
-                            },
+                            state = searchQuery,
                             placeholder = {
                                 Text(
                                     text = "Поиск по имени или номеру",
@@ -419,8 +421,8 @@ fun RecentsScreen(
                                 )
                             },
                             trailingIcon = {
-                                if (searchQuery.isNotEmpty()) {
-                                    IconButton(onClick = { viewModel.onSearchQueryChange("") }) {
+                                if (searchQuery.text.isNotEmpty()) {
+                                    IconButton(onClick = { searchQuery.setTextAndPlaceCursorAtEnd("") }) {
                                         Icon(
                                             imageVector = Icons.Default.Clear,
                                             contentDescription = "Очистить"
@@ -428,7 +430,7 @@ fun RecentsScreen(
                                     }
                                 }
                             },
-                            singleLine = true,
+                            lineLimits = TextFieldLineLimits.SingleLine,
                             colors = TextFieldDefaults.colors(
                                 focusedContainerColor = Color.Transparent,
                                 unfocusedContainerColor = Color.Transparent,
@@ -520,209 +522,223 @@ fun RecentsScreen(
                     }
 
                     Spacer(modifier = Modifier.height(16.dp))
-
-                    // Favorites Section Title
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = "Избранные контакты",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
-
-                        Text(
-                            text = "Добавить",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = SamsungGreen,
-                            modifier = Modifier
-                                .clickable { viewModel.openAddFavoriteDialog() }
-                                .padding(vertical = 4.dp, horizontal = 8.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(8.dp))
                 }
 
-                // Favorites Grid Rows (Each row is a separate item)
-                if (favoriteRows.size < maxRowsAcrossAllTabs) {
-                    val extraSpacers = maxRowsAcrossAllTabs - favoriteRows.size
-                    items(extraSpacers) {
-                        Spacer(
+
+                if (searchQuery.text.isNotEmpty()) {
+                    items(filteredContacts) { contact ->
+                        SwipeableSearchDialerCard(
+                            item = contact,
+                            context = context,
+                            query = searchQuery.text.toString(),
+                            selectedSimSlot = 1,
+                            onCall = onCall,
+                            onSms = onSms
+                        )
+                    }
+                } else {
+                    item {
+                        // Favorites Section Title
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Избранные контакты",
+                                fontSize = 18.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+
+                            Text(
+                                text = "Добавить",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = SamsungGreen,
+                                modifier = Modifier
+                                    .clickable { viewModel.openAddFavoriteDialog() }
+                                    .padding(vertical = 4.dp, horizontal = 8.dp)
+                            )
+                        }
+                    }
+
+                    // Favorites Grid Rows (Each row is a separate item)
+                    if (favoriteRows.size < maxRowsAcrossAllTabs) {
+                        val extraSpacers = maxRowsAcrossAllTabs - favoriteRows.size
+                        items(extraSpacers) {
+                            Spacer(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .aspectRatio(3f)
+                            )
+                        }
+                    }
+
+                    itemsIndexed(items = favoriteRows) { _, rowItems ->
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .aspectRatio(3f)
-                        )
-                    }
-                }
+                                .zIndex(6f)
+                                .onGloballyPositioned { coordinates ->
+                                    if (!isTopBarVisible) return@onGloballyPositioned
+                                    val rect = coordinates.boundsInWindow()
+                                    val current = favoritesBoundsRef.value
+                                    favoritesBoundsRef.value = if (current == Rect.Zero) {
+                                        rect
+                                    } else {
+                                        Rect(
+                                            left = minOf(current.left, rect.left),
+                                            top = minOf(current.top, rect.top),
+                                            right = maxOf(current.right, rect.right),
+                                            bottom = maxOf(current.bottom, rect.bottom)
+                                        )
+                                    }
+                                },
+                            horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        ) {
+                            for (i in 0 until 3) {
+                                if (i < rowItems.size) {
+                                    val contact = rowItems[i]
+                                    val contactIndex =
+                                        favorites.indexOfFirst { it.id == contact.id }
+                                    val isTargetSlot =
+                                        draggingContactId != null && dragToIndex == contactIndex && draggingContactId != contact.id
 
-                itemsIndexed(items = favoriteRows) { _, rowItems ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .zIndex(6f)
-                            .onGloballyPositioned { coordinates ->
-                                if (!isTopBarVisible) return@onGloballyPositioned
-                                val rect = coordinates.boundsInWindow()
-                                val current = favoritesBoundsRef.value
-                                favoritesBoundsRef.value = if (current == Rect.Zero) {
-                                    rect
-                                } else {
-                                    Rect(
-                                        left = minOf(current.left, rect.left),
-                                        top = minOf(current.top, rect.top),
-                                        right = maxOf(current.right, rect.right),
-                                        bottom = maxOf(current.bottom, rect.bottom)
-                                    )
-                                }
-                            },
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        for (i in 0 until 3) {
-                            if (i < rowItems.size) {
-                                val contact = rowItems[i]
-                                val contactIndex =
-                                    favorites.indexOfFirst { it.id == contact.id }
-                                val isTargetSlot =
-                                    draggingContactId != null && dragToIndex == contactIndex && draggingContactId != contact.id
-
-                                FavoriteContactCard(
-                                    contact = contact,
-                                    isSelected = selectedFavorite?.id == contact.id || isTargetSlot,
-                                    isDragging = draggingContactId == contact.id,
-                                    dragVisualOffset = if (draggingContactId == contact.id) dragOffset else Offset.Zero,
-                                    onCall = { num, sim -> onCall(num, sim) },
-                                    onSms = onSms,
-                                    onSelect = { viewModel.selectFavorite(it) },
-                                    onContactClick = { clickedContact ->
-                                        if (isTopBarVisible) {
-                                            viewModel.clearFavoriteSelection()
-                                        } else {
-                                            viewModel.openContactDetail(clickedContact)
-                                        }
-                                    },
-                                    onDragStart = {
-                                        val idx = favorites.indexOfFirst { it.id == contact.id }
-                                        if (idx != -1) {
-                                            draggingContactId = contact.id
-                                            dragFromIndex = idx
-                                            dragToIndex = idx
-                                            dragOffset = Offset.Zero
-                                        }
-                                    },
-                                    onDrag = { delta ->
-                                        dragOffset += delta
-                                        if (dragFromIndex != -1 && favorites.size > 1) {
-                                            val cellWidthPx = with(density) { 110.dp.toPx() }
-                                            val cellHeightPx = with(density) { 110.dp.toPx() }
-
-                                            val remainder = favorites.size % 3
-
-                                            val startRow: Int
-                                            val startCol: Int
-                                            if (remainder == 0) {
-                                                startRow = dragFromIndex / 3
-                                                startCol = dragFromIndex % 3
+                                    FavoriteContactCard(
+                                        contact = contact,
+                                        isSelected = selectedFavorite?.id == contact.id || isTargetSlot,
+                                        isDragging = draggingContactId == contact.id,
+                                        dragVisualOffset = if (draggingContactId == contact.id) dragOffset else Offset.Zero,
+                                        onCall = { num, sim -> onCall(num, sim) },
+                                        onSms = onSms,
+                                        onSelect = { viewModel.selectFavorite(it) },
+                                        onContactClick = { clickedContact ->
+                                            if (isTopBarVisible) {
+                                                viewModel.clearFavoriteSelection()
                                             } else {
-                                                if (dragFromIndex < remainder) {
-                                                    startRow = 0
-                                                    startCol = dragFromIndex
-                                                } else {
-                                                    startRow =
-                                                        1 + (dragFromIndex - remainder) / 3
-                                                    startCol = (dragFromIndex - remainder) % 3
-                                                }
+                                                viewModel.openContactDetail(clickedContact)
                                             }
+                                        },
+                                        onDragStart = {
+                                            val idx = favorites.indexOfFirst { it.id == contact.id }
+                                            if (idx != -1) {
+                                                draggingContactId = contact.id
+                                                dragFromIndex = idx
+                                                dragToIndex = idx
+                                                dragOffset = Offset.Zero
+                                            }
+                                        },
+                                        onDrag = { delta ->
+                                            dragOffset += delta
+                                            if (dragFromIndex != -1 && favorites.size > 1) {
+                                                val cellWidthPx = with(density) { 110.dp.toPx() }
+                                                val cellHeightPx = with(density) { 110.dp.toPx() }
 
-                                            val colShift =
-                                                (dragOffset.x / cellWidthPx).roundToInt()
-                                            val rowShift =
-                                                (dragOffset.y / cellHeightPx).roundToInt()
+                                                val remainder = favorites.size % 3
 
-                                            val totalRows = favoriteRows.size
-                                            val targetRow =
-                                                (startRow + rowShift).coerceIn(0, totalRows - 1)
-                                            val targetCol = (startCol + colShift).coerceIn(0, 2)
-                                            val newTargetIndex: Int = if (remainder == 0) {
-                                                (targetRow * 3 + targetCol).coerceIn(
-                                                    0,
-                                                    favorites.size - 1
-                                                )
-                                            } else {
-                                                if (targetRow == 0) {
-                                                    targetCol.coerceIn(0, remainder - 1)
+                                                val startRow: Int
+                                                val startCol: Int
+                                                if (remainder == 0) {
+                                                    startRow = dragFromIndex / 3
+                                                    startCol = dragFromIndex % 3
                                                 } else {
-                                                    (remainder + (targetRow - 1) * 3 + targetCol).coerceIn(
+                                                    if (dragFromIndex < remainder) {
+                                                        startRow = 0
+                                                        startCol = dragFromIndex
+                                                    } else {
+                                                        startRow =
+                                                            1 + (dragFromIndex - remainder) / 3
+                                                        startCol = (dragFromIndex - remainder) % 3
+                                                    }
+                                                }
+
+                                                val colShift =
+                                                    (dragOffset.x / cellWidthPx).roundToInt()
+                                                val rowShift =
+                                                    (dragOffset.y / cellHeightPx).roundToInt()
+
+                                                val totalRows = favoriteRows.size
+                                                val targetRow =
+                                                    (startRow + rowShift).coerceIn(0, totalRows - 1)
+                                                val targetCol = (startCol + colShift).coerceIn(0, 2)
+                                                val newTargetIndex: Int = if (remainder == 0) {
+                                                    (targetRow * 3 + targetCol).coerceIn(
                                                         0,
                                                         favorites.size - 1
                                                     )
+                                                } else {
+                                                    if (targetRow == 0) {
+                                                        targetCol.coerceIn(0, remainder - 1)
+                                                    } else {
+                                                        (remainder + (targetRow - 1) * 3 + targetCol).coerceIn(
+                                                            0,
+                                                            favorites.size - 1
+                                                        )
+                                                    }
+                                                }
+
+                                                if (newTargetIndex != dragToIndex) {
+                                                    dragToIndex = newTargetIndex
                                                 }
                                             }
-
-                                            if (newTargetIndex != dragToIndex) {
-                                                dragToIndex = newTargetIndex
+                                        },
+                                        onDragEnd = {
+                                            if (dragFromIndex in favorites.indices && dragToIndex in favorites.indices && dragFromIndex != dragToIndex) {
+                                                viewModel.reorderFavorites(
+                                                    dragFromIndex,
+                                                    dragToIndex
+                                                )
                                             }
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        if (dragFromIndex in favorites.indices && dragToIndex in favorites.indices && dragFromIndex != dragToIndex) {
-                                            viewModel.reorderFavorites(
-                                                dragFromIndex,
-                                                dragToIndex
-                                            )
-                                        }
-                                        draggingContactId = null
-                                        dragFromIndex = -1
-                                        dragToIndex = -1
-                                        dragOffset = Offset.Zero
-                                    },
-                                    modifier = Modifier.weight(1f)
-                                )
-                            } else {
-                                Spacer(modifier = Modifier.weight(1f))
+                                            draggingContactId = null
+                                            dragFromIndex = -1
+                                            dragToIndex = -1
+                                            dragOffset = Offset.Zero
+                                        },
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                } else {
+                                    Spacer(modifier = Modifier.weight(1f))
+                                }
                             }
                         }
                     }
-                }
 
-                // Favorite Tabs Selector Bar (if tabs.size > 1)
-                if (tabs.size > 1) {
-                    item(key = "favorite_tabs_selector") {
-                        LazyRow(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(top = 0.dp, bottom = 0.dp),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            itemsIndexed(
-                                items = tabs,
-                                key = { _, tab -> tab.id }
-                            ) { index, tab ->
-                                if (index > 0) {
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                }
-                                val isSelected = tab.id == activeTabId
-                                Surface(
-                                    shape = CircleShape,
-                                    color = if (isSelected) SamsungGreen else MaterialTheme.colorScheme.surface,
-                                    modifier = Modifier.clickable { viewModel.selectTab(tab.id) }
-                                ) {
-                                    Text(
-                                        text = tab.name,
-                                        fontSize = 11.sp,
-                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                                        color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface.copy(
-                                            alpha = 0.8f
-                                        ),
-                                        modifier = Modifier.padding(
-                                            horizontal = 10.dp,
-                                            vertical = 3.dp
+                    // Favorite Tabs Selector Bar (if tabs.size > 1)
+                    if (tabs.size > 1) {
+                        item(key = "favorite_tabs_selector") {
+                            LazyRow(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 0.dp, bottom = 0.dp),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                itemsIndexed(
+                                    items = tabs,
+                                    key = { _, tab -> tab.id }
+                                ) { index, tab ->
+                                    if (index > 0) {
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                    }
+                                    val isSelected = tab.id == activeTabId
+                                    Surface(
+                                        shape = CircleShape,
+                                        color = if (isSelected) SamsungGreen else MaterialTheme.colorScheme.surface,
+                                        modifier = Modifier.clickable { viewModel.selectTab(tab.id) }
+                                    ) {
+                                        Text(
+                                            text = tab.name,
+                                            fontSize = 11.sp,
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface.copy(
+                                                alpha = 0.8f
+                                            ),
+                                            modifier = Modifier.padding(
+                                                horizontal = 10.dp,
+                                                vertical = 3.dp
+                                            )
                                         )
-                                    )
+                                    }
                                 }
                             }
                         }
@@ -831,9 +847,6 @@ fun RecentsScreen(
             )
         }
 
-        // Search & Dialpad Screen Overlay
-        val isSearchDialerOpen by viewModel.isSearchDialerOpen.collectAsState()
-
         // Contact Detail Bottom Sheet Dialog (only render if search dialer is closed)
         if (!isSearchDialerOpen) {
             contactDetailToShow?.let { detailState ->
@@ -871,7 +884,7 @@ fun RecentsScreen(
         // Floating Dialpad Button (Only show on main screen when search dialer is closed)
         if (!isSearchDialerOpen && dialerOpenMode.showsFab) {
             FloatingActionButton(
-                onClick = { viewModel.openSearchDialer() },
+                onClick = { isSearchDialerOpen = true },
                 containerColor = SamsungGreen,
                 contentColor = Color.White,
                 shape = CircleShape,
@@ -894,7 +907,7 @@ fun RecentsScreen(
                 viewModel = viewModel,
                 onCall = onCall,
                 onSms = onSms,
-                onClose = { viewModel.closeSearchDialer() }
+                onClose = { isSearchDialerOpen = false }
             )
         }
     }
