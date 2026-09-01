@@ -31,6 +31,7 @@ import kotlinx.coroutines.withContext
 import androidx.core.content.edit
 import com.asinosoft.dialer.data.repository.ContactsRepository
 import kotlin.time.Duration.Companion.milliseconds
+
 data class ContactDetailState(
     val contact: FavoriteContact,
     val initialTab: Int = 0,
@@ -47,6 +48,14 @@ data class SearchDialerItem(
     val callType: CallType? = null,
     val isFavorite: Boolean = false
 )
+
+data class SearchResults(
+    val calls: List<SearchDialerItem> = listOf(),
+    val contacts: List<SearchDialerItem> = listOf(),
+) {
+    fun isEmpty(): Boolean = calls.isEmpty() && contacts.isEmpty()
+    fun isNotEmpty(): Boolean = !isEmpty()
+}
 
 class RecentsViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -107,25 +116,27 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     private val _hasLoadedCallLogs = MutableStateFlow(false)
     val hasLoadedCallLogs: StateFlow<Boolean> = _hasLoadedCallLogs.asStateFlow()
 
-    val filteredDialerResults: StateFlow<List<SearchDialerItem>> = combine(
+    val filteredDialerResults: StateFlow<SearchResults> = combine(
         _rawCallLogs,
         _contacts,
         _searchQuery
     ) { logs, contacts, query ->
         val cleanQuery = query.lowercase().trim()
         if (cleanQuery.isBlank()) {
-            logs.map { log ->
-                SearchDialerItem(
-                    id = "log_${log.id}",
-                    name = log.name ?: log.number,
-                    number = log.number,
-                    photoUri = log.photoUri,
-                    timestamp = log.timestamp,
-                    simSlot = log.simNumber,
-                    callType = log.type,
-                    isFavorite = contacts.any { it.number == log.number }
-                )
-            }.distinctBy { it.number }
+            SearchResults(
+                calls = logs.map { log ->
+                    SearchDialerItem(
+                        id = "log_${log.id}",
+                        name = log.name ?: log.number,
+                        number = log.number,
+                        photoUri = log.photoUri,
+                        timestamp = log.timestamp,
+                        simSlot = log.simNumber,
+                        callType = log.type,
+                        isFavorite = contacts.any { it.number == log.number }
+                    )
+                }.distinctBy { it.number }
+            )
         } else {
             val matchedContacts = contacts.filter { contact ->
                 contact.name.lowercase().contains(cleanQuery) ||
@@ -163,11 +174,22 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     callType = log.type,
                     isFavorite = contacts.any { it.number == log.number }
                 )
-            }.distinctBy { it.number }
+            }
+                .distinctBy { it.number }
+                .sortedBy { contact -> // Prioritize contacts, whose name starts with query
+                    contact.name.lowercase().indexOf(cleanQuery).takeIf { it >= 0 }
+                        ?: contact.name.toT9Digits().indexOf(cleanQuery).takeIf { it >= 0 }
+                        ?: Int.MAX_VALUE
+                }
 
-            matchedContacts + matchedLogs
+            val calledNumbers = matchedLogs.map { it.number }
+
+            SearchResults(
+                calls = matchedLogs,
+                contacts = matchedContacts.filter { !calledNumbers.contains(it.number) }
+            )
         }
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SearchResults())
 
     private var openContactDetailJob: Job? = null
 
@@ -182,10 +204,13 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     private var loadCallLogsJob: Job? = null
     private var suppressCallLogObserverUntilElapsed = 0L
     private var suppressContactsObserverUntilElapsed = 0L
+
     /** Bumps to drop in-flight load results (prevents deleted rows from reappearing). */
     private var callLogLoadGeneration = 0
+
     /** CallLog _IDs removed in-app; filter them out of any subsequent loads. */
     private val hiddenCallLogIds = mutableSetOf<String>()
+
     /** last-7 phone digits → hide until elapsedRealtime (clear-contact grace). */
     private val hiddenPhoneSuffixesUntil = mutableMapOf<String, Long>()
 
@@ -743,7 +768,8 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             invalidateInFlightCallLogLoads()
 
             val matching = _rawCallLogs.value.filter { isSameCallLogContact(it, item) }
-            val idsFromUi = matching.flatMap { it.allEntryIds() }.filter { it.isNotBlank() }.distinct()
+            val idsFromUi =
+                matching.flatMap { it.allEntryIds() }.filter { it.isNotBlank() }.distinct()
             rememberDeletedIds(idsFromUi)
             rememberDeletedPhone(item.number)
             _rawCallLogs.value = applyTombstones(_rawCallLogs.value)

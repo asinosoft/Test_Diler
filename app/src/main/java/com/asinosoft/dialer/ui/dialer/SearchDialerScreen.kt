@@ -92,6 +92,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import com.asinosoft.dialer.data.model.CallType
+import com.asinosoft.dialer.ui.components.Header
 import com.asinosoft.dialer.ui.recents.RecentsViewModel
 import com.asinosoft.dialer.ui.recents.SearchDialerItem
 import com.asinosoft.dialer.ui.recents.components.executeCustomSwipeAction
@@ -263,18 +264,41 @@ fun SearchDialerScreen(
                         contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(
-                            items = results,
-                            key = { it.id }
-                        ) { item ->
-                            SwipeableSearchDialerCard(
-                                item = item,
-                                context = context,
-                                query = searchQuery.text.toString(),
-                                selectedSimSlot = selectedSimSlot,
-                                onCall = onCall,
-                                onSms = onSms
-                            )
+                        if (results.calls.isNotEmpty()) {
+                            item {
+                                Header("История звонков")
+                            }
+                            items(
+                                items = results.calls,
+                                key = { "log_${it.id}" }
+                            ) { item ->
+                                SwipeableSearchDialerCard(
+                                    item = item,
+                                    context = context,
+                                    query = searchQuery.text.toString(),
+                                    selectedSimSlot = selectedSimSlot,
+                                    onCall = onCall,
+                                    onSms = onSms
+                                )
+                            }
+                        }
+                        if (results.contacts.isNotEmpty()) {
+                            item {
+                                Header("Контакты")
+                            }
+                            items(
+                                items = results.contacts,
+                                key = { "contact_${it.id}" }
+                            ) { item ->
+                                SwipeableSearchDialerCard(
+                                    item = item,
+                                    context = context,
+                                    query = searchQuery.text.toString(),
+                                    selectedSimSlot = selectedSimSlot,
+                                    onCall = onCall,
+                                    onSms = onSms
+                                )
+                            }
                         }
                     }
                 }
@@ -360,10 +384,16 @@ fun SearchDialerScreen(
                                                 .clip(RoundedCornerShape(20.dp))
                                                 .pointerInput(digit) {
                                                     detectTapGestures(
-                                                        onTap = { searchQuery.setTextAndPlaceCursorAtEnd( searchQuery.text.toString() + digit) },
+                                                        onTap = {
+                                                            searchQuery.setTextAndPlaceCursorAtEnd(
+                                                                searchQuery.text.toString() + digit
+                                                            )
+                                                        },
                                                         onLongPress = {
                                                             if (digit == "0") {
-                                                                searchQuery.setTextAndPlaceCursorAtEnd( searchQuery.text.toString() + "+")
+                                                                searchQuery.setTextAndPlaceCursorAtEnd(
+                                                                    searchQuery.text.toString() + "+"
+                                                                )
                                                             } else if (digit == "1") {
                                                                 onCall("121", selectedSimSlot)
                                                             }
@@ -482,7 +512,11 @@ fun SearchDialerScreen(
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onTap = {
-                                                searchQuery.setTextAndPlaceCursorAtEnd( searchQuery.text.dropLast(1).toString() )
+                                                searchQuery.setTextAndPlaceCursorAtEnd(
+                                                    searchQuery.text.dropLast(
+                                                        1
+                                                    ).toString()
+                                                )
                                             },
                                             onLongPress = { searchQuery.setTextAndPlaceCursorAtEnd("") }
                                         )
@@ -730,12 +764,7 @@ fun SwipeableSearchDialerCard(
                         } else {
                             val initial = item.name.trim().firstOrNull { it.isLetterOrDigit() }
                                 ?.uppercaseChar()?.toString() ?: "?"
-                            Text(
-                                text = initial,
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            Header(initial)
                         }
                     }
                 }

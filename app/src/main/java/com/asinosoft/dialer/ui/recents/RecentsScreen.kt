@@ -84,6 +84,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.ui.components.FloatingStickyDateHeader
+import com.asinosoft.dialer.ui.components.Header
 import com.asinosoft.dialer.ui.components.LazyListVerticalScrollbar
 import com.asinosoft.dialer.ui.dialer.SearchDialerScreen
 import com.asinosoft.dialer.ui.dialer.SwipeableSearchDialerCard
@@ -526,15 +527,43 @@ fun RecentsScreen(
 
 
                 if (searchQuery.text.isNotEmpty()) {
-                    items(filteredContacts, key = { "filtered_${it.id}" }) { contact ->
-                        SwipeableSearchDialerCard(
-                            item = contact,
-                            context = context,
-                            query = searchQuery.text.toString(),
-                            selectedSimSlot = 1,
-                            onCall = onCall,
-                            onSms = onSms
+                    if (filteredContacts.isEmpty()) item {
+                        Text(
+                            text = "Контакты не найдены",
+                            fontSize = 15.sp,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                         )
+                    } else {
+                        if (filteredContacts.calls.isNotEmpty()) {
+                            item {
+                                Header("Журнал звонков")
+                            }
+                            items(filteredContacts.calls, key = { "filtered_log_${it.id}" }) { contact ->
+                                SwipeableSearchDialerCard(
+                                    item = contact,
+                                    context = context,
+                                    query = searchQuery.text.toString(),
+                                    selectedSimSlot = 1,
+                                    onCall = onCall,
+                                    onSms = onSms
+                                )
+                            }
+                        }
+                        if (filteredContacts.contacts.isNotEmpty()) {
+                            item {
+                                Header("Контакты")
+                            }
+                            items(filteredContacts.contacts, key = { "filtered_contact_${it.id}" }) { contact ->
+                                SwipeableSearchDialerCard(
+                                    item = contact,
+                                    context = context,
+                                    query = searchQuery.text.toString(),
+                                    selectedSimSlot = 1,
+                                    onCall = onCall,
+                                    onSms = onSms
+                                )
+                            }
+                        }
                     }
                 } else {
                     item {
