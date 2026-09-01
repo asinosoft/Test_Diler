@@ -218,7 +218,7 @@ fun SearchDialerScreen(
                             }
                         }
                     },
-                    lineLimits = TextFieldLineLimits.MultiLine(1, 3),
+                    lineLimits = TextFieldLineLimits.SingleLine,
                     shape = RoundedCornerShape(24.dp),
                     colors = OutlinedTextFieldDefaults.colors(
                         focusedBorderColor = SamsungGreen,
