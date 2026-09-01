@@ -51,7 +51,7 @@ fun LazyListVerticalScrollbar(
     listState: LazyListState,
     modifier: Modifier = Modifier,
     thickness: Dp = 4.dp,
-    hitAreaWidth: Dp = 24.dp,
+    hitAreaWidth: Dp = 12.dp,
     thumbMinHeight: Dp = 48.dp,
     hideDelayMs: Long = 900L
 ) {
@@ -167,14 +167,30 @@ fun LazyListVerticalScrollbar(
                 .align(Alignment.CenterEnd)
                 .width(hitAreaWidth)
                 .fillMaxHeight()
-                // Stable key — do not recreate gesture detector mid-drag
                 .pointerInput(Unit) {
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
-                        down.consume()
+
+                        val currentAlpha = alpha
+                        if (currentAlpha <= 0.05f) {
+                            return@awaitEachGesture
+                        }
 
                         val trackH = trackHeightState.value.coerceAtLeast(1f)
                         val thumbH = thumbHeightState.value
+                        val thumbOff = (trackH - thumbH) * scrollFraction
+
+                        val touchY = down.position.y
+                        val paddingPx = 48f
+                        val thumbTop = thumbOff - paddingPx
+                        val thumbBottom = thumbOff + thumbH + paddingPx
+
+                        if (touchY !in thumbTop..thumbBottom) {
+                            return@awaitEachGesture
+                        }
+
+                        down.consume()
+
                         val usable = (trackH - thumbH).coerceAtLeast(1f)
 
                         fun fractionFromY(y: Float): Float =
@@ -205,7 +221,6 @@ fun LazyListVerticalScrollbar(
                                     break
                                 }
 
-                                // Keep tracking even if finger slides left/right off the bar
                                 if (change.positionChange() != Offset.Zero) {
                                     change.consume()
                                     applyFraction(fractionFromY(change.position.y))
