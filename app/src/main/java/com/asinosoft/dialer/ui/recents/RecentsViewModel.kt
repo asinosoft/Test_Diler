@@ -142,9 +142,10 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     callType = null,
                     isFavorite = true
                 )
-            }.sortedBy { contact ->
-                val position = contact.name.lowercase().indexOf(cleanQuery)
-                if (-1 == position) Int.MAX_VALUE else position
+            }.sortedBy { contact -> // Prioritize contacts, whose name starts with query
+                contact.name.lowercase().indexOf(cleanQuery).takeIf { it >= 0 }
+                    ?: contact.name.toT9Digits().indexOf(cleanQuery).takeIf { it >= 0 }
+                    ?: Int.MAX_VALUE
             }
 
             val matchedLogs = logs.filter { log ->
