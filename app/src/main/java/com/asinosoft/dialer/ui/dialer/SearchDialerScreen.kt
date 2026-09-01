@@ -75,6 +75,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -85,7 +86,9 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -174,7 +177,12 @@ fun SearchDialerScreen(
         label = "simBgColor"
     )
 
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
+
     BackHandler {
+        focusManager.clearFocus()
+        keyboardController?.hide()
         viewModel.setSearchQuery("")
         onClose()
     }
@@ -195,7 +203,11 @@ fun SearchDialerScreen(
                     .padding(horizontal = 12.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onClose) {
+                IconButton(onClick = {
+                    focusManager.clearFocus()
+                    keyboardController?.hide()
+                    onClose()
+                }) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Назад",
@@ -239,7 +251,13 @@ fun SearchDialerScreen(
                         focusedContainerColor = MaterialTheme.colorScheme.surface,
                         unfocusedContainerColor = MaterialTheme.colorScheme.surface
                     ),
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier
+                        .weight(1f)
+                        .onFocusChanged {
+                            if (it.isFocused) {
+                                isDialpadVisible = false
+                            }
+                        }
                 )
             }
 
@@ -259,6 +277,8 @@ fun SearchDialerScreen(
                                     val event = awaitPointerEvent(PointerEventPass.Initial)
                                     if (event.changes.any { it.changedToDown() }) {
                                         isDialpadVisible = false
+                                        focusManager.clearFocus()
+                                        keyboardController?.hide()
                                     }
                                 }
                             }
@@ -342,7 +362,11 @@ fun SearchDialerScreen(
                         .padding(bottom = 24.dp, end = 20.dp)
                 ) {
                     FloatingActionButton(
-                        onClick = { isDialpadVisible = true },
+                        onClick = {
+                            focusManager.clearFocus()
+                            keyboardController?.hide()
+                            isDialpadVisible = true
+                        },
                         containerColor = SamsungGreen,
                         contentColor = Color.White,
                         shape = CircleShape,
