@@ -73,6 +73,9 @@ import androidx.compose.material.icons.filled.Videocam
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -81,6 +84,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
@@ -183,6 +187,7 @@ fun ContactDetailDialog(
         birthdayDateString: String?,
         photoBitmap: android.graphics.Bitmap?
     ) -> Unit = { _, updated, _, _, _, _ -> onUpdateContact(updated) },
+    onDeleteContact: (FavoriteContact) -> Unit = {},
     onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", "Основные") }
 ) {
     val context = LocalContext.current
@@ -587,6 +592,7 @@ fun ContactDetailDialog(
             }
 
             var showEditContactDialog by remember { mutableStateOf(false) }
+            var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
             // TOP FLOATING TOOLBAR OVER PHOTO (Back Button & Three Dots Menu)
             Box(
@@ -692,13 +698,50 @@ fun ContactDetailDialog(
                                 destructive = true,
                                 onClick = {
                                     topMenuExpanded = false
-                                    onDismiss()
-                                    onRemoveFavorite(contact)
+                                    showDeleteConfirmDialog = true
                                 }
                             )
                         }
                     }
                 }
+            }
+
+            if (showDeleteConfirmDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteConfirmDialog = false },
+                    title = {
+                        Text(
+                            text = "Удалить контакт?",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = "Контакт «${contact.name}» будет удалён.",
+                            fontSize = 15.sp
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showDeleteConfirmDialog = false
+                                onDeleteContact(contact)
+                            }
+                        ) {
+                            Text(
+                                text = "Удалить",
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                            Text("Отмена")
+                        }
+                    }
+                )
             }
 
             if (showEditContactDialog) {
@@ -4683,6 +4726,236 @@ private fun showCalendarDatePicker(
 }
 
 @Composable
+fun UnsavedNumberChoiceDialog(
+    phoneNumber: String,
+    onCreateNew: () -> Unit,
+    onAddToExisting: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Добавить контакт",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = phoneNumber,
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = onCreateNew,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = SamsungGreen)
+                ) {
+                    Text("Создать новый", fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onAddToExisting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Добавить в существующий", fontWeight = FontWeight.SemiBold)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена")
+            }
+        }
+    )
+}
+
+@Composable
+fun CallLogAddContactDialog(
+    phoneNumber: String,
+    onSave: (
+        displayName: String,
+        phones: List<ContactsWriteRepository.PhoneEntry>,
+        emails: List<ContactsWriteRepository.EmailEntry>,
+        birthdayDateString: String?,
+        photoBitmap: android.graphics.Bitmap?
+    ) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val contact = remember(phoneNumber) {
+        FavoriteContact(
+            id = "new_${phoneNumber.filter { it.isDigit() || it == '+' }}",
+            name = "",
+            number = phoneNumber
+        )
+    }
+    EditContactDialog(
+        contact = contact,
+        phoneNumbersList = listOf(ContactPhoneNumber(number = phoneNumber, label = "Мобильный")),
+        emailsList = emptyList(),
+        birthdayInfo = null,
+        importantDatesList = emptyList(),
+        messengerAccountsList = emptyList(),
+        avatarBitmap = null,
+        context = context,
+        isNewContact = true,
+        onSave = { newName, newPhones, newEmails, newBirthday, _, _, _, newBitmap ->
+            onSave(
+                newName,
+                newPhones.map { ContactsWriteRepository.PhoneEntry(it.number, it.label) },
+                newEmails.map { ContactsWriteRepository.EmailEntry(it.email, it.label) },
+                newBirthday?.dateString,
+                newBitmap?.asAndroidBitmap()
+            )
+        },
+        onDismiss = onDismiss
+    )
+}
+
+@Composable
+fun CallLogAddToExistingContactDialog(
+    contact: FavoriteContact,
+    phoneNumberToAdd: String,
+    onSave: (
+        original: FavoriteContact,
+        updated: FavoriteContact,
+        phones: List<ContactsWriteRepository.PhoneEntry>,
+        emails: List<ContactsWriteRepository.EmailEntry>,
+        birthdayDateString: String?,
+        photoBitmap: android.graphics.Bitmap?
+    ) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var phoneNumbersList by remember(contact, phoneNumberToAdd) {
+        mutableStateOf<List<ContactPhoneNumber>?>(null)
+    }
+    var emailsList by remember(contact) { mutableStateOf<List<ContactEmail>>(emptyList()) }
+    var birthdayInfo by remember(contact) { mutableStateOf<ContactBirthday?>(null) }
+    var importantDatesList by remember(contact) {
+        mutableStateOf<List<ContactImportantDate>>(emptyList())
+    }
+    var messengerAccountsList by remember(contact) {
+        mutableStateOf<List<MessengerAccount>>(emptyList())
+    }
+    var avatarBitmap by remember(contact.photoUri) { mutableStateOf<ImageBitmap?>(null) }
+    var isLoading by remember(contact, phoneNumberToAdd) { mutableStateOf(true) }
+
+    LaunchedEffect(contact, phoneNumberToAdd) {
+        isLoading = true
+        withContext(Dispatchers.IO) {
+            val highResPhotoUri =
+                getHighResContactPhotoUri(context, contact.number) ?: contact.photoUri
+            if (!highResPhotoUri.isNullOrEmpty()) {
+                try {
+                    val uri = highResPhotoUri.toUri()
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        val bitmap = BitmapFactory.decodeStream(stream)
+                        avatarBitmap = bitmap?.asImageBitmap()
+                    }
+                } catch (_: Exception) {
+                    avatarBitmap = null
+                }
+            } else {
+                avatarBitmap = null
+            }
+
+            val loadedNumbers = loadContactPhoneNumbers(context, contact).toMutableList()
+            val cleanNew = phoneNumberToAdd.filter { it.isDigit() || it == '+' }
+            val alreadyHas = loadedNumbers.any {
+                it.number.filter { ch -> ch.isDigit() || ch == '+' } == cleanNew
+            }
+            if (!alreadyHas && phoneNumberToAdd.isNotBlank()) {
+                loadedNumbers.add(
+                    ContactPhoneNumber(number = phoneNumberToAdd, label = "Мобильный")
+                )
+            }
+            phoneNumbersList = loadedNumbers
+            emailsList = loadContactEmails(context, contact)
+            birthdayInfo = loadContactBirthday(context, contact)
+            importantDatesList =
+                getImportantDates(context, getContactCustomKey(contact), contact.number)
+            messengerAccountsList = loadMessengerAccounts(context, contact)
+        }
+        isLoading = false
+    }
+
+    if (isLoading || phoneNumbersList == null) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(
+                    text = "Редактирование контакта",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+            },
+            text = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = SamsungGreen)
+                }
+            },
+            confirmButton = {}
+        )
+        return
+    }
+
+    EditContactDialog(
+        contact = contact,
+        phoneNumbersList = phoneNumbersList!!,
+        emailsList = emailsList,
+        birthdayInfo = birthdayInfo,
+        importantDatesList = importantDatesList,
+        messengerAccountsList = messengerAccountsList,
+        avatarBitmap = avatarBitmap,
+        context = context,
+        onSave = { newName, newPhones, newEmails, newBirthday, newImportantDates, updatedMessengers, hiddenSet, newBitmap ->
+            val updatedContact = contact.copy(
+                name = newName,
+                number = newPhones.firstOrNull()?.number ?: contact.number
+            )
+            saveHiddenMessengers(context, getContactCustomKey(contact), hiddenSet)
+            saveCustomMessengerLinks(
+                context,
+                getContactCustomKey(updatedContact),
+                updatedMessengers
+            )
+            saveImportantDates(
+                context,
+                getContactCustomKey(updatedContact),
+                updatedContact.number,
+                newImportantDates
+            )
+            onSave(
+                contact,
+                updatedContact,
+                newPhones.map { ContactsWriteRepository.PhoneEntry(it.number, it.label) },
+                newEmails.map { ContactsWriteRepository.EmailEntry(it.email, it.label) },
+                newBirthday?.dateString,
+                newBitmap?.asAndroidBitmap()
+            )
+        },
+        onDismiss = onDismiss
+    )
+}
+
+@Composable
 private fun EditContactDialog(
     contact: FavoriteContact,
     phoneNumbersList: List<ContactPhoneNumber>,
@@ -4692,6 +4965,7 @@ private fun EditContactDialog(
     messengerAccountsList: List<MessengerAccount>,
     avatarBitmap: ImageBitmap?,
     context: Context,
+    isNewContact: Boolean = false,
     onSave: (
         newName: String,
         newPhones: List<ContactPhoneNumber>,
@@ -4750,7 +5024,13 @@ private fun EditContactDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Редактирование контакта", fontWeight = FontWeight.Bold, fontSize = 20.sp) },
+        title = {
+            Text(
+                text = if (isNewContact) "Создать контакт" else "Редактирование контакта",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp
+            )
+        },
         text = {
             Column(
                 modifier = Modifier
@@ -5310,6 +5590,12 @@ private fun EditContactDialog(
         confirmButton = {
             TextButton(
                 onClick = {
+                    val trimmedName = nameInput.trim()
+                    if (isNewContact && trimmedName.isEmpty()) {
+                        Toast.makeText(context, "Введите имя контакта", Toast.LENGTH_SHORT).show()
+                        return@TextButton
+                    }
+
                     val cleanPhones = editablePhones.filter { it.number.isNotBlank() }
                     val cleanEmails = editableEmails.filter { it.email.isNotBlank() }
                     val newBday = if (isEditingBirthday && birthdayInput.isNotBlank()) {
@@ -5317,7 +5603,7 @@ private fun EditContactDialog(
                     } else null
 
                     onSave(
-                        nameInput.trim(),
+                        trimmedName,
                         cleanPhones.ifEmpty { phoneNumbersList },
                         cleanEmails,
                         newBday,

@@ -52,7 +52,9 @@ import kotlinx.coroutines.withContext
 @Composable
 fun AddFavoriteDialog(
     onDismiss: () -> Unit,
-    onContactSelect: (FavoriteContact) -> Unit
+    onContactSelect: (FavoriteContact) -> Unit,
+    title: String = "Добавить в избранное",
+    dismissOnSelect: Boolean = true
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -90,7 +92,7 @@ fun AddFavoriteDialog(
                 .padding(horizontal = 16.dp)
         ) {
             Text(
-                text = "Добавить в избранное",
+                text = title,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -172,7 +174,9 @@ fun AddFavoriteDialog(
                                 .fillMaxWidth()
                                 .clickable {
                                     onContactSelect(item)
-                                    onDismiss()
+                                    if (dismissOnSelect) {
+                                        onDismiss()
+                                    }
                                 },
                             shape = RoundedCornerShape(16.dp),
                             color = MaterialTheme.colorScheme.surface

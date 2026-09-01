@@ -2,10 +2,14 @@ package com.asinosoft.dialer.ui.recents
 
 import android.app.Application
 import android.content.Context
+import android.content.pm.PackageManager
+import android.Manifest
 import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.asinosoft.dialer.data.model.CallLogItem
@@ -37,6 +41,18 @@ data class ContactDetailState(
     val initialTab: Int = 0,
     val isFavorite: Boolean = false
 )
+
+data class UnsavedNumberFlowState(
+    val phoneNumber: String,
+    val step: UnsavedNumberFlowStep
+)
+
+sealed class UnsavedNumberFlowStep {
+    data object Choose : UnsavedNumberFlowStep()
+    data object CreateNew : UnsavedNumberFlowStep()
+    data object PickExisting : UnsavedNumberFlowStep()
+    data class EditExisting(val contact: FavoriteContact) : UnsavedNumberFlowStep()
+}
 
 data class SearchDialerItem(
     val id: String,
@@ -129,6 +145,9 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     private val _contactDetailToShow = MutableStateFlow<ContactDetailState?>(null)
     val contactDetailToShow: StateFlow<ContactDetailState?> = _contactDetailToShow.asStateFlow()
+
+    private val _unsavedNumberFlow = MutableStateFlow<UnsavedNumberFlowState?>(null)
+    val unsavedNumberFlow: StateFlow<UnsavedNumberFlowState?> = _unsavedNumberFlow.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
 
@@ -507,6 +526,15 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         return if (digits.length >= 7) digits.takeLast(10) else null
     }
 
+    private fun clearCallLogNames(phones: Collection<String>) {
+        val keys = phones.mapNotNull { phoneMatchKey(it) }.toSet()
+        if (keys.isEmpty()) return
+        _rawCallLogs.value = _rawCallLogs.value.map { item ->
+            val key = phoneMatchKey(item.number)
+            if (key != null && key in keys) item.copy(name = null) else item
+        }
+    }
+
     private fun patchCallLogNames(phones: Collection<String>, newName: String) {
         val keys = phones.mapNotNull { phoneMatchKey(it) }.toSet()
         if (keys.isEmpty() || newName.isBlank()) return
@@ -702,6 +730,47 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         if (favorite) addFavorite(contact) else removeFavorite(contact)
     }
 
+    fun deleteContact(contact: FavoriteContact) {
+        viewModelScope.launch {
+            if (ContextCompat.checkSelfPermission(
+                    getApplication(),
+                    Manifest.permission.WRITE_CONTACTS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                showToast("Нет разрешения на запись контактов")
+                return@launch
+            }
+
+            suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 2_500L
+            suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 2_500L
+
+            val phoneNumbers = withContext(Dispatchers.IO) {
+                contactsWriteRepository.resolvePhoneNumbers(contact)
+            }
+
+            val deleted = withContext(Dispatchers.IO) {
+                contactsWriteRepository.deleteContact(contact)
+            }
+
+            if (!deleted) {
+                showToast("Не удалось удалить контакт")
+                return@launch
+            }
+
+            _favorites.value = withContext(Dispatchers.IO) {
+                favoritesRepository.removeFavorite(contact)
+            }
+            clearCallLogNames(phoneNumbers)
+            repository.resetCache()
+            withContext(Dispatchers.IO) {
+                repository.seedCachesFromContacts()
+            }
+            loadCallLogs(showLoading = false)
+            closeContactDetail()
+            showToast("Контакт удалён")
+        }
+    }
+
     fun removeFavorite(contact: FavoriteContact) {
         viewModelScope.launch {
             suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 1_500L
@@ -731,7 +800,163 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun openContactDetailFromCallLog(item: CallLogItem) {
+    fun openContactDetailFromCallLog(item: CallLogItem, initialTab: Int = 1) {
+        openContactDetail(contactFromCallLogItem(item), initialTab = initialTab)
+    }
+
+    fun openUnsavedNumberContactFlow(phoneNumber: String) {
+        if (phoneNumber.isBlank()) return
+        _unsavedNumberFlow.value = UnsavedNumberFlowState(
+            phoneNumber = phoneNumber,
+            step = UnsavedNumberFlowStep.Choose
+        )
+    }
+
+    fun closeUnsavedNumberContactFlow() {
+        _unsavedNumberFlow.value = null
+    }
+
+    fun unsavedNumberChooseCreateNew() {
+        val state = _unsavedNumberFlow.value ?: return
+        _unsavedNumberFlow.value = state.copy(step = UnsavedNumberFlowStep.CreateNew)
+    }
+
+    fun unsavedNumberChoosePickExisting() {
+        val state = _unsavedNumberFlow.value ?: return
+        _unsavedNumberFlow.value = state.copy(step = UnsavedNumberFlowStep.PickExisting)
+    }
+
+    fun unsavedNumberSelectExistingContact(contact: FavoriteContact) {
+        val state = _unsavedNumberFlow.value ?: return
+        _unsavedNumberFlow.value = state.copy(
+            step = UnsavedNumberFlowStep.EditExisting(contact)
+        )
+    }
+
+    fun unsavedNumberBackToChoose() {
+        val state = _unsavedNumberFlow.value ?: return
+        _unsavedNumberFlow.value = state.copy(step = UnsavedNumberFlowStep.Choose)
+    }
+
+    fun unsavedNumberBackToPickExisting() {
+        val state = _unsavedNumberFlow.value ?: return
+        _unsavedNumberFlow.value = state.copy(step = UnsavedNumberFlowStep.PickExisting)
+    }
+
+    fun saveExistingContactWithNumberFromCallLog(
+        original: FavoriteContact,
+        updated: FavoriteContact,
+        phones: List<ContactsWriteRepository.PhoneEntry>,
+        emails: List<ContactsWriteRepository.EmailEntry>,
+        birthdayDateString: String?,
+        photoBitmap: android.graphics.Bitmap?
+    ) {
+        viewModelScope.launch {
+            if (ContextCompat.checkSelfPermission(
+                    getApplication(),
+                    Manifest.permission.WRITE_CONTACTS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                showToast("Нет разрешения на запись контактов")
+                return@launch
+            }
+
+            suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 2_500L
+            suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 2_500L
+
+            val saved = withContext(Dispatchers.IO) {
+                contactsWriteRepository.updateContactDetails(
+                    contact = original,
+                    displayName = updated.name,
+                    phones = phones,
+                    emails = emails,
+                    birthdayDateString = birthdayDateString,
+                    photoBitmap = photoBitmap
+                )
+            }
+
+            if (!saved) {
+                showToast("Не удалось сохранить контакт")
+                return@launch
+            }
+
+            _favorites.value = withContext(Dispatchers.IO) {
+                favoritesRepository.updateFavorite(updated)
+            }
+            val phoneNumbers = phones.map { it.number }.ifEmpty { listOf(updated.number) }
+            patchCallLogNames(phoneNumbers, updated.name)
+            repository.resetCache()
+            withContext(Dispatchers.IO) {
+                repository.seedCachesFromContacts()
+            }
+            loadCallLogs(showLoading = false)
+            _unsavedNumberFlow.value = null
+            showToast("Контакт сохранён")
+        }
+    }
+
+    fun saveNewContactFromCallLog(
+        phoneNumber: String,
+        displayName: String,
+        phones: List<ContactsWriteRepository.PhoneEntry>,
+        emails: List<ContactsWriteRepository.EmailEntry>,
+        birthdayDateString: String?,
+        photoBitmap: android.graphics.Bitmap?
+    ) {
+        viewModelScope.launch {
+            val trimmedName = displayName.trim()
+            if (trimmedName.isEmpty()) {
+                showToast("Введите имя контакта")
+                return@launch
+            }
+
+            if (ContextCompat.checkSelfPermission(
+                    getApplication(),
+                    Manifest.permission.WRITE_CONTACTS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                showToast("Нет разрешения на запись контактов")
+                return@launch
+            }
+
+            suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 2_500L
+            suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 2_500L
+
+            val phoneEntries = phones.filter { it.number.isNotBlank() }.ifEmpty {
+                listOf(ContactsWriteRepository.PhoneEntry(phoneNumber, "Мобильный"))
+            }
+
+            val contactId = withContext(Dispatchers.IO) {
+                contactsWriteRepository.createContact(
+                    displayName = trimmedName,
+                    phones = phoneEntries,
+                    emails = emails,
+                    birthdayDateString = birthdayDateString,
+                    photoBitmap = photoBitmap
+                )
+            }
+
+            if (contactId == null) {
+                showToast("Не удалось сохранить контакт")
+                return@launch
+            }
+
+            repository.resetCache()
+            withContext(Dispatchers.IO) {
+                repository.seedCachesFromContacts()
+            }
+            patchCallLogNames(phoneEntries.map { it.number }, trimmedName)
+            loadCallLogs(showLoading = false)
+            _unsavedNumberFlow.value = null
+            showToast("Контакт сохранён")
+        }
+    }
+
+    private fun showToast(message: String) {
+        Toast.makeText(getApplication(), message, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun contactFromCallLogItem(item: CallLogItem): FavoriteContact {
         val cleanCallNum = item.number.filter { it.isDigit() || it == '+' }
         val existingFav = _favorites.value.find { fav ->
             val cleanFavNum = fav.number.filter { it.isDigit() || it == '+' }
@@ -741,13 +966,12 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                         .equals(item.name.trim(), ignoreCase = true))
         }
 
-        val contact = existingFav ?: FavoriteContact(
+        return existingFav ?: FavoriteContact(
             id = cleanCallNum.ifBlank { "call_log_${item.id}" },
             name = item.name ?: item.number,
             number = item.number,
             photoUri = item.photoUri
         )
-        openContactDetail(contact, initialTab = 1)
     }
 
     fun deleteCallLogGroup(item: CallLogItem) {

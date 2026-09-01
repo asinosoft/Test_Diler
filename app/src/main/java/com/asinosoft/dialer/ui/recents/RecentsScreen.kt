@@ -88,13 +88,17 @@ import com.asinosoft.dialer.ui.components.Header
 import com.asinosoft.dialer.ui.components.LazyListVerticalScrollbar
 import com.asinosoft.dialer.ui.dialer.SearchDialerScreen
 import com.asinosoft.dialer.ui.dialer.SwipeableSearchDialerCard
+import com.asinosoft.dialer.ui.recents.UnsavedNumberFlowStep
 import com.asinosoft.dialer.ui.recents.components.AddFavoriteDialog
 import com.asinosoft.dialer.ui.recents.components.AppSettingsDialog
 import com.asinosoft.dialer.ui.recents.components.AvatarBitmapCache
+import com.asinosoft.dialer.ui.recents.components.CallLogAddContactDialog
+import com.asinosoft.dialer.ui.recents.components.CallLogAddToExistingContactDialog
 import com.asinosoft.dialer.ui.recents.components.ContactDetailDialog
 import com.asinosoft.dialer.ui.recents.components.FavoriteContactCard
 import com.asinosoft.dialer.ui.recents.components.FavoritesTopBar
 import com.asinosoft.dialer.ui.recents.components.SwipeableCallLogCard
+import com.asinosoft.dialer.ui.recents.components.UnsavedNumberChoiceDialog
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
@@ -125,6 +129,7 @@ fun RecentsScreen(
     val isAppSettingsOpen by viewModel.isAppSettingsOpen.collectAsState()
     val favoriteRowsCount by viewModel.favoriteRowsCount.collectAsState()
     val contactDetailToShow by viewModel.contactDetailToShow.collectAsState()
+    val unsavedNumberFlow by viewModel.unsavedNumberFlow.collectAsState()
 
     val searchQuery = rememberTextFieldState()
     LaunchedEffect(searchQuery.text) {
@@ -806,7 +811,16 @@ fun RecentsScreen(
                                 onCall = { num -> onCall(num, null) },
                                 onSms = onSms,
                                 onCallWithSim = { num, slot -> onCall(num, slot) },
-                                onItemClick = { viewModel.openContactDetailFromCallLog(it) },
+                                onAvatarClick = { logItem ->
+                                    if (logItem.name != null) {
+                                        viewModel.openContactDetailFromCallLog(logItem, initialTab = 0)
+                                    } else {
+                                        viewModel.openUnsavedNumberContactFlow(logItem.number)
+                                    }
+                                },
+                                onBodyClick = {
+                                    viewModel.openContactDetailFromCallLog(it, initialTab = 1)
+                                },
                                 onBlockNumber = { viewModel.blockCallLogNumber(it) },
                                 onDeleteGroup = { viewModel.deleteCallLogGroup(it) },
                                 onClearContactCalls = { viewModel.clearContactCallLogs(it) }
@@ -876,6 +890,64 @@ fun RecentsScreen(
             )
         }
 
+        // Unsaved number from call log: choose / create / add to existing
+        unsavedNumberFlow?.let { flow ->
+            when (val step = flow.step) {
+                UnsavedNumberFlowStep.Choose -> {
+                    UnsavedNumberChoiceDialog(
+                        phoneNumber = flow.phoneNumber,
+                        onCreateNew = { viewModel.unsavedNumberChooseCreateNew() },
+                        onAddToExisting = { viewModel.unsavedNumberChoosePickExisting() },
+                        onDismiss = { viewModel.closeUnsavedNumberContactFlow() }
+                    )
+                }
+
+                UnsavedNumberFlowStep.CreateNew -> {
+                    CallLogAddContactDialog(
+                        phoneNumber = flow.phoneNumber,
+                        onSave = { name, phones, emails, birthday, photo ->
+                            viewModel.saveNewContactFromCallLog(
+                                phoneNumber = flow.phoneNumber,
+                                displayName = name,
+                                phones = phones,
+                                emails = emails,
+                                birthdayDateString = birthday,
+                                photoBitmap = photo
+                            )
+                        },
+                        onDismiss = { viewModel.unsavedNumberBackToChoose() }
+                    )
+                }
+
+                UnsavedNumberFlowStep.PickExisting -> {
+                    AddFavoriteDialog(
+                        title = "Поиск контакта",
+                        dismissOnSelect = false,
+                        onDismiss = { viewModel.unsavedNumberBackToChoose() },
+                        onContactSelect = { viewModel.unsavedNumberSelectExistingContact(it) }
+                    )
+                }
+
+                is UnsavedNumberFlowStep.EditExisting -> {
+                    CallLogAddToExistingContactDialog(
+                        contact = step.contact,
+                        phoneNumberToAdd = flow.phoneNumber,
+                        onSave = { original, updated, phones, emails, birthday, photo ->
+                            viewModel.saveExistingContactWithNumberFromCallLog(
+                                original = original,
+                                updated = updated,
+                                phones = phones,
+                                emails = emails,
+                                birthdayDateString = birthday,
+                                photoBitmap = photo
+                            )
+                        },
+                        onDismiss = { viewModel.unsavedNumberBackToPickExisting() }
+                    )
+                }
+            }
+        }
+
         // Contact Detail Bottom Sheet Dialog (only render if search dialer is closed)
         if (!isSearchDialerOpen) {
             contactDetailToShow?.let { detailState ->
@@ -902,6 +974,7 @@ fun RecentsScreen(
                             photoBitmap = photo
                         )
                     },
+                    onDeleteContact = { viewModel.deleteContact(it) },
                     onAddTab = { name ->
                         viewModel.addTab(name)
                         viewModel.tabs.value.lastOrNull() ?: FavoriteTab("default", name)

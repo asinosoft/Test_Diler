@@ -90,7 +90,8 @@ fun SwipeableCallLogCard(
     onCall: (String) -> Unit,
     onSms: (String) -> Unit,
     onCallWithSim: (String, Int) -> Unit = { number, _ -> onCall(number) },
-    onItemClick: ((CallLogItem) -> Unit)? = null,
+    onAvatarClick: ((CallLogItem) -> Unit)? = null,
+    onBodyClick: ((CallLogItem) -> Unit)? = null,
     onBlockNumber: (CallLogItem) -> Boolean = { false },
     onDeleteGroup: (CallLogItem) -> Unit = {},
     onClearContactCalls: (CallLogItem) -> Unit = {},
@@ -232,11 +233,6 @@ fun SwipeableCallLogCard(
                             )
                             showDeleteSubmenu = false
                             menuExpanded = true
-                        },
-                        onTap = {
-                            if (kotlin.math.abs(drawnOffset) < 2f && onItemClick != null) {
-                                onItemClick(item)
-                            }
                         }
                     )
                 }
@@ -314,42 +310,66 @@ fun SwipeableCallLogCard(
                     .padding(horizontal = 16.dp, vertical = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                AvatarView(
-                    name = avatarName,
-                    photoUri = item.photoUri
-                )
-                Spacer(modifier.width(14.dp))
-                Column(modifier.weight(1f)) {
-                    Text(
-                        text = displayName,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isMissed) MissedRed else MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
+                Box(
+                    modifier = Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        enabled = onAvatarClick != null && kotlin.math.abs(drawnOffset) < 2f
+                    ) {
+                        onAvatarClick?.invoke(item)
+                    }
+                ) {
+                    AvatarView(
+                        name = avatarName,
+                        photoUri = item.photoUri,
+                        isUnsavedContact = item.name == null
                     )
-                    Spacer(modifier.height(2.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        CallTypeIcon(item.type)
-                        Spacer(modifier.width(5.dp))
-                        SimIcon(simNumber = item.simNumber, size = 12.dp)
-                        Spacer(modifier.width(5.dp))
+                }
+                Spacer(modifier.width(14.dp))
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            enabled = onBodyClick != null && kotlin.math.abs(drawnOffset) < 2f
+                        ) {
+                            onBodyClick?.invoke(item)
+                        },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = subText,
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                            text = displayName,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (isMissed) MissedRed else MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
+                        Spacer(modifier.height(2.dp))
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CallTypeIcon(item.type)
+                            Spacer(modifier.width(5.dp))
+                            SimIcon(simNumber = item.simNumber, size = 12.dp)
+                            Spacer(modifier.width(5.dp))
+                            Text(
+                                text = subText,
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
+                    Spacer(modifier.width(8.dp))
+                    Text(
+                        text = timeText,
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        maxLines = 1
+                    )
                 }
-                Spacer(modifier.width(8.dp))
-                Text(
-                    text = timeText,
-                    fontSize = 13.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    maxLines = 1
-                )
             }
         }
 
