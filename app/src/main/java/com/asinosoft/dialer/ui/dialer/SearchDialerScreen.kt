@@ -7,10 +7,14 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
@@ -147,6 +151,15 @@ fun SearchDialerScreen(
 
     val listState = rememberLazyListState()
 
+    val bottomListPadding by animateDpAsState(
+        targetValue = if (isDialpadVisible) 380.dp else 96.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioNoBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "bottomListPadding"
+    )
+
     LaunchedEffect(searchQuery.text) {
         if (results.isNotEmpty()) {
             listState.scrollToItem(0)
@@ -230,87 +243,103 @@ fun SearchDialerScreen(
                 )
             }
 
-            // Results List
+            // Main Content Area (Results List + Floating FAB + Dialpad Overlay)
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .pointerInput(Unit) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent(PointerEventPass.Initial)
-                                if (event.changes.any { it.changedToDown() }) {
-                                    isDialpadVisible = false
+            ) {
+                // Results List
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pointerInput(Unit) {
+                            awaitPointerEventScope {
+                                while (true) {
+                                    val event = awaitPointerEvent(PointerEventPass.Initial)
+                                    if (event.changes.any { it.changedToDown() }) {
+                                        isDialpadVisible = false
+                                    }
+                                }
+                            }
+                        }
+                ) {
+                    if (results.isEmpty()) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = if (searchQuery.text.isEmpty()) "Введите номер или имя" else "Контакты не найдены",
+                                fontSize = 15.sp,
+                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
+                            )
+                        }
+                    } else {
+                        LazyColumn(
+                            state = listState,
+                            modifier = Modifier.fillMaxSize(),
+                            contentPadding = PaddingValues(
+                                start = 16.dp,
+                                end = 16.dp,
+                                top = 8.dp,
+                                bottom = bottomListPadding
+                            ),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            if (results.calls.isNotEmpty()) {
+                                item {
+                                    Header("История звонков")
+                                }
+                                items(
+                                    items = results.calls,
+                                    key = { "log_${it.id}" }
+                                ) { item ->
+                                    SwipeableSearchDialerCard(
+                                        item = item,
+                                        context = context,
+                                        query = searchQuery.text.toString(),
+                                        selectedSimSlot = selectedSimSlot,
+                                        onCall = onCall,
+                                        onSms = onSms
+                                    )
+                                }
+                            }
+                            if (results.contacts.isNotEmpty()) {
+                                item {
+                                    Header("Контакты")
+                                }
+                                items(
+                                    items = results.contacts,
+                                    key = { "contact_${it.id}" }
+                                ) { item ->
+                                    SwipeableSearchDialerCard(
+                                        item = item,
+                                        context = context,
+                                        query = searchQuery.text.toString(),
+                                        selectedSimSlot = selectedSimSlot,
+                                        onCall = onCall,
+                                        onSms = onSms
+                                    )
                                 }
                             }
                         }
                     }
-            ) {
-                if (results.isEmpty()) {
-                    Box(
-                        modifier = Modifier.fillMaxSize(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (searchQuery.text.isEmpty()) "Введите номер или имя" else "Контакты не найдены",
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                        )
-                    }
-                } else {
-                    LazyColumn(
-                        state = listState,
-                        modifier = Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        if (results.calls.isNotEmpty()) {
-                            item {
-                                Header("История звонков")
-                            }
-                            items(
-                                items = results.calls,
-                                key = { "log_${it.id}" }
-                            ) { item ->
-                                SwipeableSearchDialerCard(
-                                    item = item,
-                                    context = context,
-                                    query = searchQuery.text.toString(),
-                                    selectedSimSlot = selectedSimSlot,
-                                    onCall = onCall,
-                                    onSms = onSms
-                                )
-                            }
-                        }
-                        if (results.contacts.isNotEmpty()) {
-                            item {
-                                Header("Контакты")
-                            }
-                            items(
-                                items = results.contacts,
-                                key = { "contact_${it.id}" }
-                            ) { item ->
-                                SwipeableSearchDialerCard(
-                                    item = item,
-                                    context = context,
-                                    query = searchQuery.text.toString(),
-                                    selectedSimSlot = selectedSimSlot,
-                                    onCall = onCall,
-                                    onSms = onSms
-                                )
-                            }
-                        }
-                    }
                 }
-            }
 
-            // Floating Dialpad FAB Button (shown when dialpad is hidden)
-            if (!isDialpadVisible) {
-                Box(
+                // Floating Dialpad FAB Button (shown when dialpad is hidden, floating over the list)
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = !isDialpadVisible,
+                    enter = scaleIn(
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ) + fadeIn(animationSpec = tween(durationMillis = 200, delayMillis = 100)),
+                    exit = scaleOut(animationSpec = tween(durationMillis = 150)) + fadeOut(animationSpec = tween(durationMillis = 150)),
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 24.dp, end = 20.dp),
-                    contentAlignment = Alignment.BottomEnd
+                        .align(Alignment.BottomEnd)
+                        .padding(bottom = 24.dp, end = 20.dp)
                 ) {
                     FloatingActionButton(
                         onClick = { isDialpadVisible = true },
@@ -326,30 +355,39 @@ fun SearchDialerScreen(
                         )
                     }
                 }
-            }
 
-            // Bottom Dialpad Component
-            AnimatedVisibility(
-                visible = isDialpadVisible,
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-            ) {
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.surface,
-                    tonalElevation = 8.dp,
-                    shadowElevation = 12.dp,
-                    shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                // Bottom Dialpad Component
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = isDialpadVisible,
+                    enter = slideInVertically(
+                        initialOffsetY = { it },
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioNoBouncy,
+                            stiffness = Spring.StiffnessMediumLow
+                        )
+                    ) + fadeIn(animationSpec = tween(durationMillis = 200)),
+                    exit = slideOutVertically(
+                        targetOffsetY = { it },
+                        animationSpec = tween(durationMillis = 220)
+                    ) + fadeOut(animationSpec = tween(durationMillis = 180)),
+                    modifier = Modifier.align(Alignment.BottomCenter)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 24.dp, vertical = 12.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 8.dp,
+                        shadowElevation = 12.dp,
+                        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
                     ) {
-                        // T9 Dialpad Buttons Grid (3x4)
-                        val dialpadButtons = remember {
-                            listOf(
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 24.dp, vertical = 12.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            // T9 Dialpad Buttons Grid (3x4)
+                            val dialpadButtons = remember {
+                                listOf(
                                 Triple("1", "", ""),
                                 Triple("2", "ABC", "АБВГ"),
                                 Triple("3", "DEF", "ДЕЖЗ"),
@@ -538,6 +576,7 @@ fun SearchDialerScreen(
             }
         }
     }
+}
 }
 
 @Composable
