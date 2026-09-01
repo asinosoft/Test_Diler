@@ -31,11 +31,13 @@ import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.rememberTextFieldState
 import androidx.compose.foundation.text.input.setTextAndPlaceCursorAtEnd
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -131,14 +133,8 @@ fun RecentsScreen(
     val contactDetailToShow by viewModel.contactDetailToShow.collectAsState()
     val unsavedNumberFlow by viewModel.unsavedNumberFlow.collectAsState()
 
-    val searchQuery = rememberTextFieldState()
-    LaunchedEffect(searchQuery.text) {
-        viewModel.setSearchQuery(searchQuery.text.toString())
-    }
-
-    val showOnlyMissed by viewModel.showOnlyMissed.collectAsState()
     val hasLoadedCallLogs by viewModel.hasLoadedCallLogs.collectAsState()
-    var showHint by remember { mutableStateOf(true) }
+    val showHint by viewModel.showSwipeHint.collectAsState()
     var initialScrollDone by remember { mutableStateOf(false) }
     var listReady by remember { mutableStateOf(false) }
 
@@ -273,10 +269,6 @@ fun RecentsScreen(
         }
     }
 
-    BackHandler(enabled = searchQuery.text.isNotEmpty()) {
-        searchQuery.setTextAndPlaceCursorAtEnd("")
-    }
-
     val groupedCallLogs = remember(callLogs) {
         callLogs.groupBy { formatDateHeader(it.timestamp) }
     }
@@ -287,8 +279,6 @@ fun RecentsScreen(
 
     // Search & Dialpad Screen Overlay
     var isSearchDialerOpen by remember { mutableStateOf(false) }
-
-    val filteredContacts by viewModel.filteredDialerResults.collectAsState()
 
     Box(
         modifier = Modifier
@@ -362,238 +352,79 @@ fun RecentsScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer { alpha = if (listReady) 1f else 0f },
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                item(key = "top_header") {
-                    // Samsung One UI Top Header
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column {
-                            Text(
-                                text = "Последние",
-                                fontSize = 32.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                            Text(
-                                text = "Вызовы и сообщения",
-                                fontSize = 14.sp,
-                                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                            )
-                        }
-
-                        IconButton(
-                            onClick = { viewModel.openAppSettings() },
-                            modifier = Modifier
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.surface)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Settings,
-                                contentDescription = "Настройки",
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // One UI Search Bar
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable { isSearchDialerOpen = true },
-                        shape = RoundedCornerShape(24.dp),
-                        color = MaterialTheme.colorScheme.surface,
-                        tonalElevation = 2.dp
-                    ) {
-                        TextField(
-                            state = searchQuery,
-                            placeholder = {
-                                Text(
-                                    text = "Поиск по имени или номеру",
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
-                                )
-                            },
-                            leadingIcon = {
-                                Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = "Поиск",
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
-                                )
-                            },
-                            trailingIcon = {
-                                if (searchQuery.text.isNotEmpty()) {
-                                    IconButton(onClick = { searchQuery.setTextAndPlaceCursorAtEnd("") }) {
-                                        Icon(
-                                            imageVector = Icons.Default.Clear,
-                                            contentDescription = "Очистить"
-                                        )
-                                    }
-                                }
-                            },
-                            lineLimits = TextFieldLineLimits.SingleLine,
-                            colors = TextFieldDefaults.colors(
-                                focusedContainerColor = Color.Transparent,
-                                unfocusedContainerColor = Color.Transparent,
-                                disabledContainerColor = Color.Transparent,
-                                focusedIndicatorColor = Color.Transparent,
-                                unfocusedIndicatorColor = Color.Transparent
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    // Filter Chips (Все / Пропущенные)
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Start,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        FilterChip(
-                            selected = !showOnlyMissed,
-                            onClick = { viewModel.setShowOnlyMissed(false) },
-                            label = { Text("Все") },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SamsungGreen,
-                                selectedLabelColor = Color.White
-                            )
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-
-                        FilterChip(
-                            selected = showOnlyMissed,
-                            onClick = { viewModel.setShowOnlyMissed(true) },
-                            label = { Text("Пропущенные") },
-                            shape = RoundedCornerShape(16.dp),
-                            colors = FilterChipDefaults.filterChipColors(
-                                selectedContainerColor = SamsungGreen,
-                                selectedLabelColor = Color.White
-                            )
-                        )
-                    }
-
-                    // Samsung One UI Gesture Hint Banner
-                    if (showHint) {
-                        Spacer(modifier = Modifier.height(10.dp))
-                        Surface(
-                            shape = RoundedCornerShape(16.dp),
-                            color = SamsungGreen.copy(alpha = 0.12f),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .padding(horizontal = 14.dp, vertical = 10.dp)
-                                    .fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Info,
-                                        contentDescription = "Подсказка",
-                                        tint = SamsungGreen,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = "👉 Свайп вправо — звонок | 👈 влево — SMS",
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onBackground
-                                    )
-                                }
-
-                                Icon(
-                                    imageVector = Icons.Default.Clear,
-                                    contentDescription = "Закрыть",
-                                    tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
-                                    modifier = Modifier
-                                        .size(18.dp)
-                                        .clickable { showHint = false }
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
-
-
-                if (searchQuery.text.isNotEmpty()) {
-                    if (filteredContacts.isEmpty()) item {
-                        Text(
-                            text = "Контакты не найдены",
-                            fontSize = 15.sp,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
-                        )
-                    } else {
-                        if (filteredContacts.calls.isNotEmpty()) {
-                            item {
-                                Header("Журнал звонков")
-                            }
-                            items(filteredContacts.calls, key = { "filtered_log_${it.id}" }) { contact ->
-                                SwipeableSearchDialerCard(
-                                    item = contact,
-                                    context = context,
-                                    query = searchQuery.text.toString(),
-                                    selectedSimSlot = 1,
-                                    onCall = onCall,
-                                    onSms = onSms
-                                )
-                            }
-                        }
-                        if (filteredContacts.contacts.isNotEmpty()) {
-                            item {
-                                Header("Контакты")
-                            }
-                            items(filteredContacts.contacts, key = { "filtered_contact_${it.id}" }) { contact ->
-                                SwipeableSearchDialerCard(
-                                    item = contact,
-                                    context = context,
-                                    query = searchQuery.text.toString(),
-                                    selectedSimSlot = 1,
-                                    onCall = onCall,
-                                    onSms = onSms
-                                )
-                            }
-                        }
-                    }
-                } else {
-                    item {
-                        // Favorites Section Title
+                    item(key = "favorites_title") {
+                        // Favorites Section Title & Settings
                         Row(
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Text(
-                                text = "Избранные контакты",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
+                            // Left: Star Icon + "Избранное"
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = "Избранное",
+                                    tint = SamsungGreen,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Text(
+                                    text = "Избранное",
+                                    fontSize = 18.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
 
-                            Text(
-                                text = "Добавить",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = SamsungGreen,
-                                modifier = Modifier
-                                    .clickable { viewModel.openAddFavoriteDialog() }
-                                    .padding(vertical = 4.dp, horizontal = 8.dp)
-                            )
+                            // Right: "+ Добавить" + Settings Icon
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Surface(
+                                    shape = RoundedCornerShape(12.dp),
+                                    color = SamsungGreen.copy(alpha = 0.12f),
+                                    modifier = Modifier.clickable { viewModel.openAddFavoriteDialog() }
+                                ) {
+                                    Row(
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Add,
+                                            contentDescription = null,
+                                            tint = SamsungGreen,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                        Text(
+                                            text = "Добавить",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = SamsungGreen
+                                        )
+                                    }
+                                }
+
+                                IconButton(
+                                    onClick = { viewModel.openAppSettings() },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = "Настройки",
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
                         }
                     }
 
@@ -777,7 +608,6 @@ fun RecentsScreen(
                             }
                         }
                     }
-                }
 
                 if (callLogs.isEmpty()) {
                     item(key = "empty_call_logs") {
@@ -795,6 +625,55 @@ fun RecentsScreen(
                         }
                     }
                 } else {
+                    // Samsung One UI Gesture Hint Banner (над списком вызовов / "Сегодня")
+                    if (showHint) {
+                        item(key = "gesture_hint_banner") {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = SamsungGreen.copy(alpha = 0.12f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp, bottom = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                                        .fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Info,
+                                            contentDescription = "Подсказка",
+                                            tint = SamsungGreen,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = "👉 Свайп вправо — звонок | 👈 влево — SMS",
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onBackground
+                                        )
+                                    }
+
+                                    Icon(
+                                        imageVector = Icons.Default.Clear,
+                                        contentDescription = "Закрыть",
+                                        tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                                        modifier = Modifier
+                                            .size(18.dp)
+                                            .clickable { viewModel.dismissSwipeHint() }
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     groupedCallLogs.forEach { (dateHeader, logsInDay) ->
                         if (dateHeader.isNotEmpty()) {
                             stickyHeader(key = "header_$dateHeader") { _ ->

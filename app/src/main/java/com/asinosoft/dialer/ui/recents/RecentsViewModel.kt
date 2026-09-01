@@ -143,6 +143,9 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     private val _isAppSettingsOpen = MutableStateFlow(false)
     val isAppSettingsOpen: StateFlow<Boolean> = _isAppSettingsOpen.asStateFlow()
 
+    private val _showSwipeHint = MutableStateFlow(prefs.getBoolean("show_swipe_hint", true))
+    val showSwipeHint: StateFlow<Boolean> = _showSwipeHint.asStateFlow()
+
     private val _contactDetailToShow = MutableStateFlow<ContactDetailState?>(null)
     val contactDetailToShow: StateFlow<ContactDetailState?> = _contactDetailToShow.asStateFlow()
 
@@ -648,6 +651,11 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     fun closeAppSettings() {
         _isAppSettingsOpen.value = false
+    }
+
+    fun dismissSwipeHint() {
+        _showSwipeHint.value = false
+        prefs.edit { putBoolean("show_swipe_hint", false) }
     }
 
     fun addFavorite(contact: FavoriteContact) {
