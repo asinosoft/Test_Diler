@@ -161,6 +161,9 @@ fun LazyListVerticalScrollbar(
 
         val thumbHeightState = rememberUpdatedState(thumbHeightPx)
         val trackHeightState = rememberUpdatedState(trackHeightPx)
+        val scrollFractionState = rememberUpdatedState(scrollFraction)
+        val alphaState = rememberUpdatedState(alpha)
+        val isVisibleState = rememberUpdatedState(showScrollbar)
 
         Box(
             modifier = Modifier
@@ -171,17 +174,19 @@ fun LazyListVerticalScrollbar(
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)
 
-                        val currentAlpha = alpha
-                        if (currentAlpha <= 0.05f) {
+                        val currentAlpha = alphaState.value
+                        val isShowing = isVisibleState.value || currentAlpha > 0.05f
+                        if (!isShowing) {
                             return@awaitEachGesture
                         }
 
                         val trackH = trackHeightState.value.coerceAtLeast(1f)
                         val thumbH = thumbHeightState.value
-                        val thumbOff = (trackH - thumbH) * scrollFraction
+                        val currentFraction = scrollFractionState.value
+                        val thumbOff = (trackH - thumbH) * currentFraction
 
                         val touchY = down.position.y
-                        val paddingPx = 48f
+                        val paddingPx = with(density) { 24.dp.toPx() }
                         val thumbTop = thumbOff - paddingPx
                         val thumbBottom = thumbOff + thumbH + paddingPx
 
