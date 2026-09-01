@@ -51,7 +51,7 @@ fun LazyListVerticalScrollbar(
     listState: LazyListState,
     modifier: Modifier = Modifier,
     thickness: Dp = 4.dp,
-    hitAreaWidth: Dp = 12.dp,
+    hitAreaWidth: Dp = 18.dp,
     thumbMinHeight: Dp = 48.dp,
     hideDelayMs: Long = 900L
 ) {

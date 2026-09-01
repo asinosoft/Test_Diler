@@ -263,7 +263,10 @@ fun RecentsScreen(
     }
 
     // Handle system Back button: return to initial startup scroll position if scrolled far
-    BackHandler(enabled = listState.firstVisibleItemScrollOffset > 0) {
+    val isScrolledAway = listState.firstVisibleItemIndex > initialItemIndex ||
+            (listState.firstVisibleItemIndex == initialItemIndex && listState.firstVisibleItemScrollOffset > 0)
+
+    BackHandler(enabled = isScrolledAway) {
         coroutineScope.launch {
             listState.animateScrollToItem(initialItemIndex, 0)
         }
