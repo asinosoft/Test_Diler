@@ -47,7 +47,29 @@ data class SearchDialerItem(
     val simSlot: Int? = null,
     val callType: CallType? = null,
     val isFavorite: Boolean = false
-)
+) {
+    class Matcher(query: String) {
+        private val query = query.lowercase().trim()
+
+        fun isBlank(): Boolean = query.isBlank()
+
+        fun match(log: CallLogItem): Boolean =
+            (log.name?.lowercase()?.contains(query) == true) ||
+                    log.number.contains(query) ||
+                    (log.name != null && log.name.toT9Digits().contains(query))
+
+
+        fun match(item: SearchDialerItem): Boolean =
+            item.name.lowercase().contains(query) ||
+                    item.number.contains(query) ||
+                    item.name.toT9Digits().contains(query)
+
+        fun order(item: SearchDialerItem): Int =
+            item.name.lowercase().indexOf(query).takeIf { it >= 0 }
+                ?: item.name.toT9Digits().indexOf(query).takeIf { it >= 0 }
+                ?: Int.MAX_VALUE
+    }
+}
 
 data class SearchResults(
     val calls: List<SearchDialerItem> = listOf(),
@@ -121,8 +143,8 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         _contacts,
         _searchQuery
     ) { logs, contacts, query ->
-        val cleanQuery = query.lowercase().trim()
-        if (cleanQuery.isBlank()) {
+        val query = SearchDialerItem.Matcher(query)
+        if (query.isBlank()) {
             SearchResults(
                 calls = logs.map { log ->
                     SearchDialerItem(
@@ -138,10 +160,8 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                 }.distinctBy { it.number }
             )
         } else {
-            val matchedContacts = contacts.filter { contact ->
-                contact.name.lowercase().contains(cleanQuery) ||
-                        contact.number.contains(cleanQuery) ||
-                        contact.name.toT9Digits().contains(cleanQuery)
+            val matchedContacts = contacts.filter {
+                query.match(it)
             }.map { fav ->
                 SearchDialerItem(
                     id = "fav_${fav.id}",
@@ -153,34 +173,23 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     callType = null,
                     isFavorite = true
                 )
-            }.sortedBy { contact -> // Prioritize contacts, whose name starts with query
-                contact.name.lowercase().indexOf(cleanQuery).takeIf { it >= 0 }
-                    ?: contact.name.toT9Digits().indexOf(cleanQuery).takeIf { it >= 0 }
-                    ?: Int.MAX_VALUE
-            }
+            }.sortedBy { query.order(it) }
 
-            val matchedLogs = logs.filter { log ->
-                (log.name?.lowercase()?.contains(cleanQuery) == true) ||
-                        log.number.contains(cleanQuery) ||
-                        (log.name != null && log.name.toT9Digits().contains(cleanQuery))
-            }.map { log ->
-                SearchDialerItem(
-                    id = "log_${log.id}",
-                    name = log.name ?: log.number,
-                    number = log.number,
-                    photoUri = log.photoUri,
-                    timestamp = log.timestamp,
-                    simSlot = log.simNumber,
-                    callType = log.type,
-                    isFavorite = contacts.any { it.number == log.number }
-                )
-            }
-                .distinctBy { it.number }
-                .sortedBy { contact -> // Prioritize contacts, whose name starts with query
-                    contact.name.lowercase().indexOf(cleanQuery).takeIf { it >= 0 }
-                        ?: contact.name.toT9Digits().indexOf(cleanQuery).takeIf { it >= 0 }
-                        ?: Int.MAX_VALUE
+            val matchedLogs = logs.filter { query.match(it) }
+                .map { log ->
+                    SearchDialerItem(
+                        id = "log_${log.id}",
+                        name = log.name ?: log.number,
+                        number = log.number,
+                        photoUri = log.photoUri,
+                        timestamp = log.timestamp,
+                        simSlot = log.simNumber,
+                        callType = log.type,
+                        isFavorite = contacts.any { it.number == log.number }
+                    )
                 }
+                .distinctBy { it.number }
+                .sortedBy { query.order(it) }
 
             val calledNumbers = matchedLogs.map { it.number }
 
@@ -621,8 +630,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                 favoritesRepository.addFavorite(contactWithTab)
             }
             _contactDetailToShow.update { state ->
-                if (state == null) null
-                else state.copy(
+                state?.copy(
                     contact = state.contact.copy(tabId = contactWithTab.tabId),
                     isFavorite = true
                 )
