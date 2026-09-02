@@ -77,6 +77,7 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.roundToInt
 
 private val timeFormatter = ThreadLocal.withInitial {
@@ -222,20 +223,6 @@ fun SwipeableCallLogCard(
                 .fillMaxSize()
                 .graphicsLayer { translationX = drawnOffset }
                 .pointerInput(item.id) {
-                    detectTapGestures(
-                        onLongPress = { offset: Offset ->
-                            if (kotlin.math.abs(drawnOffset) >= 2f) return@detectTapGestures
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                            menuPopupOffset = IntOffset(
-                                offset.x.roundToInt().coerceAtLeast(0),
-                                offset.y.roundToInt().coerceAtLeast(0)
-                            )
-                            showDeleteSubmenu = false
-                            menuExpanded = true
-                        }
-                    )
-                }
-                .pointerInput(item.id) {
                     detectHorizontalDragGestures(
                         onDragStart = { ensureSwipeActionsLoaded() },
                         onDragEnd = {
@@ -328,12 +315,25 @@ fun SwipeableCallLogCard(
                 Row(
                     modifier = Modifier
                         .weight(1f)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            enabled = onBodyClick != null && kotlin.math.abs(drawnOffset) < 2f
-                        ) {
-                            onBodyClick?.invoke(item)
+                        .pointerInput(item.id) {
+                            detectTapGestures(
+                                onTap = {
+                                    if (abs(drawnOffset) < 2f) {
+                                        onBodyClick?.invoke(item)
+                                    }
+                                },
+                                onLongPress = { offset: Offset ->
+                                    if (abs(drawnOffset) < 2f) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        menuPopupOffset = IntOffset(
+                                            offset.x.roundToInt().coerceAtLeast(0),
+                                            offset.y.roundToInt().coerceAtLeast(0)
+                                        )
+                                        showDeleteSubmenu = false
+                                        menuExpanded = true
+                                    }
+                                }
+                            )
                         },
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -368,108 +368,108 @@ fun SwipeableCallLogCard(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         maxLines = 1
                     )
-                }
-            }
-        }
 
-        if (menuExpanded) {
-            OneUiPopupMenu(
-                expanded = true,
-                onDismissRequest = { dismissMenu() },
-                pressOffset = menuPopupOffset,
-                preferBelowAnchor = false
-            ) {
-                if (!showDeleteSubmenu) {
-                    OneUiPopupMenuPainterItem(
-                        painter = painterResource(R.drawable.ic_sim1),
-                        label = "Вызов через SIM1",
-                        iconBackground = SamsungSmsBlue.copy(alpha = 0.12f),
-                        onClick = {
-                            dismissMenu()
-                            onCallWithSim(item.number, 1)
+                    if (menuExpanded) {
+                        OneUiPopupMenu(
+                            expanded = true,
+                            onDismissRequest = { dismissMenu() },
+                            pressOffset = menuPopupOffset,
+                            preferBelowAnchor = false
+                        ) {
+                            if (!showDeleteSubmenu) {
+                                OneUiPopupMenuPainterItem(
+                                    painter = painterResource(R.drawable.ic_sim1),
+                                    label = "Вызов через SIM1",
+                                    iconBackground = SamsungSmsBlue.copy(alpha = 0.12f),
+                                    onClick = {
+                                        dismissMenu()
+                                        onCallWithSim(item.number, 1)
+                                    }
+                                )
+                                OneUiPopupMenuPainterItem(
+                                    painter = painterResource(R.drawable.ic_sim2),
+                                    label = "Вызов через SIM2",
+                                    iconBackground = SamsungGreen.copy(alpha = 0.12f),
+                                    onClick = {
+                                        dismissMenu()
+                                        onCallWithSim(item.number, 2)
+                                    }
+                                )
+                                OneUiPopupMenuItem(
+                                    icon = Icons.Default.ContentCopy,
+                                    label = "Копировать номер",
+                                    onClick = {
+                                        dismissMenu()
+                                        copyNumberToClipboard(context, item.number)
+                                    }
+                                )
+                                OneUiPopupMenuItem(
+                                    icon = Icons.Default.Block,
+                                    label = "Заблокировать",
+                                    onClick = {
+                                        dismissMenu()
+                                        val ok = onBlockNumber(item)
+                                        Toast.makeText(
+                                            context,
+                                            if (ok) "Номер заблокирован" else "Не удалось заблокировать",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                )
+                                OneUiPopupMenuDivider()
+                                OneUiPopupMenuItem(
+                                    icon = Icons.Default.Delete,
+                                    label = "Удалить",
+                                    destructive = true,
+                                    onClick = { showDeleteSubmenu = true }
+                                )
+                            } else {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null,
+                                            onClick = { showDeleteSubmenu = false }
+                                        )
+                                        .padding(horizontal = 10.dp, vertical = 7.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = "Назад",
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = "Удалить",
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                                    )
+                                }
+                                OneUiPopupMenuDivider()
+                                OneUiPopupMenuItem(
+                                    icon = Icons.Default.Delete,
+                                    label = "Удалить 1 элемент",
+                                    onClick = {
+                                        dismissMenu()
+                                        onDeleteGroup(item)
+                                    }
+                                )
+                                OneUiPopupMenuItem(
+                                    icon = Icons.Default.Delete,
+                                    label = "Очистить контакт",
+                                    destructive = true,
+                                    onClick = {
+                                        dismissMenu()
+                                        onClearContactCalls(item)
+                                    }
+                                )
+                            }
                         }
-                    )
-                    OneUiPopupMenuPainterItem(
-                        painter = painterResource(R.drawable.ic_sim2),
-                        label = "Вызов через SIM2",
-                        iconBackground = SamsungGreen.copy(alpha = 0.12f),
-                        onClick = {
-                            dismissMenu()
-                            onCallWithSim(item.number, 2)
-                        }
-                    )
-                    OneUiPopupMenuItem(
-                        icon = Icons.Default.ContentCopy,
-                        label = "Копировать номер",
-                        onClick = {
-                            dismissMenu()
-                            copyNumberToClipboard(context, item.number)
-                        }
-                    )
-                    OneUiPopupMenuItem(
-                        icon = Icons.Default.Block,
-                        label = "Заблокировать",
-                        onClick = {
-                            dismissMenu()
-                            val ok = onBlockNumber(item)
-                            Toast.makeText(
-                                context,
-                                if (ok) "Номер заблокирован" else "Не удалось заблокировать",
-                                Toast.LENGTH_SHORT
-                            ).show()
-                        }
-                    )
-                    OneUiPopupMenuDivider()
-                    OneUiPopupMenuItem(
-                        icon = Icons.Default.Delete,
-                        label = "Удалить",
-                        destructive = true,
-                        onClick = { showDeleteSubmenu = true }
-                    )
-                } else {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                                onClick = { showDeleteSubmenu = false }
-                            )
-                            .padding(horizontal = 10.dp, vertical = 7.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Назад",
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(
-                            text = "Удалить",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-                        )
                     }
-                    OneUiPopupMenuDivider()
-                    OneUiPopupMenuItem(
-                        icon = Icons.Default.Delete,
-                        label = "Удалить 1 элемент",
-                        onClick = {
-                            dismissMenu()
-                            onDeleteGroup(item)
-                        }
-                    )
-                    OneUiPopupMenuItem(
-                        icon = Icons.Default.Delete,
-                        label = "Очистить контакт",
-                        destructive = true,
-                        onClick = {
-                            dismissMenu()
-                            onClearContactCalls(item)
-                        }
-                    )
                 }
             }
         }
