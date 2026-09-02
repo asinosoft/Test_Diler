@@ -105,6 +105,8 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     private val _rawCallLogs = MutableStateFlow<List<CallLogItem>>(emptyList())
 
+    val recentCalls: StateFlow<List<CallLogItem>> = _rawCallLogs
+
     private val _contacts = MutableStateFlow<List<SearchDialerItem>>(emptyList())
 
     private val _favorites = MutableStateFlow<List<FavoriteContact>>(emptyList())
@@ -153,9 +155,6 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     val unsavedNumberFlow: StateFlow<UnsavedNumberFlowState?> = _unsavedNumberFlow.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
-
-    private val _showOnlyMissed = MutableStateFlow(false)
-    val showOnlyMissed: StateFlow<Boolean> = _showOnlyMissed.asStateFlow()
 
     private val _hasLoadedCallLogs = MutableStateFlow(false)
     val hasLoadedCallLogs: StateFlow<Boolean> = _hasLoadedCallLogs.asStateFlow()
@@ -437,29 +436,6 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             cr.unregisterContentObserver(contactsObserver)
         } catch (_: Exception) {
             // ignore
-        }
-    }
-
-    val filteredCallLogs = combine(
-        _rawCallLogs,
-        _searchQuery,
-        _showOnlyMissed
-    ) { logs, query, missedOnly ->
-        logs.filter { item ->
-            val matchesQuery = if (query.isBlank()) {
-                true
-            } else {
-                (item.name?.contains(query, ignoreCase = true) == true) ||
-                        item.number.contains(query, ignoreCase = true)
-            }
-
-            val matchesFilter = if (missedOnly) {
-                item.type == CallType.MISSED || item.type == CallType.REJECTED
-            } else {
-                true
-            }
-
-            matchesQuery && matchesFilter
         }
     }
 
@@ -1047,10 +1023,6 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     fun closeContactDetail() {
         openContactDetailJob?.cancel()
         _contactDetailToShow.value = null
-    }
-
-    fun setShowOnlyMissed(missedOnly: Boolean) {
-        _showOnlyMissed.value = missedOnly
     }
 }
 

@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.telephony.SubscriptionManager
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -181,8 +180,6 @@ fun SearchDialerScreen(
     val keyboardController = LocalSoftwareKeyboardController.current
 
     BackHandler {
-        focusManager.clearFocus()
-        keyboardController?.hide()
         viewModel.setSearchQuery("")
         onClose()
     }
@@ -204,8 +201,7 @@ fun SearchDialerScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = {
-                    focusManager.clearFocus()
-                    keyboardController?.hide()
+                    viewModel.setSearchQuery("")
                     onClose()
                 }) {
                     Icon(
