@@ -2,6 +2,7 @@ package com.asinosoft.dialer.ui.recents
 
 import android.annotation.SuppressLint
 import android.text.format.DateUtils
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -50,6 +51,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -123,19 +125,7 @@ fun RecentsScreen(
     var initialScrollDone by remember { mutableStateOf(false) }
     var listReady by remember { mutableStateOf(false) }
 
-    // After a call, MainActivity resumes — pull newest CallLog entries immediately
-    val lifecycleOwner = LocalLifecycleOwner.current
-    DisposableEffect(lifecycleOwner, viewModel) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME &&
-                viewModel.hasLoadedCallLogs.value
-            ) {
-                viewModel.loadCallLogs(showLoading = false)
-            }
-        }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-    }
+    val listState = rememberLazyListState()
 
     var draggingContactId by remember { mutableStateOf<String?>(null) }
     var dragFromIndex by remember { mutableIntStateOf(-1) }
@@ -148,8 +138,6 @@ fun RecentsScreen(
     LaunchedEffect(isTopBarVisible) {
         if (isTopBarVisible) favoritesBoundsRef.value = Rect.Zero
     }
-
-    val listState = rememberLazyListState()
 
     val favoriteRows = remember(favorites) {
         if (favorites.isEmpty()) {
@@ -182,6 +170,28 @@ fun RecentsScreen(
     // LazyColumn item index corresponding to target favorite row
     val initialItemIndex = remember(targetGridRowIndex) {
         1 + targetGridRowIndex
+    }
+
+    val initialItemIndexState = rememberUpdatedState(initialItemIndex)
+    val listStateRef = rememberUpdatedState(listState)
+
+    // After a call, MainActivity resumes — pull newest CallLog entries immediately; on stop reset scroll
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME &&
+                viewModel.hasLoadedCallLogs.value
+            ) {
+                viewModel.loadCallLogs(showLoading = false)
+            }
+            if (event == Lifecycle.Event.ON_STOP) {
+                coroutineScope.launch {
+                    listStateRef.value.scrollToItem(initialItemIndexState.value, 0)
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
     // Position list once; prefetch avatars first so first frames don't decode mid-scroll
@@ -247,13 +257,19 @@ fun RecentsScreen(
             }
     }
 
-    // Handle system Back button: return to initial startup scroll position if scrolled far
-    val isScrolledAway = listState.firstVisibleItemIndex > initialItemIndex ||
-            (listState.firstVisibleItemIndex == initialItemIndex && listState.firstVisibleItemScrollOffset > 0)
+    // Handle system Back button: return to initial startup scroll position if scrolled at least 1 row away (above or below)
+    val isScrolledAway = listState.firstVisibleItemIndex != initialItemIndex
 
-    BackHandler(enabled = isScrolledAway) {
-        coroutineScope.launch {
-            listState.animateScrollToItem(initialItemIndex, 0)
+    BackHandler {
+        if (isScrolledAway) {
+            coroutineScope.launch {
+                listState.animateScrollToItem(initialItemIndex, 0)
+            }
+        } else {
+            coroutineScope.launch {
+                listState.scrollToItem(initialItemIndex, 0)
+            }
+            (context as? ComponentActivity)?.finish()
         }
     }
 
