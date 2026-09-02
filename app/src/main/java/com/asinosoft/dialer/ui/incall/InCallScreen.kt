@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -72,18 +71,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import com.asinosoft.dialer.service.CallManager
 import com.asinosoft.dialer.ui.components.SimIcon
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OneUIBgDark
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.ui.theme.SamsungSmsBlue
-import com.asinosoft.dialer.util.formatPhoneNumber
+import com.asinosoft.dialer.util.PhoneNumberHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.util.Locale
-import androidx.core.net.toUri
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
@@ -259,7 +258,7 @@ fun InCallScreen(
                 val formattedName = contactName ?: if (displayName.isBlank()) {
                     "Неизвестный номер"
                 } else if (displayName == rawNumber) {
-                    formatPhoneNumber(displayName)
+                    PhoneNumberHelper.format(displayName)
                 } else {
                     displayName
                 }
@@ -276,7 +275,7 @@ fun InCallScreen(
                 if (rawNumber.isNotBlank() && (contactName != null || displayName != rawNumber)) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = formatPhoneNumber(rawNumber),
+                        text = PhoneNumberHelper.format(rawNumber),
                         fontSize = 16.sp,
                         color = Color.White.copy(alpha = 0.7f),
                         textAlign = TextAlign.Center

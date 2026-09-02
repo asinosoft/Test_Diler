@@ -23,7 +23,7 @@ import com.asinosoft.dialer.MainActivity
 import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.CallState
 import com.asinosoft.dialer.ui.incall.InCallActivity
-import com.asinosoft.dialer.util.formatPhoneNumber
+import com.asinosoft.dialer.util.PhoneNumberHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -112,7 +112,7 @@ class NotificationManager(val service: Service) {
                 }
             }
 
-            val callerName = contactName ?: call.displayName.ifBlank { formatPhoneNumber(call.rawNumber) }
+            val callerName = contactName ?: call.displayName.ifBlank { PhoneNumberHelper.format(call.rawNumber) }
 
             val callerPerson = Person.Builder()
                 .setName(callerName)
@@ -270,7 +270,7 @@ class NotificationManager(val service: Service) {
                 notificationManager.createNotificationChannel(channel)
             }
 
-            val formattedNumber = formatPhoneNumber(rawNumber)
+            val formattedNumber = PhoneNumberHelper.format(rawNumber)
             val title = "Пропущенный вызов"
             val contactDisplayName = contactName ?: formattedNumber
 

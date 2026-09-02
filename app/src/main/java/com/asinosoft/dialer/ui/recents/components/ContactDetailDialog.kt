@@ -148,7 +148,7 @@ import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.ui.theme.SamsungSmsBlue
-import com.asinosoft.dialer.util.formatPhoneNumber
+import com.asinosoft.dialer.util.PhoneNumberHelper
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.Dispatchers
@@ -1004,7 +1004,7 @@ private fun ContactTabContent(
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = formatPhoneNumber(phoneItem.number),
+                                text = PhoneNumberHelper.format(phoneItem.number),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -1245,7 +1245,7 @@ private fun ContactTabContent(
                                 }
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(
+                                    text = if (messenger.isCustomLink) messenger.accountDetail else PhoneNumberHelper.format(
                                         messenger.accountDetail
                                     ),
                                     fontSize = 15.sp,
@@ -1787,7 +1787,7 @@ private fun HistoryCallRow(item: CallLogItem) {
                     SimIcon(simNumber = item.simNumber, size = 12.dp)
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = formatPhoneNumber(item.number),
+                        text = PhoneNumberHelper.format(item.number),
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
@@ -3780,7 +3780,7 @@ private fun SwipeActionPickerDialog(
                                     )
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = formatPhoneNumber(phoneItem.number),
+                                        text = PhoneNumberHelper.format(phoneItem.number),
                                         fontSize = 15.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
@@ -3797,7 +3797,7 @@ private fun SwipeActionPickerDialog(
                                                         actionType = "call_sim1",
                                                         targetValue = phoneItem.number,
                                                         label = "Вызов SIM 1 (${
-                                                            formatPhoneNumber(
+                                                            PhoneNumberHelper.format(
                                                                 phoneItem.number
                                                             )
                                                         })"
@@ -3837,7 +3837,7 @@ private fun SwipeActionPickerDialog(
                                                         actionType = "call_sim2",
                                                         targetValue = phoneItem.number,
                                                         label = "Вызов SIM 2 (${
-                                                            formatPhoneNumber(
+                                                            PhoneNumberHelper.format(
                                                                 phoneItem.number
                                                             )
                                                         })"
@@ -3877,7 +3877,7 @@ private fun SwipeActionPickerDialog(
                                                         actionType = "call_single",
                                                         targetValue = phoneItem.number,
                                                         label = "Вызов (${
-                                                            formatPhoneNumber(
+                                                            PhoneNumberHelper.format(
                                                                 phoneItem.number
                                                             )
                                                         })"
@@ -3905,7 +3905,7 @@ private fun SwipeActionPickerDialog(
                                                 CustomSwipeAction(
                                                     actionType = "sms",
                                                     targetValue = phoneItem.number,
-                                                    label = "SMS (${formatPhoneNumber(phoneItem.number)})"
+                                                    label = "SMS (${PhoneNumberHelper.format(phoneItem.number)})"
                                                 )
                                             )
                                         },
@@ -3993,7 +3993,7 @@ private fun SwipeActionPickerDialog(
                                     }
                                     Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(
+                                        text = if (messenger.isCustomLink) messenger.accountDetail else PhoneNumberHelper.format(
                                             messenger.accountDetail
                                         ),
                                         fontSize = 15.sp,
@@ -5249,7 +5249,7 @@ private fun EditContactDialog(
                                             color = if (isHidden) Color.Gray else messenger.brandColor
                                         )
                                         Text(
-                                            text = if (messenger.isCustomLink) messenger.accountDetail else formatPhoneNumber(
+                                            text = if (messenger.isCustomLink) messenger.accountDetail else PhoneNumberHelper.format(
                                                 messenger.accountDetail
                                             ),
                                             fontSize = 11.sp,

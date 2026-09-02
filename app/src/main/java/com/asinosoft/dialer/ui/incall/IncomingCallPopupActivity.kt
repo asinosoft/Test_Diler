@@ -15,7 +15,6 @@ import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,7 +24,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -56,21 +54,18 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.PlatformTextStyle
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
-import com.asinosoft.dialer.service.CallManager
 import com.asinosoft.dialer.data.model.CallState
+import com.asinosoft.dialer.service.CallManager
 import com.asinosoft.dialer.ui.components.SimIcon
 import com.asinosoft.dialer.ui.theme.DialerTheme
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.SamsungGreen
-import com.asinosoft.dialer.ui.theme.SamsungSmsBlue
-import com.asinosoft.dialer.util.formatPhoneNumber
+import com.asinosoft.dialer.util.PhoneNumberHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -313,7 +308,7 @@ private fun IncomingCallPopupScreen(
                         Spacer(modifier = Modifier.height(2.dp))
 
                         Text(
-                            text = formatPhoneNumber(call.rawNumber),
+                            text = PhoneNumberHelper.format(call.rawNumber),
                             fontSize = 15.sp,
                             color = Color.Black.copy(alpha = 0.65f),
                             maxLines = 1,

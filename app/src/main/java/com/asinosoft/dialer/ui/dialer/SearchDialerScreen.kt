@@ -110,7 +110,7 @@ import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.ui.theme.SamsungSmsBlue
-import com.asinosoft.dialer.util.formatPhoneNumber
+import com.asinosoft.dialer.util.PhoneNumberHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -881,7 +881,7 @@ fun SwipeableSearchDialerCard(
 
                         Text(
                             text = buildHighlightedText(
-                                text = formatPhoneNumber(item.number),
+                                text = PhoneNumberHelper.format(item.number),
                                 query = query,
                                 highlightColor = SamsungGreen
                             ),

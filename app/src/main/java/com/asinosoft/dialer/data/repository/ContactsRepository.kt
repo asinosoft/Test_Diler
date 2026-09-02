@@ -11,6 +11,7 @@ import androidx.compose.ui.text.intl.Locale
 import androidx.core.net.toUri
 import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.ui.recents.SearchDialerItem
+import com.asinosoft.dialer.util.PhoneNumberHelper
 
 data class ContactMessengerAction(
     val id: String,
@@ -96,9 +97,7 @@ class ContactsRepository(private val context: Context) {
                 ContactsContract.RawContacts.ACCOUNT_TYPE,
                 ContactsContract.Data.MIMETYPE,
                 ContactsContract.Data.DATA1,
-                ContactsContract.Data.DATA2,
                 ContactsContract.Data.DATA3,
-                ContactsContract.Data.DATA4,
             ),
             "${ContactsContract.Data.CONTACT_ID} == $contactId",
             null,
@@ -112,7 +111,6 @@ class ContactsRepository(private val context: Context) {
             val cPkg = cursor.getColumnIndex(ContactsContract.RawContacts.ACCOUNT_TYPE)
             val cMimeType = cursor.getColumnIndex(ContactsContract.Data.MIMETYPE)
             val c1 = cursor.getColumnIndex(ContactsContract.Data.DATA1)
-            val c2 = cursor.getColumnIndex(ContactsContract.Data.DATA2)
             val c3 = cursor.getColumnIndex(ContactsContract.Data.DATA3)
 
             while (cursor.moveToNext()) {
@@ -120,7 +118,6 @@ class ContactsRepository(private val context: Context) {
                 val pkg = cursor.getString(cPkg)
                 val mimetype = cursor.getString(cMimeType)
                 val data1 = cursor.getString(c1)
-                val data2 = cursor.getString(c2)
                 val data3 = cursor.getString(c3)
                 val app = pkg.substringAfter('.').substringBefore('.')
 
@@ -129,7 +126,9 @@ class ContactsRepository(private val context: Context) {
                     id = key,
                     packageName = pkg,
                     messengerName = app.capitalize(Locale.current),
-                    accountDetail = data1 ?: data2 ?: data3 ?: pkg,
+                    accountDetail =
+                        data3?.let { PhoneNumberHelper.parse(it) ?: it }
+                            ?: "",
                     brandColor = colors.getOrDefault(app, Color.Red),
                     chatIntent = null,
                 )

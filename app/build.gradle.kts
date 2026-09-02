@@ -10,7 +10,7 @@ android {
     defaultConfig {
         applicationId = "com.asinosoft.dialer"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
 
@@ -47,10 +47,11 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.ktx)
 
     // CameraX & ML Kit Barcode Scanning for QR
-    implementation("androidx.camera:camera-camera2:1.4.1")
-    implementation("androidx.camera:camera-lifecycle:1.4.1")
-    implementation("androidx.camera:camera-view:1.4.1")
-    implementation("com.google.mlkit:barcode-scanning:17.3.0")
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
+    implementation(libs.barcode.scanning)
+    implementation(libs.libphonenumber)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

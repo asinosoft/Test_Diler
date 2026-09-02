@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -73,7 +72,7 @@ import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.ui.theme.SamsungSmsBlue
-import com.asinosoft.dialer.util.formatPhoneNumber
+import com.asinosoft.dialer.util.PhoneNumberHelper
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -142,7 +141,7 @@ fun SwipeableCallLogCard(
         showDeleteSubmenu = false
     }
 
-    val formattedNumber = remember(item.number) { formatPhoneNumber(item.number) }
+    val formattedNumber = remember(item.number) { PhoneNumberHelper.format(item.number) }
     val displayName = remember(item.name, item.number, item.count, formattedNumber) {
         val baseName = item.name ?: formattedNumber
         if (item.count > 1) "$baseName (${item.count})" else baseName
