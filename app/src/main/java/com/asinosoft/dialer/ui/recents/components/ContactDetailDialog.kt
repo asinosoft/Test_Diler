@@ -2364,9 +2364,11 @@ private fun SettingsTabContent(
                 onActionSelected = { action ->
                     swipeRightAction = action
                     saveCustomSwipeAction(
-                        context,
-                        contactKey,
-                        contact.number,
+                        context = context,
+                        contactKey = contactKey,
+                        contactNumber = contact.number,
+                        contactName = contact.name,
+                        allPhoneNumbers = phoneNumbersList.map { it.number },
                         isRight = true,
                         action = action
                     )
@@ -2388,9 +2390,11 @@ private fun SettingsTabContent(
                 onActionSelected = { action ->
                     swipeLeftAction = action
                     saveCustomSwipeAction(
-                        context,
-                        contactKey,
-                        contact.number,
+                        context = context,
+                        contactKey = contactKey,
+                        contactNumber = contact.number,
+                        contactName = contact.name,
+                        allPhoneNumbers = phoneNumbersList.map { it.number },
                         isRight = false,
                         action = action
                     )
@@ -3510,6 +3514,8 @@ private fun saveCustomSwipeAction(
     context: Context,
     contactKey: String,
     contactNumber: String,
+    contactName: String? = null,
+    allPhoneNumbers: List<String> = emptyList(),
     isRight: Boolean,
     action: CustomSwipeAction?
 ) {
@@ -3517,11 +3523,27 @@ private fun saveCustomSwipeAction(
         SwipeActionCache.clear()
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
         val keySuffix = if (isRight) "swipe_right_" else "swipe_left_"
-        val cleanNum = digitsOnlyPhoneFast(contactNumber)
+
+        val keysToUpdate = mutableSetOf<String>()
+        if (contactKey.isNotBlank()) keysToUpdate.add(keySuffix + contactKey)
+        if (!contactName.isNullOrBlank()) keysToUpdate.add(keySuffix + contactName.trim())
+
+        val numbers = (allPhoneNumbers + contactNumber).filter { it.isNotBlank() }.distinct()
+        for (num in numbers) {
+            keysToUpdate.add(keySuffix + num.trim())
+            val withPlus = digitsOnlyPhoneFast(num, keepPlus = true)
+            val noPlus = digitsOnlyPhoneFast(num, keepPlus = false)
+            if (withPlus.isNotBlank()) keysToUpdate.add(keySuffix + withPlus)
+            if (noPlus.isNotBlank()) keysToUpdate.add(keySuffix + noPlus)
+            if (noPlus.length >= 10) keysToUpdate.add(keySuffix + noPlus.takeLast(10))
+            if (noPlus.length >= 7) keysToUpdate.add(keySuffix + noPlus.takeLast(7))
+        }
 
         if (action == null) {
-            prefs.edit { remove(keySuffix + contactKey) }
-            if (cleanNum.isNotBlank()) prefs.edit { remove(keySuffix + cleanNum) }
+            prefs.edit {
+                keysToUpdate.forEach { remove(it) }
+            }
+            SwipeActionCache.clear()
             return
         }
 
@@ -3534,11 +3556,9 @@ private fun saveCustomSwipeAction(
         }
 
         prefs.edit {
-            putString(keySuffix + contactKey, obj.toString())
-            if (cleanNum.isNotBlank()) {
-                putString(keySuffix + cleanNum, obj.toString())
-            }
+            keysToUpdate.forEach { putString(it, obj.toString()) }
         }
+        SwipeActionCache.clear()
     } catch (e: Exception) {
         e.printStackTrace()
     }
@@ -3578,14 +3598,40 @@ private fun digitsOnlyPhoneFast(number: String, keepPlus: Boolean = true): Strin
     return sb.toString()
 }
 
+private fun lookupSystemContactId(context: Context, phoneNumber: String): String? {
+    if (phoneNumber.isBlank()) return null
+    try {
+        val uri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(phoneNumber)
+        )
+        context.contentResolver.query(
+            uri,
+            arrayOf(ContactsContract.PhoneLookup._ID),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val idIndex = cursor.getColumnIndex(ContactsContract.PhoneLookup._ID)
+                if (idIndex != -1) return cursor.getString(idIndex)
+            }
+        }
+    } catch (_: Exception) {
+        // ignore
+    }
+    return null
+}
+
 fun getCustomSwipeAction(
     context: Context,
     contactKey: String,
     isRight: Boolean,
-    fallbackNumber: String? = null
+    fallbackNumber: String? = null,
+    contactName: String? = null
 ): CustomSwipeAction? {
     val keySuffix = if (isRight) "swipe_right_" else "swipe_left_"
-    val cacheKey = "$keySuffix|$contactKey|${fallbackNumber.orEmpty()}"
+    val cacheKey = "$keySuffix|$contactKey|${fallbackNumber.orEmpty()}|${contactName.orEmpty()}"
     if (SwipeActionCache.contains(cacheKey)) {
         return SwipeActionCache.get(cacheKey)
     }
@@ -3593,35 +3639,44 @@ fun getCustomSwipeAction(
     try {
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
 
-        // 1. Try with contactKey directly
-        var jsonString = prefs.getString(keySuffix + contactKey, null)
+        // 1. Direct match candidates
+        val candidates = mutableListOf<String>()
+        if (contactKey.isNotBlank()) candidates.add(contactKey.trim())
+        if (!contactName.isNullOrBlank()) candidates.add(contactName.trim())
 
-        // 2. Try with raw fallbackNumber directly
-        if (jsonString.isNullOrEmpty() && !fallbackNumber.isNullOrBlank()) {
-            jsonString = prefs.getString(keySuffix + fallbackNumber, null)
-        }
-
-        // 3. Try with clean fallbackNumber (with and without plus)
-        if (jsonString.isNullOrEmpty() && !fallbackNumber.isNullOrBlank()) {
-            val cleanNumNoPlus = digitsOnlyPhoneFast(fallbackNumber, keepPlus = false)
-            val cleanNumWithPlus = digitsOnlyPhoneFast(fallbackNumber, keepPlus = true)
-            if (cleanNumNoPlus.isNotBlank()) {
-                jsonString = prefs.getString(keySuffix + cleanNumNoPlus, null)
-                    ?: prefs.getString(keySuffix + cleanNumWithPlus, null)
+        val numbersToProcess = listOfNotNull(fallbackNumber, contactKey).filter { it.isNotBlank() }
+        for (num in numbersToProcess) {
+            candidates.add(num.trim())
+            val withPlus = digitsOnlyPhoneFast(num, keepPlus = true)
+            val noPlus = digitsOnlyPhoneFast(num, keepPlus = false)
+            if (withPlus.isNotBlank()) candidates.add(withPlus)
+            if (noPlus.isNotBlank()) candidates.add(noPlus)
+            if (noPlus.length >= 10) candidates.add(noPlus.takeLast(10))
+            if (noPlus.length >= 7) candidates.add(noPlus.takeLast(7))
+            if (noPlus.length == 11 && (noPlus.startsWith("7") || noPlus.startsWith("8"))) {
+                candidates.add(noPlus.substring(1))
             }
         }
 
-        // 4. Try with clean contactKey (with and without plus)
-        if (jsonString.isNullOrEmpty() && contactKey.isNotBlank()) {
-            val cleanKeyNoPlus = digitsOnlyPhoneFast(contactKey, keepPlus = false)
-            val cleanKeyWithPlus = digitsOnlyPhoneFast(contactKey, keepPlus = true)
-            if (cleanKeyNoPlus.isNotBlank()) {
-                jsonString = prefs.getString(keySuffix + cleanKeyNoPlus, null)
-                    ?: prefs.getString(keySuffix + cleanKeyWithPlus, null)
+        var jsonString: String? = null
+        for (cand in candidates.distinct()) {
+            jsonString = prefs.getString(keySuffix + cand, null)
+            if (!jsonString.isNullOrEmpty()) break
+        }
+
+        // 2. Lookup by system Contact ID
+        if (jsonString.isNullOrEmpty()) {
+            val phoneForLookup = fallbackNumber?.takeIf { it.isNotBlank() }
+                ?: contactKey.takeIf { it.any { c -> c.isDigit() } }
+            if (!phoneForLookup.isNullOrBlank()) {
+                val systemContactId = lookupSystemContactId(context, phoneForLookup)
+                if (!systemContactId.isNullOrBlank()) {
+                    jsonString = prefs.getString(keySuffix + systemContactId, null)
+                }
             }
         }
 
-        // 5. Fallback: match by last 7 digits of phone number across all saved keys
+        // 3. Fallback: match across all keys by last 7 digits
         if (jsonString.isNullOrEmpty()) {
             val searchNum = digitsOnlyPhoneFast(
                 if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey,
@@ -3636,6 +3691,38 @@ fun getCustomSwipeAction(
                         jsonString = prefs.getString(k, null)
                         if (!jsonString.isNullOrEmpty()) break
                     }
+                }
+            }
+        }
+
+        // 4. Deep Match: search inside all saved actions by targetValue phone number or contact name
+        if (jsonString.isNullOrEmpty()) {
+            val searchNum = digitsOnlyPhoneFast(
+                if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey,
+                keepPlus = false
+            )
+            val searchLast7 = if (searchNum.length >= 7) searchNum.takeLast(7) else ""
+            val searchName = contactName?.trim()?.lowercase().orEmpty()
+
+            val allEntries = prefs.all
+            for ((key, value) in allEntries) {
+                if (!key.startsWith(keySuffix)) continue
+                val str = value as? String ?: continue
+                try {
+                    val obj = JSONObject(str)
+                    val targetValue = obj.optString("targetValue")
+                    val cleanTarget = digitsOnlyPhoneFast(targetValue, keepPlus = false)
+                    if (searchLast7.isNotBlank() && cleanTarget.length >= 7 && cleanTarget.takeLast(7) == searchLast7) {
+                        jsonString = str
+                        break
+                    }
+                    val keyWithoutPrefix = key.removePrefix(keySuffix).trim().lowercase()
+                    if (searchName.isNotBlank() && keyWithoutPrefix == searchName) {
+                        jsonString = str
+                        break
+                    }
+                } catch (_: Exception) {
+                    // ignore
                 }
             }
         }

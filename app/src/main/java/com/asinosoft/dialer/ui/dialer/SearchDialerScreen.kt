@@ -98,6 +98,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import com.asinosoft.dialer.data.model.CallType
+import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.ui.components.Header
 import com.asinosoft.dialer.ui.recents.RecentsViewModel
 import com.asinosoft.dialer.ui.recents.SearchDialerItem
@@ -317,7 +318,16 @@ fun SearchDialerScreen(
                                         query = searchQuery.text.toString(),
                                         selectedSimSlot = selectedSimSlot,
                                         onCall = onCall,
-                                        onSms = onSms
+                                        onSms = onSms,
+                                        onCardClick = { clickedItem ->
+                                            val contact = FavoriteContact(
+                                                id = clickedItem.id,
+                                                name = clickedItem.name ?: clickedItem.number,
+                                                number = clickedItem.number,
+                                                photoUri = clickedItem.photoUri
+                                            )
+                                            viewModel.openContactDetail(contact, initialTab = 0)
+                                        }
                                     )
                                 }
                             }
@@ -335,7 +345,16 @@ fun SearchDialerScreen(
                                         query = searchQuery.text.toString(),
                                         selectedSimSlot = selectedSimSlot,
                                         onCall = onCall,
-                                        onSms = onSms
+                                        onSms = onSms,
+                                        onCardClick = { clickedItem ->
+                                            val contact = FavoriteContact(
+                                                id = clickedItem.id,
+                                                name = clickedItem.name ?: clickedItem.number,
+                                                number = clickedItem.number,
+                                                photoUri = clickedItem.photoUri
+                                            )
+                                            viewModel.openContactDetail(contact, initialTab = 0)
+                                        }
                                     )
                                 }
                             }
@@ -606,7 +625,8 @@ fun SwipeableSearchDialerCard(
     query: String,
     selectedSimSlot: Int,
     onCall: (String, Int?) -> Unit,
-    onSms: (String) -> Unit
+    onSms: (String) -> Unit,
+    onCardClick: (SearchDialerItem) -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
@@ -645,12 +665,24 @@ fun SwipeableSearchDialerCard(
         val currentOffset = offsetX.value
 
         val customRightAction = if (currentOffset > 0f) {
-            getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = item.number)
+            getCustomSwipeAction(
+                context,
+                contactKey,
+                isRight = true,
+                fallbackNumber = item.number,
+                contactName = item.name
+            )
         } else null
         val rightVisuals = getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true)
 
         val customLeftAction = if (currentOffset < 0f) {
-            getCustomSwipeAction(context, contactKey, isRight = false, fallbackNumber = item.number)
+            getCustomSwipeAction(
+                context,
+                contactKey,
+                isRight = false,
+                fallbackNumber = item.number,
+                contactName = item.name
+            )
         } else null
         val leftVisuals = getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false)
 
@@ -718,16 +750,7 @@ fun SwipeableSearchDialerCard(
                 .pointerInput(item.id) {
                     detectTapGestures(
                         onTap = {
-                            if (customRightAction != null) {
-                                executeCustomSwipeAction(
-                                    context,
-                                    customRightAction,
-                                    { num, sim -> onCall(num, sim) },
-                                    onSms
-                                )
-                            } else {
-                                onCall(item.number, selectedSimSlot)
-                            }
+                            onCardClick(item)
                         }
                     )
                 }

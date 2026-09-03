@@ -156,7 +156,8 @@ fun FavoriteContactCard(
                                             context,
                                             contactKey,
                                             isRight = true,
-                                            fallbackNumber = contact.number
+                                            fallbackNumber = contact.number,
+                                            contactName = contact.name
                                         )
                                         if (customAction != null) {
                                             executeCustomSwipeAction(
@@ -173,7 +174,8 @@ fun FavoriteContactCard(
                                             context,
                                             contactKey,
                                             isRight = false,
-                                            fallbackNumber = contact.number
+                                            fallbackNumber = contact.number,
+                                            contactName = contact.name
                                         )
                                         if (customAction != null) {
                                             executeCustomSwipeAction(

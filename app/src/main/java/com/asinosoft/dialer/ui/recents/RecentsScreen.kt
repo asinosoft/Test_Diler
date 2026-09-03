@@ -856,39 +856,37 @@ fun RecentsScreen(
             }
         }
 
-        // Contact Detail Bottom Sheet Dialog (only render if search dialer is closed)
-        if (!isSearchDialerOpen) {
-            contactDetailToShow?.let { detailState ->
-                ContactDetailDialog(
-                    contact = detailState.contact,
-                    initialTab = detailState.initialTab,
-                    isFavorite = detailState.isFavorite,
-                    tabs = tabs,
-                    onDismiss = { viewModel.closeContactDetail() },
-                    onCall = onCall,
-                    onSms = onSms,
-                    onRemoveFavorite = { viewModel.removeFavorite(it) },
-                    onToggleFavorite = { contact, favorite ->
-                        viewModel.setContactFavorite(contact, favorite)
-                    },
-                    onUpdateContact = { viewModel.updateFavorite(it) },
-                    onSaveEditedContact = { original, updated, phones, emails, birthday, photo ->
-                        viewModel.saveEditedContact(
-                            original = original,
-                            updated = updated,
-                            phones = phones,
-                            emails = emails,
-                            birthdayDateString = birthday,
-                            photoBitmap = photo
-                        )
-                    },
-                    onDeleteContact = { viewModel.deleteContact(it) },
-                    onAddTab = { name ->
-                        viewModel.addTab(name)
-                        viewModel.tabs.value.lastOrNull() ?: FavoriteTab("default", name)
-                    }
-                )
-            }
+        // Contact Detail Dialog
+        contactDetailToShow?.let { detailState ->
+            ContactDetailDialog(
+                contact = detailState.contact,
+                initialTab = detailState.initialTab,
+                isFavorite = detailState.isFavorite,
+                tabs = tabs,
+                onDismiss = { viewModel.closeContactDetail() },
+                onCall = onCall,
+                onSms = onSms,
+                onRemoveFavorite = { viewModel.removeFavorite(it) },
+                onToggleFavorite = { contact, favorite ->
+                    viewModel.setContactFavorite(contact, favorite)
+                },
+                onUpdateContact = { viewModel.updateFavorite(it) },
+                onSaveEditedContact = { original, updated, phones, emails, birthday, photo ->
+                    viewModel.saveEditedContact(
+                        original = original,
+                        updated = updated,
+                        phones = phones,
+                        emails = emails,
+                        birthdayDateString = birthday,
+                        photoBitmap = photo
+                    )
+                },
+                onDeleteContact = { viewModel.deleteContact(it) },
+                onAddTab = { name ->
+                    viewModel.addTab(name)
+                    viewModel.tabs.value.lastOrNull() ?: FavoriteTab("default", name)
+                }
+            )
         }
 
         // Call Log Filter Dialog

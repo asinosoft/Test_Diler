@@ -113,33 +113,35 @@ fun SwipeableCallLogCard(
     var showDeleteSubmenu by remember { mutableStateOf(false) }
     var menuPopupOffset by remember { mutableStateOf(IntOffset.Zero) }
 
-    val contactKey = remember(item.id, item.number) {
-        item.id.ifBlank { digitsOnlyPhone(item.number) }
+    val contactKey = remember(item.name, item.number) {
+        item.name?.ifBlank { item.number } ?: item.number
     }
-
-    // Defaults only at compose — SharedPreferences loaded on first drag (avoids scroll jank)
-    var rightVisuals by remember {
-        mutableStateOf(getSwipeBackgroundVisuals(null, defaultIsRight = true))
-    }
-    var leftVisuals by remember {
-        mutableStateOf(getSwipeBackgroundVisuals(null, defaultIsRight = false))
-    }
-    var customRightAction by remember { mutableStateOf<CustomSwipeAction?>(null) }
-    var customLeftAction by remember { mutableStateOf<CustomSwipeAction?>(null) }
-    var swipeActionsLoaded by remember(contactKey) { mutableStateOf(false) }
 
     val cacheCleared by SwipeActionCache.lastChangedAt.collectAsState()
-    LaunchedEffect(cacheCleared) { swipeActionsLoaded = false }
 
-    fun ensureSwipeActionsLoaded() {
-        if (swipeActionsLoaded) return
-        swipeActionsLoaded = true
-        customRightAction =
-            getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = item.number)
-        customLeftAction =
-            getCustomSwipeAction(context, contactKey, isRight = false, fallbackNumber = item.number)
-        rightVisuals = getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true)
-        leftVisuals = getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false)
+    val customRightAction = remember(contactKey, item.number, item.name, cacheCleared) {
+        getCustomSwipeAction(
+            context,
+            contactKey,
+            isRight = true,
+            fallbackNumber = item.number,
+            contactName = item.name
+        )
+    }
+    val customLeftAction = remember(contactKey, item.number, item.name, cacheCleared) {
+        getCustomSwipeAction(
+            context,
+            contactKey,
+            isRight = false,
+            fallbackNumber = item.number,
+            contactName = item.name
+        )
+    }
+    val rightVisuals = remember(customRightAction) {
+        getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true)
+    }
+    val leftVisuals = remember(customLeftAction) {
+        getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false)
     }
 
     fun dismissMenu() {
@@ -229,17 +231,29 @@ fun SwipeableCallLogCard(
                 .graphicsLayer { translationX = drawnOffset }
                 .pointerInput(item.id) {
                     detectHorizontalDragGestures(
-                        onDragStart = { ensureSwipeActionsLoaded() },
+                        onDragStart = { },
                         onDragEnd = {
                             coroutineScope.launch {
                                 val finalOffset = drawnOffset
-                                ensureSwipeActionsLoaded()
+                                val rAction = getCustomSwipeAction(
+                                    context,
+                                    contactKey,
+                                    isRight = true,
+                                    fallbackNumber = item.number,
+                                    contactName = item.name
+                                )
+                                val lAction = getCustomSwipeAction(
+                                    context,
+                                    contactKey,
+                                    isRight = false,
+                                    fallbackNumber = item.number,
+                                    contactName = item.name
+                                )
                                 if (finalOffset > thresholdPx) {
-                                    val action = customRightAction
-                                    if (action != null) {
+                                    if (rAction != null) {
                                         executeCustomSwipeAction(
                                             context,
-                                            action,
+                                            rAction,
                                             { num, _ -> onCall(num) },
                                             onSms
                                         )
@@ -247,11 +261,10 @@ fun SwipeableCallLogCard(
                                         onCall(item.number)
                                     }
                                 } else if (finalOffset < -thresholdPx) {
-                                    val action = customLeftAction
-                                    if (action != null) {
+                                    if (lAction != null) {
                                         executeCustomSwipeAction(
                                             context,
-                                            action,
+                                            lAction,
                                             { num, _ -> onCall(num) },
                                             onSms
                                         )
