@@ -1,12 +1,15 @@
 package com.asinosoft.dialer
 
 import android.Manifest
+import android.app.NotificationManager
 import android.app.role.RoleManager
+import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.provider.CallLog
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
 import android.telephony.SubscriptionManager
@@ -16,6 +19,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import com.asinosoft.dialer.service.MissedCallNotificationListener
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -129,6 +133,53 @@ class MainActivity : ComponentActivity() {
                     )
                 }
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        clearMissedCallNotifications()
+    }
+
+    private fun clearMissedCallNotifications() {
+        try {
+            // 1. Cancel own app's notifications (missed calls, etc.)
+            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as? NotificationManager
+            notificationManager?.cancelAll()
+        } catch (_: Exception) {
+        }
+
+        try {
+            // 2. Cancel Telecom system missed call notification
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val telecomManager = getSystemService(TELECOM_SERVICE) as? TelecomManager
+                @Suppress("MissingPermission")
+                telecomManager?.cancelMissedCallsNotification()
+            }
+        } catch (_: Exception) {
+        }
+
+        try {
+            // 3. Cancel through MissedCallNotificationListener if active
+            MissedCallNotificationListener.cancelActiveIfConnected()
+        } catch (_: Exception) {
+        }
+
+        try {
+            // 4. Mark missed calls as read/seen in CallLog
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_CALL_LOG) == PackageManager.PERMISSION_GRANTED) {
+                val values = ContentValues().apply {
+                    put(CallLog.Calls.NEW, 0)
+                    put(CallLog.Calls.IS_READ, 1)
+                }
+                contentResolver.update(
+                    CallLog.Calls.CONTENT_URI,
+                    values,
+                    "${CallLog.Calls.TYPE} = ? AND ${CallLog.Calls.NEW} = 1",
+                    arrayOf(CallLog.Calls.MISSED_TYPE.toString())
+                )
+            }
+        } catch (_: Exception) {
         }
     }
 
