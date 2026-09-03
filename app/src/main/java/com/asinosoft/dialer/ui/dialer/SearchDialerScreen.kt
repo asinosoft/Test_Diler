@@ -922,15 +922,15 @@ private fun buildHighlightedText(
     }
 
     // 2. T9 digit sequence match
-    val t9Digits = text.toT9Digits()
-    val t9Index = t9Digits.indexOf(cleanQuery)
-    if (t9Index != -1 && t9Index + cleanQuery.length <= text.length) {
+    val (t9Digits, t9Indexes) = text.toT9Digits()
+    val start = t9Digits.indexOf(cleanQuery)
+    if (start != -1) {
         return buildAnnotatedString {
             append(text)
             addStyle(
                 style = SpanStyle(color = highlightColor, fontWeight = FontWeight.Bold),
-                start = t9Index,
-                end = t9Index + cleanQuery.length
+                start = t9Indexes[start],
+                end = t9Indexes.getOrElse(start + cleanQuery.length, { text.length })
             )
         }
     }
@@ -938,9 +938,10 @@ private fun buildHighlightedText(
     return AnnotatedString(text)
 }
 
-private fun String.toT9Digits(): String {
+private fun String.toT9Digits(): Pair<String,List<Int>> {
     val sb = StringBuilder()
-    for (ch in this.lowercase()) {
+    val indexes = mutableListOf<Int>()
+    for ((index, ch) in this.lowercase().withIndex()) {
         val digit = when (ch) {
             'a', 'b', 'c', 'а', 'б', 'в', 'г' -> '2'
             'd', 'e', 'f', 'д', 'е', 'ж', 'з' -> '3'
@@ -952,9 +953,12 @@ private fun String.toT9Digits(): String {
             'w', 'x', 'y', 'z', 'э', 'ю', 'я' -> '9'
             else -> if (ch.isDigit()) ch else null
         }
-        if (digit != null) sb.append(digit)
+        if (digit != null) {
+            sb.append(digit)
+            indexes.add(index)
+        }
     }
-    return sb.toString()
+    return Pair(sb.toString(), indexes)
 }
 
 @Composable
