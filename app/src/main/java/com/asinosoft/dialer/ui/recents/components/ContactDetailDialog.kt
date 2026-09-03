@@ -488,6 +488,14 @@ fun ContactDetailDialog(
                                             }
                                             Spacer(modifier = Modifier.height(40.dp))
                                         }
+
+                                        else -> {
+                                            ContactHistoryStatistics(
+                                                historyLogs = historyLogs,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                            Spacer(modifier = Modifier.height(16.dp))
+                                        }
                                     }
                                 }
 
