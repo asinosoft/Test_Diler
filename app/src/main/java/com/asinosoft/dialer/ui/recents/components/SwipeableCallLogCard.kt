@@ -36,6 +36,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -125,6 +127,9 @@ fun SwipeableCallLogCard(
     var customRightAction by remember { mutableStateOf<CustomSwipeAction?>(null) }
     var customLeftAction by remember { mutableStateOf<CustomSwipeAction?>(null) }
     var swipeActionsLoaded by remember(contactKey) { mutableStateOf(false) }
+
+    val cacheCleared by SwipeActionCache.lastChangedAt.collectAsState()
+    LaunchedEffect(cacheCleared) { swipeActionsLoaded = false }
 
     fun ensureSwipeActionsLoaded() {
         if (swipeActionsLoaded) return
@@ -300,7 +305,7 @@ fun SwipeableCallLogCard(
                     modifier = Modifier.clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
-                        enabled = onAvatarClick != null && kotlin.math.abs(drawnOffset) < 2f
+                        enabled = onAvatarClick != null && abs(drawnOffset) < 2f
                     ) {
                         onAvatarClick?.invoke(item)
                     }

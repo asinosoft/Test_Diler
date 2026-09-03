@@ -152,6 +152,7 @@ import com.asinosoft.dialer.util.PhoneNumberHelper
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -3449,6 +3450,8 @@ internal object SwipeActionCache {
             size > 256
     }
 
+    val lastChangedAt = MutableStateFlow(Date())
+
     @Synchronized
     fun get(key: String): CustomSwipeAction? = if (map.containsKey(key)) map[key] else null
 
@@ -3463,6 +3466,7 @@ internal object SwipeActionCache {
     @Synchronized
     fun clear() {
         map.clear()
+        lastChangedAt.value = Date()
     }
 }
 
