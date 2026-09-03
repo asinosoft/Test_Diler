@@ -62,7 +62,10 @@ import android.os.Bundle
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
 import android.widget.Toast
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Person
+import com.asinosoft.dialer.ui.components.OneUiPopupMenu
+import com.asinosoft.dialer.ui.components.OneUiPopupMenuItem
 import com.asinosoft.dialer.ui.recents.components.executeCustomSwipeAction
 import com.asinosoft.dialer.ui.recents.components.getCustomSwipeAction
 import com.asinosoft.dialer.ui.recents.components.getSwipeBackgroundVisuals
@@ -70,6 +73,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -132,6 +136,10 @@ fun InCallScreen(
     val audioRoute by CallManager.audioRoute.collectAsState()
     val isHold by CallManager.isHold.collectAsState()
     val isRecording by CallManager.isRecording.collectAsState()
+    val bluetoothDevices by CallManager.bluetoothDevices.collectAsState()
+    val currentBtName by CallManager.currentBluetoothDeviceName.collectAsState()
+
+    var showBluetoothMenu by remember { mutableStateOf(false) }
 
     var callState by remember { mutableIntStateOf(activeCall?.state ?: Call.STATE_DISCONNECTED) }
     var durationSeconds by remember { mutableIntStateOf(0) }
@@ -536,13 +544,61 @@ fun InCallScreen(
 
                         // 3. Bluetooth
                         val isBluetoothActive = audioRoute == CallAudioState.ROUTE_BLUETOOTH
-                        InCallActionButton(
-                            icon = if (isBluetoothActive) Icons.Default.BluetoothAudio else Icons.Default.Bluetooth,
-                            label = "Bluetooth",
-                            isActive = isBluetoothActive,
-                            activeColor = SamsungSmsBlue,
-                            onClick = { CallManager.toggleBluetooth() }
-                        )
+                        val rawBtName = if (isBluetoothActive && !currentBtName.isNullOrBlank()) {
+                            currentBtName!!
+                        } else {
+                            "Bluetooth"
+                        }
+                        val isMacAddress = rawBtName.matches(Regex("^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")) ||
+                                rawBtName.matches(Regex(".*([0-9A-Fa-f]{2}:){3,}.*")) ||
+                                rawBtName.startsWith("bt_", ignoreCase = true)
+
+                        val btDeviceName = if (isMacAddress) {
+                            bluetoothDevices.firstOrNull { it.isCurrent && !it.name.contains(":") }?.name
+                                ?: bluetoothDevices.firstOrNull { !it.name.contains(":") }?.name
+                                ?: "Bluetooth"
+                        } else {
+                            rawBtName
+                        }
+                        val hasMultipleBtDevices = bluetoothDevices.size > 1
+
+                        Box(contentAlignment = Alignment.Center) {
+                            InCallActionButton(
+                                icon = if (isBluetoothActive) Icons.Default.BluetoothAudio else Icons.Default.Bluetooth,
+                                label = if (hasMultipleBtDevices) "$btDeviceName ›" else btDeviceName,
+                                isActive = isBluetoothActive,
+                                activeColor = SamsungSmsBlue,
+                                onClick = {
+                                    if (hasMultipleBtDevices) {
+                                        showBluetoothMenu = true
+                                    } else {
+                                        CallManager.toggleBluetooth()
+                                    }
+                                }
+                            )
+
+                            if (hasMultipleBtDevices) {
+                                OneUiPopupMenu(
+                                    expanded = showBluetoothMenu,
+                                    onDismissRequest = { showBluetoothMenu = false }
+                                ) {
+                                    bluetoothDevices.forEach { device ->
+                                        val isSelected = device.isCurrent || (isBluetoothActive && device.name == currentBtName)
+                                        OneUiPopupMenuItem(
+                                            icon = if (isSelected) Icons.Default.Check else Icons.Default.Bluetooth,
+                                            label = device.name,
+                                            labelColor = if (isSelected) SamsungGreen else MaterialTheme.colorScheme.onSurface,
+                                            iconTint = if (isSelected) SamsungGreen else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                            iconBackground = if (isSelected) SamsungGreen.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
+                                            onClick = {
+                                                showBluetoothMenu = false
+                                                CallManager.selectBluetoothDevice(device)
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
 
                     // Row 2

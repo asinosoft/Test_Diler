@@ -1,10 +1,19 @@
 package com.asinosoft.dialer.service
 
+import android.bluetooth.BluetoothDevice
 import android.telecom.Call
 import android.telecom.CallAudioState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+
+data class BluetoothAudioDevice(
+    val id: String,
+    val name: String,
+    val isCurrent: Boolean = false,
+    val bluetoothDevice: BluetoothDevice? = null,
+    val endpoint: Any? = null
+)
 
 object CallManager {
     private val _currentCall = MutableStateFlow<Call?>(null)
@@ -15,6 +24,12 @@ object CallManager {
 
     private val _audioRoute = MutableStateFlow(CallAudioState.ROUTE_WIRED_OR_EARPIECE)
     val audioRoute: StateFlow<Int> = _audioRoute.asStateFlow()
+
+    private val _bluetoothDevices = MutableStateFlow<List<BluetoothAudioDevice>>(emptyList())
+    val bluetoothDevices: StateFlow<List<BluetoothAudioDevice>> = _bluetoothDevices.asStateFlow()
+
+    private val _currentBluetoothDeviceName = MutableStateFlow<String?>(null)
+    val currentBluetoothDeviceName: StateFlow<String?> = _currentBluetoothDeviceName.asStateFlow()
 
     private val _isHold = MutableStateFlow(false)
     val isHold: StateFlow<Boolean> = _isHold.asStateFlow()
@@ -31,6 +46,8 @@ object CallManager {
             _audioRoute.value = CallAudioState.ROUTE_WIRED_OR_EARPIECE
             _isHold.value = false
             _isRecording.value = false
+            _bluetoothDevices.value = emptyList()
+            _currentBluetoothDeviceName.value = null
         }
     }
 
@@ -59,6 +76,18 @@ object CallManager {
 
     fun updateAudioRoute(route: Int) {
         _audioRoute.value = route
+    }
+
+    fun updateBluetoothDevices(devices: List<BluetoothAudioDevice>) {
+        _bluetoothDevices.value = devices
+    }
+
+    fun updateCurrentBluetoothDeviceName(name: String?) {
+        _currentBluetoothDeviceName.value = name
+    }
+
+    fun selectBluetoothDevice(device: BluetoothAudioDevice) {
+        inCallService?.selectBluetoothDevice(device)
     }
 
     fun toggleSpeaker() {

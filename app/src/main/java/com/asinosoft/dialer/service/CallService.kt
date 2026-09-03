@@ -1,6 +1,9 @@
 package com.asinosoft.dialer.service
 
 import android.app.KeyguardManager
+import android.bluetooth.BluetoothAdapter
+import android.bluetooth.BluetoothDevice
+import android.bluetooth.BluetoothManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -120,14 +123,159 @@ class CallService : InCallService() {
         })
     }
 
+    override fun onCallAudioStateChanged(audioState: CallAudioState?) {
+        super.onCallAudioStateChanged(audioState)
+        if (audioState != null) {
+            CallManager.updateAudioRoute(audioState.route)
+            updateBluetoothDevicesFromAudioState(audioState)
+        }
+    }
+
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     override fun onCallEndpointChanged(callEndpoint: CallEndpoint) {
-        CallManager.updateAudioRoute(endpointTypeToRoute(callEndpoint.endpointType))
+        val route = endpointTypeToRoute(callEndpoint.endpointType)
+        CallManager.updateAudioRoute(route)
+        if (callEndpoint.endpointType == CallEndpoint.TYPE_BLUETOOTH) {
+            val resolvedName = resolveBluetoothDeviceName(callEndpoint.endpointName.toString())
+            CallManager.updateCurrentBluetoothDeviceName(resolvedName)
+        } else {
+            CallManager.updateCurrentBluetoothDeviceName(null)
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     override fun onAvailableCallEndpointsChanged(availableEndpoints: List<CallEndpoint>) {
         this.availableEndpoints = availableEndpoints
+        val btEndpoints = availableEndpoints.filter { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
+        if (btEndpoints.isNotEmpty()) {
+            val devices = btEndpoints.map { endpoint ->
+                val resolvedName = resolveBluetoothDeviceName(endpoint.endpointName.toString())
+                BluetoothAudioDevice(
+                    id = endpoint.identifier.toString(),
+                    name = resolvedName,
+                    isCurrent = resolvedName == CallManager.currentBluetoothDeviceName.value,
+                    endpoint = endpoint
+                )
+            }
+            CallManager.updateBluetoothDevices(devices)
+        }
+    }
+
+    fun selectBluetoothDevice(device: BluetoothAudioDevice) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE && device.endpoint is CallEndpoint) {
+            requestCallEndpointChange(
+                device.endpoint as CallEndpoint,
+                endpointExecutor,
+                object : OutcomeReceiver<Void, CallEndpointException> {
+                    override fun onResult(result: Void?) = Unit
+                    override fun onError(error: CallEndpointException) = Unit
+                }
+            )
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && device.bluetoothDevice != null) {
+            try {
+                requestBluetoothAudio(device.bluetoothDevice)
+            } catch (_: Exception) {
+                setAudioRoute(CallAudioState.ROUTE_BLUETOOTH)
+            }
+        } else {
+            requestAudioRoute(CallAudioState.ROUTE_BLUETOOTH)
+        }
+    }
+
+    private fun updateBluetoothDevicesFromAudioState(audioState: CallAudioState) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val activeBt = audioState.activeBluetoothDevice
+            val supportedBt = audioState.supportedBluetoothDevices?.toList().orEmpty()
+
+            val activeName = getDeviceDisplayName(activeBt)
+            if (!activeName.isNullOrBlank()) {
+                CallManager.updateCurrentBluetoothDeviceName(activeName)
+            }
+
+            val devices = supportedBt.map { device ->
+                val name = getDeviceDisplayName(device) ?: "Bluetooth"
+                val isCurrent = device == activeBt || (activeBt != null && device.address == activeBt.address)
+                BluetoothAudioDevice(
+                    id = device.address ?: name,
+                    name = name,
+                    isCurrent = isCurrent,
+                    bluetoothDevice = device
+                )
+            }
+            if (devices.isNotEmpty()) {
+                CallManager.updateBluetoothDevices(devices)
+            }
+        }
+    }
+
+    private fun resolveBluetoothDeviceName(rawNameOrAddress: String?): String {
+        if (rawNameOrAddress.isNullOrBlank()) return "Bluetooth"
+        val isMac = isMacAddressString(rawNameOrAddress)
+        if (!isMac) return rawNameOrAddress
+
+        // Try to match from CallAudioState active/supported devices
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            val audioState = callAudioState
+            if (audioState != null) {
+                val active = audioState.activeBluetoothDevice
+                val activeName = getDeviceDisplayName(active)
+                if (!activeName.isNullOrBlank() && !isMacAddressString(activeName) && activeName != "Bluetooth") {
+                    return activeName
+                }
+                for (dev in audioState.supportedBluetoothDevices.orEmpty()) {
+                    val name = getDeviceDisplayName(dev)
+                    if (!name.isNullOrBlank() && !isMacAddressString(name) && name != "Bluetooth") {
+                        return name
+                    }
+                }
+            }
+        }
+
+        // Try to match from BluetoothAdapter bonded devices
+        try {
+            val btManager = getSystemService(BLUETOOTH_SERVICE) as? BluetoothManager
+            val adapter = btManager?.adapter ?: BluetoothAdapter.getDefaultAdapter()
+            if (adapter != null) {
+                val cleanAddress = rawNameOrAddress.replace("bt_", "", ignoreCase = true).trim()
+                @Suppress("MissingPermission")
+                val bonded = adapter.bondedDevices
+                val matched = bonded?.find { it.address.equals(cleanAddress, ignoreCase = true) }
+                if (matched != null) {
+                    val name = getDeviceDisplayName(matched)
+                    if (!name.isNullOrBlank() && !isMacAddressString(name) && name != "Bluetooth") {
+                        return name
+                    }
+                }
+            }
+        } catch (_: Exception) {
+            // ignore
+        }
+
+        return "Bluetooth"
+    }
+
+    private fun isMacAddressString(str: String): Boolean {
+        val clean = str.trim()
+        return clean.matches(Regex("^[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}$")) ||
+                clean.matches(Regex(".*([0-9A-Fa-f]{2}:){3,}.*")) ||
+                clean.startsWith("bt_", ignoreCase = true)
+    }
+
+    private fun getDeviceDisplayName(device: BluetoothDevice?): String? {
+        if (device == null) return null
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                @Suppress("MissingPermission")
+                val alias = device.alias
+                if (!alias.isNullOrBlank() && !isMacAddressString(alias)) return alias
+            }
+            @Suppress("MissingPermission")
+            val name = device.name
+            if (!name.isNullOrBlank() && !isMacAddressString(name)) return name
+        } catch (_: Exception) {
+            // ignore
+        }
+        return null
     }
 
     override fun onSilenceRinger() {
