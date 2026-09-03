@@ -4,7 +4,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
-import android.content.Context
 import android.content.Context.NOTIFICATION_SERVICE
 import android.content.Context.TELECOM_SERVICE
 import android.content.Intent
@@ -17,6 +16,7 @@ import android.telecom.Call
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.ContextCompat
+import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.net.toUri
 import com.asinosoft.dialer.MainActivity
@@ -333,9 +333,14 @@ class NotificationManager(val service: Service) {
                         smsPendingIntent
                     )
 
-            val redIconBitmap = contactBitmap ?: createRedMissedCallBitmap(service)
-            if (redIconBitmap != null) {
-                notificationBuilder.setLargeIcon(redIconBitmap)
+            val circularAvatar: Bitmap? = if (contactBitmap != null) {
+                getCircularBitmap(contactBitmap)
+            } else {
+                createRoundAvatarBitmap(contactDisplayName)
+            }
+
+            if (circularAvatar != null) {
+                notificationBuilder.setLargeIcon(circularAvatar)
             }
 
             notificationManager.notify(notificationId, notificationBuilder.build())
@@ -356,8 +361,8 @@ class NotificationManager(val service: Service) {
         val canvas = android.graphics.Canvas(output)
         val badgeSize = (size * 0.36f).toInt().coerceAtLeast(24)
         val margin = (size * 0.04f).toInt()
-        val left = size - badgeSize - margin
-        val top = size - badgeSize - margin
+        val left = margin / 2
+        val top = size - badgeSize + margin
 
         // Белая подложка, чтобы бейдж читался на любом аватаре
         val bgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
@@ -366,7 +371,7 @@ class NotificationManager(val service: Service) {
         }
         val cx = left + badgeSize / 2f
         val cy = top + badgeSize / 2f
-        canvas.drawCircle(cx, cy, badgeSize / 2f, bgPaint)
+        canvas.drawCircle(cx, cy, badgeSize * 0.6f, bgPaint)
 
         val resId = when (simNumber) {
             2 -> R.drawable.ic_sim2
@@ -374,37 +379,11 @@ class NotificationManager(val service: Service) {
             else -> R.drawable.ic_sim1
         }
         val inset = (badgeSize * 0.14f).toInt()
-        val drawable = service.resources.getDrawable(resId, null).mutate()
-        drawable.setBounds(left + inset, top + inset, left + badgeSize - inset, top + badgeSize - inset)
-        drawable.draw(canvas)
-        return output
-    }
-
-    private fun createRedMissedCallBitmap(context: Context): Bitmap? {
-        try {
-            val size = 128
-            val bitmap = createBitmap(size, size)
-            val canvas = android.graphics.Canvas(bitmap)
-
-            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                color = 0xFFFF3B30.toInt()
-                style = android.graphics.Paint.Style.FILL
-            }
-            canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
-
-            val drawable =
-                ContextCompat.getDrawable(context, R.drawable.ic_missed_call)
-            if (drawable != null) {
-                val iconSize = 72
-                val margin = (size - iconSize) / 2
-                drawable.setBounds(margin, margin, margin + iconSize, margin + iconSize)
-                drawable.setTint(android.graphics.Color.WHITE)
-                drawable.draw(canvas)
-            }
-            return bitmap
-        } catch (_: Exception) {
-            return null
+        ResourcesCompat.getDrawable(service.resources, resId, null)?.apply {
+            setBounds(left + inset, top + inset, left + badgeSize - inset, top + badgeSize - inset)
+            draw(canvas)
         }
+        return output
     }
 
     private fun suppressSystemMissedCallNotification(service:Service, rawNumber: String) {
