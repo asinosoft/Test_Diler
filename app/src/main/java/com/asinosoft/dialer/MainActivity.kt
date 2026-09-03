@@ -53,12 +53,15 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.ui.recents.RecentsScreen
 import com.asinosoft.dialer.ui.recents.RecentsViewModel
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.ui.theme.DialerTheme
 
 class MainActivity : ComponentActivity() {
+
+    private var mainViewModel: RecentsViewModel? = null
 
     private val requiredPermissions = arrayOf(
         Manifest.permission.READ_CALL_LOG,
@@ -78,6 +81,8 @@ class MainActivity : ComponentActivity() {
         setContent {
             DialerTheme {
                 val viewModel: RecentsViewModel = viewModel()
+                mainViewModel = viewModel
+
                 var isPermissionsGranted by remember {
                     mutableStateOf(
                         requiredPermissions.all { perm ->
@@ -121,6 +126,10 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                LaunchedEffect(intent) {
+                    handleContactOpenIntent(intent)
+                }
+
                 if (isPermissionsGranted) {
                     RecentsScreen(
                         viewModel = viewModel,
@@ -134,6 +143,33 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleContactOpenIntent(intent)
+    }
+
+    private fun handleContactOpenIntent(intent: Intent?) {
+        val number = intent?.getStringExtra(EXTRA_OPEN_CONTACT_NUMBER)
+        if (!number.isNullOrBlank()) {
+            val name = intent.getStringExtra(EXTRA_OPEN_CONTACT_NAME)
+            val id = intent.getStringExtra(EXTRA_OPEN_CONTACT_ID).orEmpty()
+            val contact = FavoriteContact(
+                id = id,
+                name = name ?: number,
+                number = number,
+                photoUri = null
+            )
+            mainViewModel?.openContactDetail(contact, initialTab = 0)
+        }
+    }
+
+    companion object {
+        const val EXTRA_OPEN_CONTACT_NUMBER = "extra_open_contact_number"
+        const val EXTRA_OPEN_CONTACT_NAME = "extra_open_contact_name"
+        const val EXTRA_OPEN_CONTACT_ID = "extra_open_contact_id"
     }
 
     override fun onResume() {

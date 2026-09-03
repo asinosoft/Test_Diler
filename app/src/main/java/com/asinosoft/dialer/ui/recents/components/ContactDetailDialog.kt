@@ -3593,18 +3593,35 @@ fun getCustomSwipeAction(
     try {
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
 
-        // 1. Try with contactKey
+        // 1. Try with contactKey directly
         var jsonString = prefs.getString(keySuffix + contactKey, null)
 
-        // 2. Try with clean fallbackNumber
+        // 2. Try with raw fallbackNumber directly
         if (jsonString.isNullOrEmpty() && !fallbackNumber.isNullOrBlank()) {
-            val cleanNum = digitsOnlyPhoneFast(fallbackNumber)
-            if (cleanNum.isNotBlank()) {
-                jsonString = prefs.getString(keySuffix + cleanNum, null)
+            jsonString = prefs.getString(keySuffix + fallbackNumber, null)
+        }
+
+        // 3. Try with clean fallbackNumber (with and without plus)
+        if (jsonString.isNullOrEmpty() && !fallbackNumber.isNullOrBlank()) {
+            val cleanNumNoPlus = digitsOnlyPhoneFast(fallbackNumber, keepPlus = false)
+            val cleanNumWithPlus = digitsOnlyPhoneFast(fallbackNumber, keepPlus = true)
+            if (cleanNumNoPlus.isNotBlank()) {
+                jsonString = prefs.getString(keySuffix + cleanNumNoPlus, null)
+                    ?: prefs.getString(keySuffix + cleanNumWithPlus, null)
             }
         }
 
-        // 3. Fallback: match by last 7 digits of phone number across all saved keys
+        // 4. Try with clean contactKey (with and without plus)
+        if (jsonString.isNullOrEmpty() && contactKey.isNotBlank()) {
+            val cleanKeyNoPlus = digitsOnlyPhoneFast(contactKey, keepPlus = false)
+            val cleanKeyWithPlus = digitsOnlyPhoneFast(contactKey, keepPlus = true)
+            if (cleanKeyNoPlus.isNotBlank()) {
+                jsonString = prefs.getString(keySuffix + cleanKeyNoPlus, null)
+                    ?: prefs.getString(keySuffix + cleanKeyWithPlus, null)
+            }
+        }
+
+        // 5. Fallback: match by last 7 digits of phone number across all saved keys
         if (jsonString.isNullOrEmpty()) {
             val searchNum = digitsOnlyPhoneFast(
                 if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey,

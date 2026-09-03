@@ -2,9 +2,14 @@ package com.asinosoft.dialer.ui.incall
 
 import android.Manifest
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.provider.ContactsContract
 import android.telecom.Call
 import android.telecom.CallAudioState
@@ -53,6 +58,14 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import android.os.Bundle
+import android.telecom.PhoneAccountHandle
+import android.telecom.TelecomManager
+import android.widget.Toast
+import androidx.compose.material.icons.filled.Person
+import com.asinosoft.dialer.ui.recents.components.executeCustomSwipeAction
+import com.asinosoft.dialer.ui.recents.components.getCustomSwipeAction
+import com.asinosoft.dialer.ui.recents.components.getSwipeBackgroundVisuals
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -93,6 +106,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
+import com.asinosoft.dialer.MainActivity
 import com.asinosoft.dialer.service.CallManager
 import com.asinosoft.dialer.ui.components.SimIcon
 import com.asinosoft.dialer.ui.theme.MissedRed
@@ -128,6 +142,7 @@ fun InCallScreen(
     val rawNumber = handle?.schemeSpecificPart ?: ""
     val displayName = activeCall?.details?.callerDisplayName ?: rawNumber
 
+    var contactId by remember { mutableStateOf<String?>(null) }
     var contactName by remember { mutableStateOf<String?>(null) }
     var contactPhotoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
@@ -137,6 +152,7 @@ fun InCallScreen(
         if (rawNumber.isNotBlank()) {
             withContext(Dispatchers.IO) {
                 val result = lookupContactInfo(context, rawNumber)
+                contactId = result.contactId
                 contactName = result.name
 
                 if (!result.photoUri.isNullOrEmpty()) {
@@ -180,28 +196,43 @@ fun InCallScreen(
         }
     }
 
+    var isDisconnecting by remember { mutableStateOf(false) }
+
     // Call state callback listener
     DisposableEffect(activeCall) {
         val current = activeCall
         if (current == null) {
-            onFinish()
+            isDisconnecting = true
             return@DisposableEffect onDispose {}
         }
 
         val callback = object : Call.Callback() {
             override fun onStateChanged(call: Call, state: Int) {
                 callState = state
-                if (state == Call.STATE_DISCONNECTED) {
-                    onFinish()
+                if (state == Call.STATE_DISCONNECTED || state == Call.STATE_DISCONNECTING) {
+                    isDisconnecting = true
                 }
             }
         }
 
         current.registerCallback(callback)
         callState = current.state
+        if (current.state == Call.STATE_DISCONNECTED || current.state == Call.STATE_DISCONNECTING) {
+            isDisconnecting = true
+        }
 
         onDispose {
             current.unregisterCallback(callback)
+        }
+    }
+
+    // Auto-finish after 2 seconds on disconnect
+    LaunchedEffect(isDisconnecting, activeCall) {
+        if (isDisconnecting || activeCall == null || callState == Call.STATE_DISCONNECTED) {
+            isDisconnecting = true
+            callState = Call.STATE_DISCONNECTED
+            delay(2000L)
+            onFinish()
         }
     }
 
@@ -217,11 +248,27 @@ fun InCallScreen(
 
     ProximityScreenOffEffect(callState = callState, audioRoute = audioRoute)
 
-    // Auto-finish if no call
-    LaunchedEffect(activeCall) {
-        if (activeCall == null) {
-            onFinish()
-        }
+    val isCallDisconnected = isDisconnecting || callState == Call.STATE_DISCONNECTING || callState == Call.STATE_DISCONNECTED
+    val isCallActive = callState == Call.STATE_ACTIVE && !isCallDisconnected
+
+    val contactKey = remember(contactId, rawNumber) {
+        contactId?.ifBlank { rawNumber } ?: rawNumber
+    }
+    val swipeRightAction = remember(contactKey, rawNumber, contactId) {
+        if (rawNumber.isNotBlank() || !contactId.isNullOrBlank()) {
+            getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = rawNumber)
+        } else null
+    }
+    val swipeLeftAction = remember(contactKey, rawNumber, contactId) {
+        if (rawNumber.isNotBlank() || !contactId.isNullOrBlank()) {
+            getCustomSwipeAction(context, contactKey, isRight = false, fallbackNumber = rawNumber)
+        } else null
+    }
+    val rightVisuals = remember(swipeRightAction) {
+        getSwipeBackgroundVisuals(swipeRightAction, defaultIsRight = true)
+    }
+    val leftVisuals = remember(swipeLeftAction) {
+        getSwipeBackgroundVisuals(swipeLeftAction, defaultIsRight = false)
     }
 
     val formattedName = contactName ?: if (displayName.isBlank()) {
@@ -348,20 +395,20 @@ fun InCallScreen(
                 Spacer(modifier = Modifier.height(14.dp))
 
                 // Call Status & Timer Badge
-                val isCallActive = callState == Call.STATE_ACTIVE
                 val statusText = when {
+                    isCallDisconnected -> "Вызов завершен"
                     isHold -> "На удержании"
                     callState == Call.STATE_RINGING -> "Входящий вызов"
                     callState == Call.STATE_DIALING -> "Вызов..."
                     callState == Call.STATE_CONNECTING -> "Соединение..."
                     isCallActive -> formatDuration(durationSeconds)
-                    callState == Call.STATE_DISCONNECTING || callState == Call.STATE_DISCONNECTED -> "Завершение..."
-                    else -> "Соединение..."
+                    else -> "Вызов завершен"
                 }
 
                 Surface(
                     shape = RoundedCornerShape(16.dp),
                     color = when {
+                        isCallDisconnected -> Color.White.copy(alpha = 0.12f)
                         isHold -> Color(0xFFFFB300).copy(alpha = 0.22f)
                         isCallActive -> Color.White.copy(alpha = 0.12f)
                         else -> SamsungGreen.copy(alpha = 0.18f)
@@ -385,6 +432,7 @@ fun InCallScreen(
                             fontSize = 14.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = when {
+                                isCallDisconnected -> Color.White.copy(alpha = 0.85f)
                                 isHold -> Color(0xFFFFC107)
                                 isCallActive -> Color.White
                                 else -> SamsungGreen
@@ -392,10 +440,73 @@ fun InCallScreen(
                         )
                     }
                 }
+
+                // 3 Quick Action Buttons placed directly under "Вызов завершен"
+                if (isCallDisconnected) {
+                    Spacer(modifier = Modifier.height(32.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.SpaceEvenly,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Button 1: Call (Swipe Right Action)
+                        InCallPostCallActionButton(
+                            icon = rightVisuals.icon,
+                            label = rightVisuals.label,
+                            containerColor = rightVisuals.backgroundColor,
+                            onClick = {
+                                onFinish()
+                                if (swipeRightAction != null) {
+                                    executeCustomSwipeAction(
+                                        context = context,
+                                        action = swipeRightAction,
+                                        onCall = { num, sim -> startCallFromInCallScreen(context, num, sim) },
+                                        onSms = { num -> startSmsFromInCallScreen(context, num) }
+                                    )
+                                } else {
+                                    startCallFromInCallScreen(context, rawNumber, null)
+                                }
+                            }
+                        )
+
+                        // Button 2: Message/Messenger (Swipe Left Action - Blue)
+                        InCallPostCallActionButton(
+                            icon = leftVisuals.icon,
+                            label = leftVisuals.label,
+                            containerColor = leftVisuals.backgroundColor,
+                            onClick = {
+                                onFinish()
+                                if (swipeLeftAction != null) {
+                                    executeCustomSwipeAction(
+                                        context = context,
+                                        action = swipeLeftAction,
+                                        onCall = { num, sim -> startCallFromInCallScreen(context, num, sim) },
+                                        onSms = { num -> startSmsFromInCallScreen(context, num) }
+                                    )
+                                } else {
+                                    startSmsFromInCallScreen(context, rawNumber)
+                                }
+                            }
+                        )
+
+                        // Button 3: Info -> opens ContactDetailDialog on Contact Tab (tab 0)
+                        InCallPostCallActionButton(
+                            icon = Icons.Default.Person,
+                            label = "Инфо",
+                            containerColor = Color.White.copy(alpha = 0.15f),
+                            onClick = {
+                                onFinish()
+                                openContactInApp(context, rawNumber, contactName, contactId)
+                            }
+                        )
+                    }
+                }
             }
 
             // Middle Section: Samsung One UI 3x2 Action Button Grid
-            if (callState == Call.STATE_ACTIVE || callState == Call.STATE_DIALING || isHold) {
+            if ((callState == Call.STATE_ACTIVE || callState == Call.STATE_DIALING || isHold) && !isCallDisconnected) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -474,27 +585,34 @@ fun InCallScreen(
 
             // Bottom Section: Answer / Decline / End Call Buttons
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.height(if (isCallDisconnected) 0.dp else 76.dp)
             ) {
-                if (callState == Call.STATE_RINGING) {
-                    SamsungSwipeAnswerDeclineRow(
-                        onAnswer = { CallManager.answer() },
-                        onDecline = { CallManager.disconnect() }
-                    )
-                } else {
-                    // Active Call: Centered End Call Button (Red) without "Завершить" text
-                    FloatingActionButton(
-                        onClick = { CallManager.disconnect() },
-                        containerColor = MissedRed,
-                        contentColor = Color.White,
-                        shape = CircleShape,
-                        modifier = Modifier.size(76.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CallEnd,
-                            contentDescription = "Завершить вызов",
-                            modifier = Modifier.size(38.dp)
+                when {
+                    isCallDisconnected -> {
+                        // Handled above directly under "Вызов завершен"
+                    }
+                    callState == Call.STATE_RINGING -> {
+                        SamsungSwipeAnswerDeclineRow(
+                            onAnswer = { CallManager.answer() },
+                            onDecline = { CallManager.disconnect() }
                         )
+                    }
+                    else -> {
+                        // Active Call: Centered End Call Button (Red) without "Завершить" text
+                        FloatingActionButton(
+                            onClick = { CallManager.disconnect() },
+                            containerColor = MissedRed,
+                            contentColor = Color.White,
+                            shape = CircleShape,
+                            modifier = Modifier.size(76.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CallEnd,
+                                contentDescription = "Завершить вызов",
+                                modifier = Modifier.size(38.dp)
+                            )
+                        }
                     }
                 }
             }
@@ -521,6 +639,7 @@ private fun SamsungSwipeAnswerDeclineRow(
     onDecline: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -528,8 +647,7 @@ private fun SamsungSwipeAnswerDeclineRow(
     val answerOffsetX = remember { Animatable(0f) }
     val declineOffsetX = remember { Animatable(0f) }
 
-    val thresholdPx = with(density) { 85.dp.toPx() }
-    val maxDragPx = with(density) { 130.dp.toPx() }
+    val thresholdPx = with(density) { 80.dp.toPx() }
 
     var hasTriggered by remember { mutableStateOf(false) }
 
@@ -591,6 +709,7 @@ private fun SamsungSwipeAnswerDeclineRow(
                                     coroutineScope.launch {
                                         if (answerOffsetX.value >= thresholdPx && !hasTriggered) {
                                             hasTriggered = true
+                                            performSwipeActionVibration(context)
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             onAnswer()
                                         } else {
@@ -605,11 +724,12 @@ private fun SamsungSwipeAnswerDeclineRow(
                                 },
                                 onHorizontalDrag = { change, dragAmount ->
                                     change.consume()
-                                    val newOffset = (answerOffsetX.value + dragAmount).coerceIn(0f, maxDragPx)
+                                    val newOffset = (answerOffsetX.value + dragAmount).coerceIn(0f, thresholdPx)
                                     coroutineScope.launch {
                                         answerOffsetX.snapTo(newOffset)
                                         if (newOffset >= thresholdPx && !hasTriggered) {
                                             hasTriggered = true
+                                            performSwipeActionVibration(context)
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             onAnswer()
                                         }
@@ -682,6 +802,7 @@ private fun SamsungSwipeAnswerDeclineRow(
                                     coroutineScope.launch {
                                         if (declineOffsetX.value <= -thresholdPx && !hasTriggered) {
                                             hasTriggered = true
+                                            performSwipeActionVibration(context)
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             onDecline()
                                         } else {
@@ -696,11 +817,12 @@ private fun SamsungSwipeAnswerDeclineRow(
                                 },
                                 onHorizontalDrag = { change, dragAmount ->
                                     change.consume()
-                                    val newOffset = (declineOffsetX.value + dragAmount).coerceIn(-maxDragPx, 0f)
+                                    val newOffset = (declineOffsetX.value + dragAmount).coerceIn(-thresholdPx, 0f)
                                     coroutineScope.launch {
                                         declineOffsetX.snapTo(newOffset)
                                         if (newOffset <= -thresholdPx && !hasTriggered) {
                                             hasTriggered = true
+                                            performSwipeActionVibration(context)
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             onDecline()
                                         }
@@ -997,33 +1119,38 @@ private fun formatDuration(seconds: Int): String {
 
 private data class ContactLookupResult(
     val name: String?,
-    val photoUri: String?
+    val photoUri: String?,
+    val contactId: String? = null
 )
 
 private suspend fun lookupContactInfo(context: Context, phoneNumber: String): ContactLookupResult =
     withContext(Dispatchers.IO) {
-        if (phoneNumber.isBlank()) return@withContext ContactLookupResult(null, null)
+        if (phoneNumber.isBlank()) return@withContext ContactLookupResult(null, null, null)
         try {
             val uri = Uri.withAppendedPath(
                 ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
                 Uri.encode(phoneNumber)
             )
             val projection = arrayOf(
+                ContactsContract.PhoneLookup._ID,
                 ContactsContract.PhoneLookup.DISPLAY_NAME,
                 ContactsContract.PhoneLookup.PHOTO_URI,
                 ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI
             )
             val cursor = context.contentResolver.query(uri, projection, null, null, null)
+            var contactId: String? = null
             var contactName: String? = null
             var contactPhotoUri: String? = null
 
             cursor?.use { c ->
                 if (c.moveToFirst()) {
+                    val idIndex = c.getColumnIndex(ContactsContract.PhoneLookup._ID)
                     val nameIndex = c.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
                     val fullPhotoIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
                     val thumbPhotoIndex =
                         c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI)
 
+                    if (idIndex != -1) contactId = c.getString(idIndex)
                     if (nameIndex != -1) contactName = c.getString(nameIndex)
                     if (fullPhotoIndex != -1) contactPhotoUri = c.getString(fullPhotoIndex)
                     if (contactPhotoUri.isNullOrEmpty() && thumbPhotoIndex != -1) {
@@ -1031,8 +1158,170 @@ private suspend fun lookupContactInfo(context: Context, phoneNumber: String): Co
                     }
                 }
             }
-            ContactLookupResult(contactName, contactPhotoUri)
+            ContactLookupResult(contactName, contactPhotoUri, contactId)
         } catch (_: Exception) {
-            ContactLookupResult(null, null)
+            ContactLookupResult(null, null, null)
         }
     }
+
+private fun performSwipeActionVibration(context: Context) {
+    try {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+            val vibrator = vibratorManager?.defaultVibrator
+            vibrator?.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_HEAVY_CLICK))
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            vibrator?.vibrate(VibrationEffect.createOneShot(55L, VibrationEffect.DEFAULT_AMPLITUDE))
+        } else {
+            @Suppress("DEPRECATION")
+            val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(55L)
+        }
+    } catch (_: Exception) {
+        // ignore
+    }
+}
+
+@Composable
+private fun InCallPostCallActionButton(
+    icon: ImageVector,
+    label: String,
+    containerColor: Color,
+    contentColor: Color = Color.White,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+    ) {
+        Surface(
+            modifier = Modifier.size(60.dp),
+            shape = CircleShape,
+            color = containerColor,
+            shadowElevation = 4.dp
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = contentColor,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(6.dp))
+
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = Color.White.copy(alpha = 0.85f),
+            textAlign = TextAlign.Center,
+            maxLines = 1
+        )
+    }
+}
+
+private fun startCallFromInCallScreen(context: Context, number: String, simSlot: Int? = null) {
+    try {
+        val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+        val uri = Uri.fromParts("tel", number, null)
+        val extras = Bundle().apply {
+            if (simSlot != null) {
+                val accountHandle = getPhoneAccountHandleForSimSlot(context, simSlot)
+                if (accountHandle != null) {
+                    putParcelable(TelecomManager.EXTRA_PHONE_ACCOUNT_HANDLE, accountHandle)
+                }
+            }
+        }
+        if (telecomManager != null && ContextCompat.checkSelfPermission(context, Manifest.permission.CALL_PHONE) == PackageManager.PERMISSION_GRANTED) {
+            telecomManager.placeCall(uri, extras)
+        } else {
+            val intent = Intent(Intent.ACTION_CALL, uri).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        }
+    } catch (_: Exception) {
+        val intent = Intent(Intent.ACTION_DIAL, Uri.fromParts("tel", number, null)).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
+    }
+}
+
+private fun startSmsFromInCallScreen(context: Context, number: String) {
+    try {
+        val intent = Intent(Intent.ACTION_SENDTO, "smsto:${Uri.encode(number)}".toUri()).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        // ignore
+    }
+}
+
+private fun openSystemContactFromInCallScreen(context: Context, contactNumber: String) {
+    try {
+        val uri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(contactNumber)
+        )
+        val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+        }
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        try {
+            val intent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_APP_CONTACTS)
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(context, "Не удалось открыть информацию о контакте", Toast.LENGTH_SHORT).show()
+        }
+    }
+}
+
+private fun openContactInApp(context: Context, number: String, name: String?, contactId: String?) {
+    try {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            putExtra(MainActivity.EXTRA_OPEN_CONTACT_NUMBER, number)
+            if (!name.isNullOrBlank()) putExtra(MainActivity.EXTRA_OPEN_CONTACT_NAME, name)
+            if (!contactId.isNullOrBlank()) putExtra(MainActivity.EXTRA_OPEN_CONTACT_ID, contactId)
+        }
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        openSystemContactFromInCallScreen(context, number)
+    }
+}
+
+private fun getPhoneAccountHandleForSimSlot(context: Context, simSlot: Int): PhoneAccountHandle? {
+    try {
+        val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager ?: return null
+        val hasPermission = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_PHONE_STATE
+        ) == PackageManager.PERMISSION_GRANTED
+        if (!hasPermission) return null
+
+        val phoneAccountHandles = telecomManager.callCapablePhoneAccounts
+        if (!phoneAccountHandles.isNullOrEmpty()) {
+            val targetSlotIndex = simSlot - 1
+            return phoneAccountHandles.getOrNull(targetSlotIndex) ?: phoneAccountHandles.firstOrNull()
+        }
+    } catch (_: Exception) {
+        // ignore
+    }
+    return null
+}

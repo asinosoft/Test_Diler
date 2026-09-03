@@ -45,7 +45,13 @@ class InCallActivity : ComponentActivity() {
                 }
 
                 InCallScreen(
-                    onFinish = { finish() }
+                    onFinish = {
+                        try {
+                            finishAndRemoveTask()
+                        } catch (_: Exception) {
+                            finish()
+                        }
+                    }
                 )
             }
         }
