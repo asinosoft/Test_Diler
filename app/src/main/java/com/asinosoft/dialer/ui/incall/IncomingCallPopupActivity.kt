@@ -14,8 +14,11 @@ import android.view.WindowManager
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,6 +38,7 @@ import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -218,6 +222,7 @@ private fun IncomingCallPopupScreen(
         }
     }
 
+    val isDark = isSystemInDarkTheme()
     val finalName = contactName
         ?: if (call.displayName.isNotBlank() && call.displayName != call.rawNumber) call.displayName else "Неизвестный номер"
 
@@ -229,11 +234,18 @@ private fun IncomingCallPopupScreen(
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onOpenFullScreen() },
+                .clickable { onOpenFullScreen() }
+                .border(
+                    BorderStroke(
+                        1.dp,
+                        if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f)
+                    ),
+                    RoundedCornerShape(28.dp)
+                ),
             shape = RoundedCornerShape(28.dp),
-            color = Color(0xFFF2F0E8), // Light Samsung One UI Card Surface
+            color = if (isDark) Color(0xFF222834) else Color(0xFFF2F0E8), // Samsung One UI Adaptive Surface
             tonalElevation = 8.dp,
-            shadowElevation = 10.dp
+            shadowElevation = 12.dp
         ) {
             Column(
                 modifier = Modifier
@@ -251,7 +263,7 @@ private fun IncomingCallPopupScreen(
                             .size(64.dp)
                             .clip(CircleShape),
                         shape = CircleShape,
-                        color = Color(0xFFD8D4C8)
+                        color = if (isDark) Color(0xFF333B4A) else Color(0xFFD8D4C8)
                     ) {
                         Box(
                             contentAlignment = Alignment.Center,
@@ -271,7 +283,7 @@ private fun IncomingCallPopupScreen(
                                     text = initial,
                                     fontSize = 26.sp,
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.DarkGray
+                                    color = if (isDark) Color.White else Color.DarkGray
                                 )
                             }
                         }
@@ -290,7 +302,7 @@ private fun IncomingCallPopupScreen(
                                 text = "Входящие вызовы",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Medium,
-                                color = Color.Black.copy(alpha = 0.65f)
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
                             )
                         }
 
@@ -300,7 +312,7 @@ private fun IncomingCallPopupScreen(
                             text = finalName,
                             fontSize = 22.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color.Black,
+                            color = MaterialTheme.colorScheme.onSurface,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -310,7 +322,7 @@ private fun IncomingCallPopupScreen(
                         Text(
                             text = PhoneNumberHelper.format(call.rawNumber),
                             fontSize = 15.sp,
-                            color = Color.Black.copy(alpha = 0.65f),
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -341,7 +353,9 @@ private fun IncomingCallPopupScreen(
                     }
 
                     // Send SMS Button
-                    Row(
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.45f else 0.7f),
                         modifier = Modifier
                             .clip(RoundedCornerShape(20.dp))
                             .clickable {
@@ -361,22 +375,25 @@ private fun IncomingCallPopupScreen(
                                     ).show()
                                 }
                             }
-                            .padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "Отправить сообщение",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.Black
-                        )
-                        Spacer(modifier = Modifier.width(2.dp))
-                        Icon(
-                            imageVector = Icons.Default.KeyboardArrowDown,
-                            contentDescription = "Быстрый ответ SMS",
-                            tint = Color.Black,
-                            modifier = Modifier.size(18.dp)
-                        )
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Отправить сообщение",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Быстрый ответ SMS",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
                     }
 
                     // Red Decline Button

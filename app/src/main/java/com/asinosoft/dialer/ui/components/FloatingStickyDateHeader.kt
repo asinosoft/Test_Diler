@@ -1,7 +1,6 @@
 package com.asinosoft.dialer.ui.components
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
@@ -48,7 +47,8 @@ fun FloatingStickyDateHeader(
         Surface(
             shape = RoundedCornerShape(50),
             color = MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
-            shadowElevation = 2.dp
+            shadowElevation = 2.dp,
+            tonalElevation = 1.dp
         ) {
             Text(
                 text = text,
@@ -62,12 +62,11 @@ fun FloatingStickyDateHeader(
         // Filter Sticker (справа)
         if (onFilterClick != null) {
             Surface(
+                onClick = onFilterClick,
                 shape = RoundedCornerShape(50),
-                color = if (isFilterActive) SamsungGreen.copy(alpha = 0.15f) else MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
+                color = if (isFilterActive) SamsungGreen.copy(alpha = 0.18f) else MaterialTheme.colorScheme.background.copy(alpha = 0.92f),
                 shadowElevation = 2.dp,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .clickable(onClick = onFilterClick)
+                tonalElevation = 1.dp
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
