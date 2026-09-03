@@ -32,13 +32,15 @@ fun FloatingStickyDateHeader(
     text: String,
     modifier: Modifier = Modifier,
     startPadding: Dp = 4.dp,
+    endPadding: Dp = 4.dp,
+    topPadding: Dp = 6.dp,
     onFilterClick: (() -> Unit)? = null,
     isFilterActive: Boolean = false
 ) {
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .padding(start = startPadding, end = 4.dp, top = 6.dp, bottom = 4.dp),
+            .padding(start = startPadding, end = endPadding, top = topPadding, bottom = 4.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {

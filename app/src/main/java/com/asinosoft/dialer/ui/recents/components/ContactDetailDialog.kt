@@ -19,6 +19,7 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -94,6 +95,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -113,15 +115,20 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import com.asinosoft.dialer.ui.components.FloatingStickyDateHeader
+import com.asinosoft.dialer.ui.recents.CallTypeFilter
+import com.asinosoft.dialer.ui.recents.SimFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import kotlin.math.roundToInt
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
@@ -294,8 +301,31 @@ fun ContactDetailDialog(
         isLoadingHistory = false
     }
 
-    val groupedHistoryLogs = remember(historyLogs) {
-        historyLogs.groupBy { formatDateHeader(it.timestamp) }.toList()
+    var callTypeFilter by remember { mutableStateOf(CallTypeFilter.ALL) }
+    var simFilter by remember { mutableStateOf(SimFilter.ALL) }
+    var showCallFilterDialog by remember { mutableStateOf(false) }
+
+    val isFilterActive = callTypeFilter != CallTypeFilter.ALL || simFilter != SimFilter.ALL
+
+    val filteredHistoryLogs = remember(historyLogs, callTypeFilter, simFilter) {
+        historyLogs.filter { item ->
+            val matchesType = when (callTypeFilter) {
+                CallTypeFilter.ALL -> true
+                CallTypeFilter.INCOMING -> item.type == CallType.INCOMING
+                CallTypeFilter.OUTGOING -> item.type == CallType.OUTGOING
+                CallTypeFilter.MISSED -> item.type == CallType.MISSED || item.type == CallType.REJECTED
+            }
+            val matchesSim = when (simFilter) {
+                SimFilter.ALL -> true
+                SimFilter.SIM_1 -> item.simNumber == 1
+                SimFilter.SIM_2 -> item.simNumber == 2
+            }
+            matchesType && matchesSim
+        }
+    }
+
+    val groupedHistoryLogs = remember(filteredHistoryLogs) {
+        filteredHistoryLogs.groupBy { formatDateHeader(it.timestamp) }.toList()
     }
 
     Dialog(
@@ -321,6 +351,8 @@ fun ContactDetailDialog(
         }
 
         val listState = rememberLazyListState()
+        val density = LocalDensity.current
+        val topBarrierPx = with(density) { 86.dp.toPx() }
 
         Box(
             modifier = Modifier
@@ -525,25 +557,64 @@ fun ContactDetailDialog(
                 if (selectedTab == 1 && !isLoadingHistory && historyLogs.isNotEmpty()) {
                     item(key = "history_statistics") {
                         ContactHistoryStatistics(
-                            historyLogs = historyLogs,
+                            historyLogs = filteredHistoryLogs,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp)
+                                .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 4.dp)
                         )
                     }
 
-                    groupedHistoryLogs.forEach { (dateHeader, logsInDay) ->
+                    groupedHistoryLogs.forEachIndexed { dateIndex, (dateHeader, logsInDay) ->
                         if (dateHeader.isNotEmpty()) {
-                            item(key = "history_header_$dateHeader") {
-                                Text(
-                                    text = dateHeader,
-                                    fontSize = 13.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
+                            stickyHeader(key = "history_header_$dateHeader") { _ ->
+                                val headerOffsetPx by remember(listState) {
+                                    derivedStateOf {
+                                        val layoutInfo = listState.layoutInfo
+                                        val currentItem = layoutInfo.visibleItemsInfo.find { it.key == "history_header_$dateHeader" }
+                                        if (currentItem == null) {
+                                            0f
+                                        } else {
+                                            val nextHeader = layoutInfo.visibleItemsInfo.find {
+                                                it.key.toString().startsWith("history_header_") && it.index > currentItem.index
+                                            }
+                                            val headerHeight = currentItem.size.toFloat().coerceAtLeast(1f)
+
+                                            if (currentItem.offset <= 0) {
+                                                if (nextHeader != null) {
+                                                    minOf(topBarrierPx, (nextHeader.offset - headerHeight).coerceAtLeast(0f))
+                                                } else {
+                                                    topBarrierPx
+                                                }
+                                            } else if (currentItem.offset < topBarrierPx) {
+                                                if (nextHeader != null && nextHeader.offset < topBarrierPx + headerHeight) {
+                                                    minOf(topBarrierPx - currentItem.offset, (nextHeader.offset - headerHeight).coerceAtLeast(0f))
+                                                } else {
+                                                    topBarrierPx - currentItem.offset
+                                                }
+                                            } else {
+                                                0f
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Box(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(start = 24.dp, end = 20.dp, top = 0.dp, bottom = 2.dp)
-                                )
+                                        .zIndex(2f)
+                                        .offset { IntOffset(0, headerOffsetPx.roundToInt()) }
+                                ) {
+                                    FloatingStickyDateHeader(
+                                        text = dateHeader,
+                                        onFilterClick = if (dateIndex == 0) {
+                                            { showCallFilterDialog = true }
+                                        } else null,
+                                        isFilterActive = isFilterActive,
+                                        startPadding = 20.dp,
+                                        endPadding = 20.dp,
+                                        topPadding = 6.dp
+                                    )
+                                }
                             }
                         }
 
@@ -811,6 +882,19 @@ fun ContactDetailDialog(
                         showEditContactDialog = false
                     },
                     onDismiss = { showEditContactDialog = false }
+                )
+            }
+
+            if (showCallFilterDialog) {
+                CallFilterDialog(
+                    initialTypeFilter = callTypeFilter,
+                    initialSimFilter = simFilter,
+                    activeSimCount = activeSimCount,
+                    onApply = { type, sim ->
+                        callTypeFilter = type
+                        simFilter = sim
+                    },
+                    onDismiss = { showCallFilterDialog = false }
                 )
             }
         }
