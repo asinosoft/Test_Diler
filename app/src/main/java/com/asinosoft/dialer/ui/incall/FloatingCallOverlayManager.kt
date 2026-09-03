@@ -1,0 +1,531 @@
+package com.asinosoft.dialer.ui.incall
+
+import android.content.Context
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.graphics.PixelFormat
+import android.net.Uri
+import android.os.Build
+import android.os.Bundle
+import android.provider.ContactsContract
+import android.provider.Settings
+import android.telecom.Call
+import android.view.Gravity
+import android.view.WindowManager
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.SavedStateRegistry
+import androidx.savedstate.SavedStateRegistryController
+import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.asinosoft.dialer.data.model.CallState
+import com.asinosoft.dialer.service.CallManager
+import com.asinosoft.dialer.ui.components.SimIcon
+import com.asinosoft.dialer.ui.theme.DialerTheme
+import com.asinosoft.dialer.ui.theme.MissedRed
+import com.asinosoft.dialer.ui.theme.SamsungGreen
+import com.asinosoft.dialer.util.PhoneNumberHelper
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/**
+ * Manages a true system WindowManager overlay for incoming calls (`TYPE_APPLICATION_OVERLAY`).
+ * The overlay takes only WRAP_CONTENT height at the top of the screen with `FLAG_NOT_FOCUSABLE`.
+ * Touches outside the floating banner pass completely through to any app/launcher underneath!
+ */
+object FloatingCallOverlayManager {
+
+    private var currentComposeView: ComposeView? = null
+    private var currentLifecycleOwner: OverlayLifecycleOwner? = null
+    private var windowManager: WindowManager? = null
+
+    fun canDrawOverlay(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            Settings.canDrawOverlays(context)
+        } else {
+            true
+        }
+    }
+
+    fun isShowing(): Boolean = currentComposeView != null
+
+    fun show(
+        context: Context,
+        onPromoteToFullScreen: () -> Unit
+    ) {
+        if (currentComposeView != null) return
+
+        try {
+            val wm = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+            windowManager = wm
+
+            val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            } else {
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE
+            }
+
+            val params = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                layoutType,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                        WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                        WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
+                PixelFormat.TRANSLUCENT
+            ).apply {
+                gravity = Gravity.TOP
+                y = 0
+            }
+
+            val lifecycleOwner = OverlayLifecycleOwner()
+            currentLifecycleOwner = lifecycleOwner
+
+            val composeView = ComposeView(context).apply {
+                setViewTreeLifecycleOwner(lifecycleOwner)
+                setViewTreeViewModelStoreOwner(lifecycleOwner)
+                setViewTreeSavedStateRegistryOwner(lifecycleOwner)
+                setContent {
+                    DialerTheme {
+                        FloatingIncomingCallOverlayContent(
+                            context = context,
+                            onAnswer = {
+                                CallManager.answer()
+                                hide()
+                                onPromoteToFullScreen()
+                            },
+                            onDecline = {
+                                CallManager.disconnect()
+                                hide()
+                            },
+                            onOpenFullScreen = {
+                                hide()
+                                onPromoteToFullScreen()
+                            },
+                            onDismiss = {
+                                hide()
+                            }
+                        )
+                    }
+                }
+            }
+
+            currentComposeView = composeView
+            wm.addView(composeView, params)
+        } catch (_: Exception) {
+            hide()
+            onPromoteToFullScreen()
+        }
+    }
+
+    fun hide() {
+        try {
+            val view = currentComposeView
+            val wm = windowManager
+            if (view != null && wm != null) {
+                wm.removeView(view)
+            }
+        } catch (_: Exception) {
+            // ignore
+        } finally {
+            currentComposeView = null
+            windowManager = null
+            currentLifecycleOwner?.destroy()
+            currentLifecycleOwner = null
+        }
+    }
+
+    private class OverlayLifecycleOwner : LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
+        private val lifecycleRegistry = LifecycleRegistry(this)
+        private val store = ViewModelStore()
+        private val savedStateRegistryController = SavedStateRegistryController.create(this)
+
+        init {
+            savedStateRegistryController.performRestore(Bundle())
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_CREATE)
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
+            lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        }
+
+        override val lifecycle: Lifecycle get() = lifecycleRegistry
+        override val viewModelStore: ViewModelStore get() = store
+        override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
+
+        fun destroy() {
+            try {
+                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+                lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+                store.clear()
+            } catch (_: Exception) {
+                // ignore
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingIncomingCallOverlayContent(
+    context: Context,
+    onAnswer: () -> Unit,
+    onDecline: () -> Unit,
+    onOpenFullScreen: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val activeCall by CallManager.currentCall.collectAsState()
+    val currentCall = activeCall
+
+    if (currentCall == null) {
+        LaunchedEffect(Unit) { onDismiss() }
+        return
+    }
+
+    val call = remember(currentCall) {
+        CallState.fromSystemCall(currentCall, context)
+    }
+
+    var contactName by remember { mutableStateOf<String?>(null) }
+    var contactPhotoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+
+    LaunchedEffect(call.rawNumber) {
+        if (call.rawNumber.isNotBlank()) {
+            withContext(Dispatchers.IO) {
+                val result = lookupOverlayContactInfo(context, call.rawNumber)
+                contactName = result.name
+
+                if (!result.photoUri.isNullOrEmpty()) {
+                    try {
+                        val uri = result.photoUri.toUri()
+                        context.contentResolver.openInputStream(uri)?.use { stream ->
+                            val bitmap = BitmapFactory.decodeStream(stream)
+                            contactPhotoBitmap = bitmap?.asImageBitmap()
+                        }
+                    } catch (_: Exception) {
+                        contactPhotoBitmap = null
+                    }
+                } else {
+                    contactPhotoBitmap = null
+                }
+            }
+        }
+    }
+
+    DisposableEffect(activeCall) {
+        val current = activeCall
+        if (current == null) {
+            onDismiss()
+            return@DisposableEffect onDispose {}
+        }
+
+        val callback = object : Call.Callback() {
+            override fun onStateChanged(call: Call, state: Int) {
+                when (state) {
+                    Call.STATE_ACTIVE,
+                    Call.STATE_HOLDING -> onOpenFullScreen()
+                    Call.STATE_DISCONNECTED -> onDismiss()
+                }
+            }
+        }
+
+        current.registerCallback(callback)
+
+        onDispose {
+            current.unregisterCallback(callback)
+        }
+    }
+
+    val isDark = isSystemInDarkTheme()
+    val finalName = contactName
+        ?: if (call.displayName.isNotBlank() && call.displayName != call.rawNumber) call.displayName else "Неизвестный номер"
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 28.dp, start = 12.dp, end = 12.dp, bottom = 8.dp)
+    ) {
+        Surface(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { onOpenFullScreen() }
+                .border(
+                    BorderStroke(
+                        1.dp,
+                        if (isDark) Color.White.copy(alpha = 0.12f) else Color.Black.copy(alpha = 0.08f)
+                    ),
+                    RoundedCornerShape(28.dp)
+                ),
+            shape = RoundedCornerShape(28.dp),
+            color = if (isDark) Color(0xFF222834) else Color(0xFFF2F0E8), // Samsung One UI Adaptive Surface
+            tonalElevation = 8.dp,
+            shadowElevation = 12.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 16.dp)
+            ) {
+                // Main Details Row: Avatar on Left + (SIM Header, Contact Name, Number) Column on Right
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Left: Contact Photo Avatar Circle
+                    Surface(
+                        modifier = Modifier
+                            .size(64.dp)
+                            .clip(CircleShape),
+                        shape = CircleShape,
+                        color = if (isDark) Color(0xFF333B4A) else Color(0xFFD8D4C8)
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            if (contactPhotoBitmap != null) {
+                                Image(
+                                    bitmap = contactPhotoBitmap!!,
+                                    contentDescription = "Фото контакта",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else {
+                                val initial = finalName.trim().firstOrNull { it.isLetterOrDigit() }
+                                    ?.uppercaseChar()?.toString() ?: "?"
+                                Text(
+                                    text = initial,
+                                    fontSize = 26.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isDark) Color.White else Color.DarkGray
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    // Right Column: SIM Badge Header, Contact Name, Phone Number
+                    Column(modifier = Modifier.weight(1f)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SimIcon(simNumber = call.simNumber, size = 14.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "Входящие вызовы",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = finalName,
+                            fontSize = 22.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+
+                        Spacer(modifier = Modifier.height(2.dp))
+
+                        Text(
+                            text = PhoneNumberHelper.format(call.rawNumber),
+                            fontSize = 15.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
+
+                // Bottom Action Bar: Green Answer | "Отправить сообщение" | Red Decline
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Green Answer Button
+                    FloatingActionButton(
+                        onClick = onAnswer,
+                        containerColor = SamsungGreen,
+                        contentColor = Color.White,
+                        shape = CircleShape,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Call,
+                            contentDescription = "Ответить",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+
+                    // Send SMS Button
+                    Surface(
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.45f else 0.7f),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable {
+                                try {
+                                    val smsIntent = Intent(
+                                        Intent.ACTION_SENDTO,
+                                        "smsto:${Uri.encode(call.rawNumber)}".toUri()
+                                    ).apply {
+                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                    }
+                                    context.startActivity(smsIntent)
+                                } catch (_: Exception) {
+                                    Toast.makeText(
+                                        context,
+                                        "Не удалось открыть отправку сообщений",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = "Отправить сообщение",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Icon(
+                                imageVector = Icons.Default.KeyboardArrowDown,
+                                contentDescription = "Быстрый ответ SMS",
+                                tint = MaterialTheme.colorScheme.onSurface,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    // Red Decline Button
+                    FloatingActionButton(
+                        onClick = onDecline,
+                        containerColor = MissedRed,
+                        contentColor = Color.White,
+                        shape = CircleShape,
+                        modifier = Modifier.size(48.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CallEnd,
+                            contentDescription = "Отклонить",
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+private data class OverlayContactLookupResult(
+    val name: String?,
+    val photoUri: String?
+)
+
+private suspend fun lookupOverlayContactInfo(
+    context: Context,
+    phoneNumber: String
+): OverlayContactLookupResult = withContext(Dispatchers.IO) {
+    if (phoneNumber.isBlank()) return@withContext OverlayContactLookupResult(null, null)
+    try {
+        val uri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(phoneNumber)
+        )
+        val projection = arrayOf(
+            ContactsContract.PhoneLookup.DISPLAY_NAME,
+            ContactsContract.PhoneLookup.PHOTO_URI,
+            ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI
+        )
+        val cursor = context.contentResolver.query(uri, projection, null, null, null)
+        var contactName: String? = null
+        var contactPhotoUri: String? = null
+
+        cursor?.use { c ->
+            if (c.moveToFirst()) {
+                val nameIndex = c.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
+                val fullPhotoIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
+                val thumbPhotoIndex =
+                    c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI)
+
+                if (nameIndex != -1) contactName = c.getString(nameIndex)
+                if (fullPhotoIndex != -1) contactPhotoUri = c.getString(fullPhotoIndex)
+                if (contactPhotoUri.isNullOrEmpty() && thumbPhotoIndex != -1) {
+                    contactPhotoUri = c.getString(thumbPhotoIndex)
+                }
+            }
+        }
+        OverlayContactLookupResult(contactName, contactPhotoUri)
+    } catch (_: Exception) {
+        OverlayContactLookupResult(null, null)
+    }
+}

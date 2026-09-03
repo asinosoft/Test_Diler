@@ -15,6 +15,7 @@ import android.telecom.CallEndpointException
 import android.telecom.InCallService
 import androidx.annotation.RequiresApi
 import com.asinosoft.dialer.data.model.CallState
+import com.asinosoft.dialer.ui.incall.FloatingCallOverlayManager
 import com.asinosoft.dialer.ui.incall.InCallActivity
 import com.asinosoft.dialer.ui.incall.IncomingCallPopupActivity
 import java.util.concurrent.Executors
@@ -71,16 +72,14 @@ class CallService : InCallService() {
         val rawNumber = handle?.schemeSpecificPart ?: ""
 
         val showPopup = (call.state == Call.STATE_RINGING) && shouldShowFloatingPopup(this)
-        val activityClass = if (showPopup) {
-            IncomingCallPopupActivity::class.java
+        if (showPopup) {
+            FloatingCallOverlayManager.show(this, onPromoteToFullScreen = { promoteToFullInCallUi() })
         } else {
-            InCallActivity::class.java
+            val intent = Intent(this, InCallActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            }
+            startActivity(intent)
         }
-
-        val intent = Intent(this, activityClass).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-        }
-        startActivity(intent)
 
         if (call.state == Call.STATE_RINGING) {
             ringtonePlayer.start()
@@ -99,6 +98,7 @@ class CallService : InCallService() {
                     wasAnswered = true
                     ringtonePlayer.stop()
                     unregisterSilenceReceiver()
+                    FloatingCallOverlayManager.hide()
                     // BT headset / external answer while floating popup is showing
                     promoteToFullInCallUi()
                 } else {
@@ -108,6 +108,7 @@ class CallService : InCallService() {
                 if (state == Call.STATE_DISCONNECTED) {
                     ringtonePlayer.stop()
                     unregisterSilenceReceiver()
+                    FloatingCallOverlayManager.hide()
                     stopForeground(true)
                     if (wasRinging && !wasAnswered && rawNumber.isNotBlank()) {
                         notification.showMissedCallNotification(rawNumber)
@@ -174,6 +175,7 @@ class CallService : InCallService() {
         super.onCallRemoved(call)
         ringtonePlayer.stop()
         unregisterSilenceReceiver()
+        FloatingCallOverlayManager.hide()
         if (CallManager.currentCall.value == call) {
             CallManager.setCall(null)
             stopForeground(true)
@@ -184,6 +186,7 @@ class CallService : InCallService() {
         super.onDestroy()
         ringtonePlayer.stop()
         unregisterSilenceReceiver()
+        FloatingCallOverlayManager.hide()
         if (CallManager.inCallService == this) {
             CallManager.inCallService = null
         }
@@ -231,6 +234,7 @@ class CallService : InCallService() {
 
     private fun promoteToFullInCallUi() {
         try {
+            FloatingCallOverlayManager.hide()
             val intent = Intent(this, InCallActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
