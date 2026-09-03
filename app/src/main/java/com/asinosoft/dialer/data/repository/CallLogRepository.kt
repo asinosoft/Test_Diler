@@ -97,7 +97,10 @@ class CallLogRepository(private val context: Context) {
     /**
      * @param limit max raw CallLog rows (newest first). Null = entire journal.
      */
-    suspend fun getCallLogs(limit: Int? = DEFAULT_RECENTS_LIMIT): List<CallLogItem> =
+    suspend fun getCallLogs(
+        limit: Int? = DEFAULT_RECENTS_LIMIT,
+        groupConsecutive: Boolean = false
+    ): List<CallLogItem> =
         withContext(Dispatchers.IO) {
             if (photoCache.isEmpty() and nameCache.isEmpty()) {
                 seedCachesFromContacts()
@@ -110,7 +113,11 @@ class CallLogRepository(private val context: Context) {
             )
             val withNames = enrichNames(raw)
             val withPhotos = enrichPhotos(withNames)
-            groupConsecutiveCallLogs(withPhotos)
+            if (groupConsecutive) {
+                groupConsecutiveCallLogs(withPhotos)
+            } else {
+                withPhotos
+            }
         }
 
     /**
@@ -490,7 +497,7 @@ class CallLogRepository(private val context: Context) {
         }
     }
 
-    private fun groupConsecutiveCallLogs(logs: List<CallLogItem>): List<CallLogItem> {
+    fun groupConsecutiveCallLogs(logs: List<CallLogItem>): List<CallLogItem> {
         if (logs.isEmpty()) return emptyList()
 
         val cal = java.util.Calendar.getInstance()

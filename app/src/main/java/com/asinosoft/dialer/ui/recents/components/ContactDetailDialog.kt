@@ -400,7 +400,12 @@ fun ContactDetailDialog(
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 8.dp),
+                                .padding(
+                                    start = 20.dp,
+                                    end = 20.dp,
+                                    top = 24.dp,
+                                    bottom = if (selectedTab == 1 && !isLoadingHistory && historyLogs.isNotEmpty()) 0.dp else 8.dp
+                                ),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
@@ -421,7 +426,9 @@ fun ContactDetailDialog(
                                 onTabSelected = { selectedTab = it }
                             )
 
-                            Spacer(modifier = Modifier.height(24.dp))
+                            if (selectedTab != 1 || isLoadingHistory || historyLogs.isEmpty()) {
+                                Spacer(modifier = Modifier.height(24.dp))
+                            }
 
                             when (selectedTab) {
                                 0 -> {
@@ -488,14 +495,6 @@ fun ContactDetailDialog(
                                             }
                                             Spacer(modifier = Modifier.height(40.dp))
                                         }
-
-                                        else -> {
-                                            ContactHistoryStatistics(
-                                                historyLogs = historyLogs,
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                            Spacer(modifier = Modifier.height(16.dp))
-                                        }
                                     }
                                 }
 
@@ -524,6 +523,15 @@ fun ContactDetailDialog(
                 }
 
                 if (selectedTab == 1 && !isLoadingHistory && historyLogs.isNotEmpty()) {
+                    item(key = "history_statistics") {
+                        ContactHistoryStatistics(
+                            historyLogs = historyLogs,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 12.dp)
+                        )
+                    }
+
                     groupedHistoryLogs.forEach { (dateHeader, logsInDay) ->
                         if (dateHeader.isNotEmpty()) {
                             item(key = "history_header_$dateHeader") {

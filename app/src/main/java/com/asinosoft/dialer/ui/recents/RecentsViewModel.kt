@@ -42,6 +42,19 @@ data class ContactDetailState(
     val isFavorite: Boolean = false
 )
 
+enum class CallTypeFilter(val title: String) {
+    ALL("Все"),
+    INCOMING("Входящие"),
+    OUTGOING("Исходящие"),
+    MISSED("Пропущенные")
+}
+
+enum class SimFilter(val title: String) {
+    ALL("Все SIM"),
+    SIM_1("SIM 1"),
+    SIM_2("SIM 2")
+}
+
 data class UnsavedNumberFlowState(
     val phoneNumber: String,
     val step: UnsavedNumberFlowStep
@@ -105,7 +118,50 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     private val _rawCallLogs = MutableStateFlow<List<CallLogItem>>(emptyList())
 
-    val recentCalls: StateFlow<List<CallLogItem>> = _rawCallLogs
+    private val _callTypeFilter = MutableStateFlow(CallTypeFilter.ALL)
+    val callTypeFilter: StateFlow<CallTypeFilter> = _callTypeFilter.asStateFlow()
+
+    private val _simFilter = MutableStateFlow(SimFilter.ALL)
+    val simFilter: StateFlow<SimFilter> = _simFilter.asStateFlow()
+
+    val isFilterActive: StateFlow<Boolean> = combine(
+        _callTypeFilter,
+        _simFilter
+    ) { type, sim ->
+        type != CallTypeFilter.ALL || sim != SimFilter.ALL
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val recentCalls: StateFlow<List<CallLogItem>> = combine(
+        _rawCallLogs,
+        _callTypeFilter,
+        _simFilter
+    ) { logs, typeFilter, simFilter ->
+        val filtered = logs.filter { item ->
+            val matchesType = when (typeFilter) {
+                CallTypeFilter.ALL -> true
+                CallTypeFilter.INCOMING -> item.type == CallType.INCOMING
+                CallTypeFilter.OUTGOING -> item.type == CallType.OUTGOING
+                CallTypeFilter.MISSED -> item.type == CallType.MISSED || item.type == CallType.REJECTED
+            }
+            val matchesSim = when (simFilter) {
+                SimFilter.ALL -> true
+                SimFilter.SIM_1 -> item.simNumber == 1
+                SimFilter.SIM_2 -> item.simNumber == 2
+            }
+            matchesType && matchesSim
+        }
+        repository.groupConsecutiveCallLogs(filtered)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    fun setCallFilters(type: CallTypeFilter, sim: SimFilter) {
+        _callTypeFilter.value = type
+        _simFilter.value = sim
+    }
+
+    fun resetCallFilters() {
+        _callTypeFilter.value = CallTypeFilter.ALL
+        _simFilter.value = SimFilter.ALL
+    }
 
     private val _contacts = MutableStateFlow<List<SearchDialerItem>>(emptyList())
 

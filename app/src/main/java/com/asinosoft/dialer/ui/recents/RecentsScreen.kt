@@ -73,6 +73,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import android.content.Context
+import android.telephony.SubscriptionManager
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.ui.components.FloatingStickyDateHeader
@@ -81,6 +83,7 @@ import com.asinosoft.dialer.ui.dialer.SearchDialerScreen
 import com.asinosoft.dialer.ui.recents.components.AddFavoriteDialog
 import com.asinosoft.dialer.ui.recents.components.AppSettingsDialog
 import com.asinosoft.dialer.ui.recents.components.AvatarBitmapCache
+import com.asinosoft.dialer.ui.recents.components.CallFilterDialog
 import com.asinosoft.dialer.ui.recents.components.CallLogAddContactDialog
 import com.asinosoft.dialer.ui.recents.components.CallLogAddToExistingContactDialog
 import com.asinosoft.dialer.ui.recents.components.ContactDetailDialog
@@ -124,6 +127,22 @@ fun RecentsScreen(
     val showHint by viewModel.showSwipeHint.collectAsState()
     var initialScrollDone by remember { mutableStateOf(false) }
     var listReady by remember { mutableStateOf(false) }
+
+    val activeSimCount = remember(context) {
+        try {
+            val sm = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+            @Suppress("MissingPermission")
+            val count = sm?.activeSubscriptionInfoCount ?: 1
+            if (count > 1) count else 1
+        } catch (_: Exception) {
+            1
+        }
+    }
+
+    val callTypeFilter by viewModel.callTypeFilter.collectAsState()
+    val simFilter by viewModel.simFilter.collectAsState()
+    val isFilterActive by viewModel.isFilterActive.collectAsState()
+    var showCallFilterDialog by remember { mutableStateOf(false) }
 
     val listState = rememberLazyListState()
 
@@ -678,10 +697,16 @@ fun RecentsScreen(
                         }
                     }
 
-                    groupedCallLogs.forEach { (dateHeader, logsInDay) ->
+                    groupedCallLogs.entries.forEachIndexed { dateIndex, (dateHeader, logsInDay) ->
                         if (dateHeader.isNotEmpty()) {
                             stickyHeader(key = "header_$dateHeader") { _ ->
-                                FloatingStickyDateHeader(text = dateHeader)
+                                FloatingStickyDateHeader(
+                                    text = dateHeader,
+                                    onFilterClick = if (dateIndex == 0) {
+                                        { showCallFilterDialog = true }
+                                    } else null,
+                                    isFilterActive = isFilterActive
+                                )
                             }
                         }
 
@@ -864,6 +889,19 @@ fun RecentsScreen(
                     }
                 )
             }
+        }
+
+        // Call Log Filter Dialog
+        if (showCallFilterDialog) {
+            CallFilterDialog(
+                initialTypeFilter = callTypeFilter,
+                initialSimFilter = simFilter,
+                activeSimCount = activeSimCount,
+                onApply = { type, sim ->
+                    viewModel.setCallFilters(type, sim)
+                },
+                onDismiss = { showCallFilterDialog = false }
+            )
         }
 
         // Floating Dialpad Button (Only show on main screen when search dialer is closed)

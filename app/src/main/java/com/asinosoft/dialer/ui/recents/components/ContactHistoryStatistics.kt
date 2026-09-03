@@ -325,6 +325,7 @@ fun ContactHistoryStatistics(
                                             showDateRangePickerDialog = true
                                         } else {
                                             selectedPeriod = period
+                                            selectedGroupIndex = null
                                         }
                                     }
                                 )
@@ -507,7 +508,6 @@ fun ContactHistoryStatistics(
                                             .clip(RoundedCornerShape(10.dp))
                                             .clickable {
                                                 selectedMetric = metric
-                                                selectedGroupIndex = null
                                             }
                                     ) {
                                         Text(
@@ -546,51 +546,6 @@ fun ContactHistoryStatistics(
                                 text = "Нет данных за выбранный период",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(10.dp))
-
-                    // Legend Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceAround,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(IncomingGreen)
-                            )
-                            Text(
-                                text = "Входящие: " + if (selectedMetric == DiagramMetric.TIME) formatExactDuration(incomingDurationSec) else "$incomingCount",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
-                            )
-                        }
-
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(OutgoingBlue)
-                            )
-                            Text(
-                                text = "Исходящие: " + if (selectedMetric == DiagramMetric.TIME) formatExactDuration(outgoingDurationSec) else "$outgoingCount",
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
                             )
                         }
                     }

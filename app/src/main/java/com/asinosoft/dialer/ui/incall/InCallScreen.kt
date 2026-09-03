@@ -9,10 +9,20 @@ import android.provider.ContactsContract
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telephony.SubscriptionManager
-import android.widget.Toast
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,12 +31,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material.icons.filled.Call
@@ -36,10 +52,7 @@ import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -56,18 +69,26 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -75,14 +96,15 @@ import androidx.core.net.toUri
 import com.asinosoft.dialer.service.CallManager
 import com.asinosoft.dialer.ui.components.SimIcon
 import com.asinosoft.dialer.ui.theme.MissedRed
-import com.asinosoft.dialer.ui.theme.OneUIBgDark
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.ui.theme.SamsungSmsBlue
 import com.asinosoft.dialer.util.PhoneNumberHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
 
 @Composable
@@ -202,30 +224,49 @@ fun InCallScreen(
         }
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = OneUIBgDark
+    val formattedName = contactName ?: if (displayName.isBlank()) {
+        "Неизвестный номер"
+    } else if (displayName == rawNumber) {
+        PhoneNumberHelper.format(displayName)
+    } else {
+        displayName
+    }
+
+    // Samsung One UI In-Call Screen
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFF222834),
+                        Color(0xFF151922),
+                        Color(0xFF0C0E14)
+                    )
+                )
+            )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 24.dp, vertical = 28.dp),
+                .padding(horizontal = 24.dp)
+                .padding(top = 48.dp, bottom = 42.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            Spacer(modifier = Modifier.height(20.dp))
-
-            // Top Section: Avatar, Contact Name, Number, Status, SIM
+            // Top Section: Avatar, Contact Name, (SIM Icon + Number), Status badge
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Large Avatar (170dp)
+                // Large One UI Circular Avatar (170dp)
                 Surface(
                     modifier = Modifier
                         .size(170.dp)
-                        .clip(CircleShape),
+                        .clip(CircleShape)
+                        .border(BorderStroke(2.5.dp, Color.White.copy(alpha = 0.18f)), CircleShape),
                     shape = CircleShape,
-                    color = Color(0xFF2B2D31)
+                    color = Color(0xFF282E3C),
+                    shadowElevation = 14.dp
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
@@ -243,25 +284,28 @@ fun InCallScreen(
                             val initial =
                                 titleForInitial.trim().firstOrNull { it.isLetterOrDigit() }
                                     ?.uppercaseChar()?.toString() ?: "?"
-                            Text(
-                                text = initial,
-                                color = Color.White,
-                                fontSize = 60.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.linearGradient(
+                                            listOf(Color(0xFF3E4758), Color(0xFF262C38))
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = initial,
+                                    color = Color.White,
+                                    fontSize = 64.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
                     }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))
-
-                val formattedName = contactName ?: if (displayName.isBlank()) {
-                    "Неизвестный номер"
-                } else if (displayName == rawNumber) {
-                    PhoneNumberHelper.format(displayName)
-                } else {
-                    displayName
-                }
 
                 Text(
                     text = formattedName,
@@ -269,58 +313,82 @@ fun InCallScreen(
                     fontWeight = FontWeight.Bold,
                     color = Color.White,
                     textAlign = TextAlign.Center,
-                    maxLines = 2
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
                 )
 
-                if (rawNumber.isNotBlank() && (contactName != null || displayName != rawNumber)) {
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = PhoneNumberHelper.format(rawNumber),
-                        fontSize = 16.sp,
-                        color = Color.White.copy(alpha = 0.7f),
-                        textAlign = TextAlign.Center
-                    )
+                // Phone number line with SIM icon in front (without "SIM" text)
+                if (rawNumber.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (activeSimCount > 1) {
+                            SimIcon(simNumber = simNumber, size = 15.dp)
+                            Spacer(modifier = Modifier.width(6.dp))
+                        }
+                        val numberToDisplay = if (contactName != null || displayName != rawNumber) {
+                            PhoneNumberHelper.format(rawNumber)
+                        } else {
+                            ""
+                        }
+                        if (numberToDisplay.isNotBlank()) {
+                            Text(
+                                text = numberToDisplay,
+                                fontSize = 16.sp,
+                                color = Color.White.copy(alpha = 0.65f),
+                                textAlign = TextAlign.Center,
+                                maxLines = 1
+                            )
+                        }
+                    }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // Call Status Text & Timer
+                // Call Status & Timer Badge
+                val isCallActive = callState == Call.STATE_ACTIVE
                 val statusText = when {
                     isHold -> "На удержании"
-                    callState == Call.STATE_RINGING -> "Входящий вызов..."
+                    callState == Call.STATE_RINGING -> "Входящий вызов"
                     callState == Call.STATE_DIALING -> "Вызов..."
                     callState == Call.STATE_CONNECTING -> "Соединение..."
-                    callState == Call.STATE_ACTIVE -> formatDuration(durationSeconds)
-                    callState == Call.STATE_DISCONNECTING || callState == Call.STATE_DISCONNECTED -> "Завершение вызова..."
+                    isCallActive -> formatDuration(durationSeconds)
+                    callState == Call.STATE_DISCONNECTING || callState == Call.STATE_DISCONNECTED -> "Завершение..."
                     else -> "Соединение..."
                 }
 
-                Text(
-                    text = statusText,
-                    fontSize = 19.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = if (isHold) Color(0xFFFFB300) else SamsungGreen
-                )
-
-                if (activeSimCount > 1) {
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    // SIM Indicator Chip
+                Surface(
+                    shape = RoundedCornerShape(16.dp),
+                    color = when {
+                        isHold -> Color(0xFFFFB300).copy(alpha = 0.22f)
+                        isCallActive -> Color.White.copy(alpha = 0.12f)
+                        else -> SamsungGreen.copy(alpha = 0.18f)
+                    }
+                ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(Color.White.copy(alpha = 0.12f))
-                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                     ) {
-                        SimIcon(simNumber = simNumber, size = 14.dp)
-                        Spacer(modifier = Modifier.width(6.dp))
+                        if (isCallActive) {
+                            Box(
+                                modifier = Modifier
+                                    .size(8.dp)
+                                    .clip(CircleShape)
+                                    .background(SamsungGreen)
+                            )
+                        }
                         Text(
-                            text = "СИМ $simNumber",
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = Color.White.copy(alpha = 0.85f)
+                            text = statusText,
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = when {
+                                isHold -> Color(0xFFFFC107)
+                                isCallActive -> Color.White
+                                else -> SamsungGreen
+                            }
                         )
                     }
                 }
@@ -330,7 +398,7 @@ fun InCallScreen(
             if (callState == Call.STATE_ACTIVE || callState == Call.STATE_DIALING || isHold) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Row 1
                     Row(
@@ -346,18 +414,13 @@ fun InCallScreen(
                             onClick = { CallManager.toggleRecord() }
                         )
 
-                        // 2. Add Call
+                        // 2. Hold
                         InCallActionButton(
-                            icon = Icons.Default.PersonAdd,
-                            label = "Добавить",
-                            isActive = false,
-                            onClick = {
-                                Toast.makeText(
-                                    context,
-                                    "Откройте приложение для второго звонка",
-                                    Toast.LENGTH_SHORT
-                                ).show()
-                            }
+                            icon = if (isHold) Icons.Default.PlayArrow else Icons.Default.Pause,
+                            label = if (isHold) "Продолжить" else "Удержание",
+                            isActive = isHold,
+                            activeColor = Color(0xFFFFB300),
+                            onClick = { CallManager.toggleHold() }
                         )
 
                         // 3. Bluetooth
@@ -379,14 +442,14 @@ fun InCallScreen(
                         // 4. Speaker
                         val isSpeakerActive = audioRoute == CallAudioState.ROUTE_SPEAKER
                         InCallActionButton(
-                            icon = if (isSpeakerActive) Icons.Default.VolumeUp else Icons.Default.VolumeOff,
+                            icon = if (isSpeakerActive) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
                             label = "Динамик",
                             isActive = isSpeakerActive,
                             activeColor = SamsungGreen,
                             onClick = { CallManager.toggleSpeaker() }
                         )
 
-                        // 5. Mute
+                        // 5. Mute Microphone
                         InCallActionButton(
                             icon = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
                             label = if (isMuted) "Выкл. микр." else "Микрофон",
@@ -395,7 +458,7 @@ fun InCallScreen(
                             onClick = { CallManager.toggleMute() }
                         )
 
-                        // 6. Keypad
+                        // 6. DTMF Keypad
                         InCallActionButton(
                             icon = Icons.Default.Dialpad,
                             label = "Клавиатура",
@@ -411,65 +474,27 @@ fun InCallScreen(
 
             // Bottom Section: Answer / Decline / End Call Buttons
             Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(bottom = 20.dp)
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 if (callState == Call.STATE_RINGING) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Decline Button (Red)
-                        FloatingActionButton(
-                            onClick = { CallManager.disconnect() },
-                            containerColor = MissedRed,
-                            contentColor = Color.White,
-                            shape = CircleShape,
-                            modifier = Modifier.size(72.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CallEnd,
-                                contentDescription = "Отклонить",
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-
-                        // Answer Button (Green)
-                        FloatingActionButton(
-                            onClick = { CallManager.answer() },
-                            containerColor = SamsungGreen,
-                            contentColor = Color.White,
-                            shape = CircleShape,
-                            modifier = Modifier.size(72.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Call,
-                                contentDescription = "Ответить",
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    }
+                    SamsungSwipeAnswerDeclineRow(
+                        onAnswer = { CallManager.answer() },
+                        onDecline = { CallManager.disconnect() }
+                    )
                 } else {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+                    // Active Call: Centered End Call Button (Red) without "Завершить" text
+                    FloatingActionButton(
+                        onClick = { CallManager.disconnect() },
+                        containerColor = MissedRed,
+                        contentColor = Color.White,
+                        shape = CircleShape,
+                        modifier = Modifier.size(76.dp)
                     ) {
-                        // End Call Button (Red)
-                        FloatingActionButton(
-                            onClick = { CallManager.disconnect() },
-                            containerColor = MissedRed,
-                            contentColor = Color.White,
-                            shape = CircleShape,
-                            modifier = Modifier.size(72.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.CallEnd,
-                                contentDescription = "Завершить вызов",
-                                modifier = Modifier.size(36.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.CallEnd,
+                            contentDescription = "Завершить вызов",
+                            modifier = Modifier.size(38.dp)
+                        )
                     }
                 }
             }
@@ -487,6 +512,228 @@ fun InCallScreen(
     }
 }
 
+/**
+ * Samsung One UI Swipe to Answer (Green, swipes Right) / Swipe to Decline (Red, swipes Left)
+ */
+@Composable
+private fun SamsungSwipeAnswerDeclineRow(
+    onAnswer: () -> Unit,
+    onDecline: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val haptic = LocalHapticFeedback.current
+    val coroutineScope = rememberCoroutineScope()
+    val density = LocalDensity.current
+
+    val answerOffsetX = remember { Animatable(0f) }
+    val declineOffsetX = remember { Animatable(0f) }
+
+    val thresholdPx = with(density) { 85.dp.toPx() }
+    val maxDragPx = with(density) { 130.dp.toPx() }
+
+    var hasTriggered by remember { mutableStateOf(false) }
+
+    // Pulsing chevrons guide animation
+    val infiniteTransition = rememberInfiniteTransition(label = "pulseTransition")
+    val pulseAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.25f,
+        targetValue = 0.90f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(750),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulseAlpha"
+    )
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // Left: Answer Button (Green) - Swipes RIGHT
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.weight(1f)
+        ) {
+            Box(
+                contentAlignment = Alignment.CenterStart,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Guided pulsing chevrons pointing right >>>
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    modifier = Modifier.padding(start = 78.dp)
+                ) {
+                    repeat(3) { i ->
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                            contentDescription = null,
+                            tint = SamsungGreen.copy(alpha = (pulseAlpha - i * 0.2f).coerceIn(0.12f, 1f)),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // Green Draggable Answer Button
+                Surface(
+                    shape = CircleShape,
+                    color = SamsungGreen,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .offset { IntOffset(answerOffsetX.value.roundToInt(), 0) }
+                        .size(74.dp)
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures(
+                                onDragEnd = {
+                                    coroutineScope.launch {
+                                        if (answerOffsetX.value >= thresholdPx && !hasTriggered) {
+                                            hasTriggered = true
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onAnswer()
+                                        } else {
+                                            answerOffsetX.animateTo(0f, spring())
+                                        }
+                                    }
+                                },
+                                onDragCancel = {
+                                    coroutineScope.launch {
+                                        answerOffsetX.animateTo(0f, spring())
+                                    }
+                                },
+                                onHorizontalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    val newOffset = (answerOffsetX.value + dragAmount).coerceIn(0f, maxDragPx)
+                                    coroutineScope.launch {
+                                        answerOffsetX.snapTo(newOffset)
+                                        if (newOffset >= thresholdPx && !hasTriggered) {
+                                            hasTriggered = true
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onAnswer()
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Call,
+                            contentDescription = "Ответить",
+                            tint = Color.White,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Ответить",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.White.copy(alpha = 0.8f)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(16.dp))
+
+        // Right: Decline Button (Red) - Swipes LEFT
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.weight(1f)
+        ) {
+            Box(
+                contentAlignment = Alignment.CenterEnd,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Guided pulsing chevrons pointing left <<<
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(3.dp),
+                    modifier = Modifier.padding(end = 78.dp)
+                ) {
+                    repeat(3) { i ->
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
+                            contentDescription = null,
+                            tint = MissedRed.copy(alpha = (pulseAlpha - i * 0.2f).coerceIn(0.12f, 1f)),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
+                }
+
+                // Red Draggable Decline Button
+                Surface(
+                    shape = CircleShape,
+                    color = MissedRed,
+                    shadowElevation = 8.dp,
+                    modifier = Modifier
+                        .offset { IntOffset(declineOffsetX.value.roundToInt(), 0) }
+                        .size(74.dp)
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures(
+                                onDragEnd = {
+                                    coroutineScope.launch {
+                                        if (declineOffsetX.value <= -thresholdPx && !hasTriggered) {
+                                            hasTriggered = true
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onDecline()
+                                        } else {
+                                            declineOffsetX.animateTo(0f, spring())
+                                        }
+                                    }
+                                },
+                                onDragCancel = {
+                                    coroutineScope.launch {
+                                        declineOffsetX.animateTo(0f, spring())
+                                    }
+                                },
+                                onHorizontalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    val newOffset = (declineOffsetX.value + dragAmount).coerceIn(-maxDragPx, 0f)
+                                    coroutineScope.launch {
+                                        declineOffsetX.snapTo(newOffset)
+                                        if (newOffset <= -thresholdPx && !hasTriggered) {
+                                            hasTriggered = true
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            onDecline()
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CallEnd,
+                            contentDescription = "Отклонить",
+                            tint = Color.White,
+                            modifier = Modifier.size(34.dp)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "Отклонить",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color.White.copy(alpha = 0.8f)
+            )
+        }
+    }
+}
+
 @Composable
 private fun InCallActionButton(
     icon: ImageVector,
@@ -498,25 +745,30 @@ private fun InCallActionButton(
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
-            .width(80.dp)
-            .clickable { onClick() }
+            .width(84.dp)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
     ) {
         Surface(
-            modifier = Modifier.size(60.dp),
+            modifier = Modifier.size(64.dp),
             shape = CircleShape,
-            color = if (isActive) activeColor else Color.White.copy(alpha = 0.15f)
+            color = if (isActive) activeColor else Color.White.copy(alpha = 0.12f),
+            shadowElevation = if (isActive) 6.dp else 0.dp
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     imageVector = icon,
                     contentDescription = label,
                     tint = Color.White,
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(28.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.height(6.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         Text(
             text = label,
@@ -536,31 +788,53 @@ private fun InCallKeypadSheet(
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var dialedDigits by remember { mutableStateOf("") }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        containerColor = OneUIBgDark,
+        containerColor = Color(0xFF1E232E),
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+                .padding(bottom = 36.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Header Row: Digits Text & Close Button
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Клавиатура тонального набора",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = dialedDigits.ifEmpty { "Клавиатура" },
+                        fontSize = if (dialedDigits.isNotEmpty()) 24.sp else 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    if (dialedDigits.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(8.dp))
+                        IconButton(onClick = { dialedDigits = dialedDigits.dropLast(1) }) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Backspace,
+                                contentDescription = "Удалить",
+                                tint = Color.White.copy(alpha = 0.6f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
 
                 IconButton(onClick = onDismiss) {
                     Icon(
@@ -573,39 +847,68 @@ private fun InCallKeypadSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // DTMF Dialpad Grid (3x4)
-            val digits = listOf(
-                listOf('1', '2', '3'),
-                listOf('4', '5', '6'),
-                listOf('7', '8', '9'),
-                listOf('*', '0', '#')
-            )
+            // DTMF Dialpad Grid (3x4) with T9 Subletters
+            val dtmfButtons = remember {
+                listOf(
+                    Pair("1", ""),
+                    Pair("2", "ABC"),
+                    Pair("3", "DEF"),
+                    Pair("4", "GHI"),
+                    Pair("5", "JKL"),
+                    Pair("6", "MNO"),
+                    Pair("7", "PQRS"),
+                    Pair("8", "TUV"),
+                    Pair("9", "WXYZ"),
+                    Pair("*", ""),
+                    Pair("0", "+"),
+                    Pair("#", "")
+                )
+            }
 
-            digits.forEach { row ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp),
-                    horizontalArrangement = Arrangement.SpaceEvenly
-                ) {
-                    row.forEach { char ->
-                        Surface(
-                            modifier = Modifier
-                                .size(64.dp)
-                                .clip(CircleShape)
-                                .clickable {
-                                    onDigitClick(char)
-                                },
-                            shape = CircleShape,
-                            color = Color.White.copy(alpha = 0.15f)
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = "$char",
-                                    fontSize = 24.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White
-                                )
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                for (row in 0 until 4) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceEvenly
+                    ) {
+                        for (col in 0 until 3) {
+                            val (digit, letters) = dtmfButtons[row * 3 + col]
+                            Surface(
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .clip(CircleShape)
+                                    .clickable {
+                                        val char = digit.firstOrNull() ?: ' '
+                                        onDigitClick(char)
+                                        dialedDigits += digit
+                                    },
+                                shape = CircleShape,
+                                color = Color.White.copy(alpha = 0.12f)
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Text(
+                                        text = digit,
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
+                                    if (letters.isNotEmpty()) {
+                                        Text(
+                                            text = letters,
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Normal,
+                                            color = Color.White.copy(alpha = 0.5f),
+                                            lineHeight = 10.sp
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
