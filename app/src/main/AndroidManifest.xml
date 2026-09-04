@@ -129,6 +129,13 @@
             </intent-filter>
         </service>
 
+        <service android:name=".service.TestService" />
+
+        <activity
+            android:name=".TestActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Dialer"
+            />
     </application>
 
 </manifest>
