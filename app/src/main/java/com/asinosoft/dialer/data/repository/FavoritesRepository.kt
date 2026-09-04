@@ -14,6 +14,11 @@ class FavoritesRepository(private val context: Context) {
     private val prefs = context.getSharedPreferences("favorites_prefs", Context.MODE_PRIVATE)
     private val contactsWrite = ContactsWriteRepository(context)
 
+    /** Instant read for cold start (< 1ms). */
+    fun getCachedFavorites(): List<FavoriteContact> {
+        return getSavedFavorites()
+    }
+
     fun getFavorites(): List<FavoriteContact> {
         val savedFavorites = getSavedFavorites()
         val refreshedSaved = savedFavorites.map { refreshContactFromAndroid(it) }

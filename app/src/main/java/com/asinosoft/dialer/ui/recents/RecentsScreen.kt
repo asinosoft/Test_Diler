@@ -126,7 +126,13 @@ fun RecentsScreen(
     val hasLoadedCallLogs by viewModel.hasLoadedCallLogs.collectAsState()
     val showHint by viewModel.showSwipeHint.collectAsState()
     var initialScrollDone by remember { mutableStateOf(false) }
-    var listReady by remember { mutableStateOf(false) }
+    var listReady by remember { mutableStateOf(hasLoadedCallLogs || callLogs.isNotEmpty()) }
+
+    LaunchedEffect(hasLoadedCallLogs, callLogs) {
+        if (hasLoadedCallLogs || callLogs.isNotEmpty()) {
+            listReady = true
+        }
+    }
 
     val activeSimCount = remember(context) {
         try {
