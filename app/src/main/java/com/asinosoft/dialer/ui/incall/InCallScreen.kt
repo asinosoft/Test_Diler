@@ -151,22 +151,40 @@ fun InCallScreen(
     var showKeypadSheet by remember { mutableStateOf(false) }
 
     val handle = activeCall?.details?.handle
-    val rawNumber = handle?.schemeSpecificPart ?: ""
-    val displayName = activeCall?.details?.callerDisplayName ?: rawNumber
+    val currentRawNumber = handle?.schemeSpecificPart.orEmpty()
+    val currentDisplayName = activeCall?.details?.callerDisplayName ?: currentRawNumber
+    val currentSimNumber = remember(activeCall) { getSimNumberFromCall(activeCall, context) }
+
+    var lastKnownNumber by remember { mutableStateOf("") }
+    var lastKnownDisplayName by remember { mutableStateOf("") }
+    var lastKnownSimNumber by remember { mutableIntStateOf(1) }
+
+    LaunchedEffect(currentRawNumber, currentDisplayName, currentSimNumber) {
+        if (currentRawNumber.isNotBlank()) lastKnownNumber = currentRawNumber
+        if (currentDisplayName.isNotBlank()) lastKnownDisplayName = currentDisplayName
+        if (currentSimNumber > 0) lastKnownSimNumber = currentSimNumber
+    }
+
+    val rawNumber = if (currentRawNumber.isNotBlank()) currentRawNumber else lastKnownNumber
+    val displayName = if (currentDisplayName.isNotBlank()) currentDisplayName else lastKnownDisplayName
+    val simNumber = if (currentSimNumber > 0) currentSimNumber else lastKnownSimNumber
 
     var contactId by remember { mutableStateOf<String?>(null) }
     var contactName by remember { mutableStateOf<String?>(null) }
     var contactPhotoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
-    val simNumber = remember(activeCall) { getSimNumberFromCall(activeCall, context) }
-
     val displayableCalls = remember(allCalls, activeCall) { CallManager.getDisplayableTopLevelCalls() }
     val incomingWaitingCall = displayableCalls.firstOrNull { it.state == Call.STATE_RINGING && it != activeCall }
     val isConference = remember(activeCall, allCalls) { CallManager.isConferenceCall(activeCall) || (displayableCalls.size == 1 && CallManager.isConferenceCall(displayableCalls.firstOrNull())) }
 
-    val hasAnyActiveCall = displayableCalls.any { it.state == Call.STATE_ACTIVE || it.state == Call.STATE_DIALING || it.state == Call.STATE_CONNECTING || it.state == Call.STATE_HOLDING || CallManager.isConferenceCall(it) }
-    val isCallDisconnected = displayableCalls.isEmpty() || !hasAnyActiveCall
-    val isCallActive = hasAnyActiveCall && !isCallDisconnected
+    val hasLiveCall = displayableCalls.any { it.state != Call.STATE_DISCONNECTED && it.state != Call.STATE_DISCONNECTING }
+    val isCallDisconnected = displayableCalls.isEmpty() || !hasLiveCall
+    val isCallActive = (callState == Call.STATE_ACTIVE) && !isCallDisconnected
+
+    val showMultiCallList = displayableCalls.size >= 2 &&
+            incomingWaitingCall == null &&
+            !isCallDisconnected &&
+            displayableCalls.all { it.state == Call.STATE_ACTIVE || it.state == Call.STATE_HOLDING }
 
     LaunchedEffect(rawNumber, isConference) {
         if (isConference) {
@@ -312,8 +330,8 @@ fun InCallScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top Section: Multiple Calls List OR Single Call Info
-            if (displayableCalls.size >= 2 && incomingWaitingCall == null && !isCallDisconnected) {
+            // Top Section: Multiple Calls List (only when both are connected) OR Single Call Info
+            if (showMultiCallList) {
                 MultiCallCardsView(
                     calls = displayableCalls,
                     primaryCall = activeCall,
@@ -485,7 +503,7 @@ fun InCallScreen(
 
                     // 3 Quick Action Buttons placed directly under "Вызов завершен"
                     if (isCallDisconnected) {
-                        Spacer(modifier = Modifier.height(32.dp))
+                        Spacer(modifier = Modifier.height(68.dp))
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

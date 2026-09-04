@@ -74,10 +74,11 @@ class CallService : InCallService() {
         val handle = call.details?.handle
         val rawNumber = handle?.schemeSpecificPart ?: ""
 
-        val showPopup = (call.state == Call.STATE_RINGING) && shouldShowFloatingPopup(this)
+        val showPopup = (call.state == Call.STATE_RINGING) && shouldShowFloatingPopup(this, call)
         if (showPopup) {
             FloatingCallOverlayManager.show(this, onPromoteToFullScreen = { promoteToFullInCallUi() })
         } else {
+            FloatingCallOverlayManager.hide()
             val intent = Intent(this, InCallActivity::class.java).apply {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
@@ -388,7 +389,13 @@ class CallService : InCallService() {
         silenceReceiverRegistered = false
     }
 
-    private fun shouldShowFloatingPopup(context: Context): Boolean {
+    private fun shouldShowFloatingPopup(context: Context, call: Call): Boolean {
+        // If there are other ongoing calls (active, held, dialing), show only Full Screen InCallActivity
+        val otherCalls = CallManager.calls.value.filter { it != call && it.state != Call.STATE_DISCONNECTED }
+        if (otherCalls.isNotEmpty()) {
+            return false
+        }
+
         try {
             val keyguardManager = context.getSystemService(KEYGUARD_SERVICE) as? KeyguardManager
             if (keyguardManager != null && keyguardManager.isKeyguardLocked) {
