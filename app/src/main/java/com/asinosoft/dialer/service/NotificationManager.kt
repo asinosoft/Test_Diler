@@ -16,7 +16,6 @@ import android.telecom.Call
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.ContextCompat
-import androidx.core.content.res.ResourcesCompat
 import androidx.core.graphics.createBitmap
 import androidx.core.net.toUri
 import com.asinosoft.dialer.MainActivity
@@ -157,12 +156,11 @@ class NotificationManager(val service: Service) {
             } else {
                 createRoundAvatarBitmap(callerName)
             }
-            val avatarWithSim = circularAvatar?.let { withSimBadge(it, call.simNumber) }
 
             if (isRinging) {
                 val notificationBuilder = NotificationCompat.Builder(service,CHANNEL_ID)
                     .setSmallIcon(R.drawable.ic_phone_white)
-                    .setLargeIcon(avatarWithSim)
+                    .setLargeIcon(circularAvatar)
                     .setStyle(
                         NotificationCompat.CallStyle.forIncomingCall(
                             callerPerson,
@@ -185,7 +183,7 @@ class NotificationManager(val service: Service) {
             } else {
                 val notificationBuilder = NotificationCompat.Builder(service, CHANNEL_ID)
                     .setSmallIcon(R.drawable.ic_phone_white)
-                    .setLargeIcon(avatarWithSim)
+                    .setLargeIcon(circularAvatar)
                     .setStyle(
                         NotificationCompat.CallStyle.forOngoingCall(
                             callerPerson,
@@ -346,44 +344,6 @@ class NotificationManager(val service: Service) {
             notificationManager.notify(notificationId, notificationBuilder.build())
             suppressSystemMissedCallNotification(service, rawNumber)
         }
-    }
-
-    /**
-     * CallStyle.verificationIcon всегда тонируется системой в mono.
-     * Цветную SIM рисуем бейджем на large icon — там tint не применяется.
-     */
-    private fun withSimBadge(avatar: Bitmap, simNumber: Int): Bitmap {
-        val size = avatar.width.coerceAtLeast(1)
-        val output = avatar.copy(Bitmap.Config.ARGB_8888, true)
-            ?: createBitmap(size, size).also {
-                android.graphics.Canvas(it).drawBitmap(avatar, 0f, 0f, null)
-            }
-        val canvas = android.graphics.Canvas(output)
-        val badgeSize = (size * 0.36f).toInt().coerceAtLeast(24)
-        val margin = (size * 0.04f).toInt()
-        val left = margin / 2
-        val top = size - badgeSize + margin
-
-        // Белая подложка, чтобы бейдж читался на любом аватаре
-        val bgPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.WHITE
-            style = android.graphics.Paint.Style.FILL
-        }
-        val cx = left + badgeSize / 2f
-        val cy = top + badgeSize / 2f
-        canvas.drawCircle(cx, cy, badgeSize * 0.6f, bgPaint)
-
-        val resId = when (simNumber) {
-            2 -> R.drawable.ic_sim2
-            3 -> R.drawable.ic_sim3
-            else -> R.drawable.ic_sim1
-        }
-        val inset = (badgeSize * 0.14f).toInt()
-        ResourcesCompat.getDrawable(service.resources, resId, null)?.apply {
-            setBounds(left + inset, top + inset, left + badgeSize - inset, top + badgeSize - inset)
-            draw(canvas)
-        }
-        return output
     }
 
     private fun suppressSystemMissedCallNotification(service:Service, rawNumber: String) {
