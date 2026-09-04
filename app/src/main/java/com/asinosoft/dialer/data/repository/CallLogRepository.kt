@@ -36,6 +36,15 @@ class CallLogRepository(private val context: Context) {
     @Volatile
     private var cachedSubscriptions: List<SubscriptionInfo>? = null
 
+    init {
+        CallLogDiskCache.loadCachedMeta(context, nameCache, photoCache)
+    }
+
+    /** Instant read from disk cache for cold start (< 10ms). */
+    fun getCachedCallLogs(): List<CallLogItem> {
+        return CallLogDiskCache.loadCachedCallLogs(context)
+    }
+
     fun resetCache() {
         nameCache.clear()
         photoCache.clear()
@@ -89,6 +98,7 @@ class CallLogRepository(private val context: Context) {
                     }
                 }
             }
+            CallLogDiskCache.saveCachedMeta(context, nameCache, photoCache)
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -102,7 +112,7 @@ class CallLogRepository(private val context: Context) {
         groupConsecutive: Boolean = false
     ): List<CallLogItem> =
         withContext(Dispatchers.IO) {
-            if (photoCache.isEmpty() and nameCache.isEmpty()) {
+            if (photoCache.isEmpty() && nameCache.isEmpty()) {
                 seedCachesFromContacts()
             }
 
@@ -113,6 +123,11 @@ class CallLogRepository(private val context: Context) {
             )
             val withNames = enrichNames(raw)
             val withPhotos = enrichPhotos(withNames)
+            
+            // Save to disk cache in background
+            CallLogDiskCache.saveCachedCallLogs(context, withPhotos)
+            CallLogDiskCache.saveCachedMeta(context, nameCache, photoCache)
+
             if (groupConsecutive) {
                 groupConsecutiveCallLogs(withPhotos)
             } else {

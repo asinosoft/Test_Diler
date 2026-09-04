@@ -302,8 +302,28 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         loadTabs()
+        loadCachedData()
         startObservingCallLogs()
         startObservingContacts()
+    }
+
+    private fun loadCachedData() {
+        try {
+            val cachedFavs = favoritesRepository.getCachedFavorites()
+            val cachedLogs = repository.getCachedCallLogs()
+
+            if (cachedFavs.isNotEmpty() || cachedLogs.isNotEmpty()) {
+                if (cachedFavs.isNotEmpty()) {
+                    _favorites.value = cachedFavs
+                }
+                if (cachedLogs.isNotEmpty()) {
+                    _rawCallLogs.value = applyTombstones(applyFavoriteNames(cachedLogs, cachedFavs))
+                }
+                _hasLoadedCallLogs.value = true
+            }
+        } catch (_: Exception) {
+            // ignore
+        }
     }
 
     private fun startObservingCallLogs() {
@@ -501,12 +521,15 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             loadCallLogsJob?.cancel()
         }
         val generation = ++callLogLoadGeneration
-        loadCallLogsJob = viewModelScope.launch {
+        loadCallLogsJob = viewModelScope.launch(Dispatchers.IO) {
             val shouldShowLoading = showLoading && !_hasLoadedCallLogs.value
             try {
-                _contacts.value = withContext(Dispatchers.IO) { contactsRepository.getContacts() }
-                val favorites = withContext(Dispatchers.IO) {
-                    favoritesRepository.getFavorites()
+                val contacts = contactsRepository.getContacts()
+                val favorites = favoritesRepository.getFavorites()
+                
+                withContext(Dispatchers.Main) {
+                    _contacts.value = contacts
+                    _favorites.value = favorites
                 }
                 if (generation != callLogLoadGeneration) return@launch
 
@@ -517,21 +540,37 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                 }
 
                 if (shouldShowLoading || _rawCallLogs.value.isEmpty()) {
-                    publish(repository.getCallLogs(CallLogRepository.DEFAULT_RECENTS_LIMIT))
-                    _hasLoadedCallLogs.value = true
+                    val initialLogs = repository.getCallLogs(CallLogRepository.DEFAULT_RECENTS_LIMIT)
+                    withContext(Dispatchers.Main) {
+                        publish(initialLogs)
+                        _hasLoadedCallLogs.value = true
+                    }
 
-                    publish(repository.getCallLogs(limit = null))
-                    suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 1_500L
+                    val fullLogs = repository.getCallLogs(limit = null)
+                    withContext(Dispatchers.Main) {
+                        publish(fullLogs)
+                        suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 1_500L
+                    }
                 } else {
-                    publish(repository.getCallLogs(CallLogRepository.DEFAULT_RECENTS_LIMIT))
-                    publish(repository.getCallLogs(limit = null))
+                    val initialLogs = repository.getCallLogs(CallLogRepository.DEFAULT_RECENTS_LIMIT)
+                    withContext(Dispatchers.Main) {
+                        publish(initialLogs)
+                    }
+                    val fullLogs = repository.getCallLogs(limit = null)
+                    withContext(Dispatchers.Main) {
+                        publish(fullLogs)
+                    }
                 }
                 if (generation == callLogLoadGeneration) {
-                    syncOpenContactDetail(favorites)
+                    withContext(Dispatchers.Main) {
+                        syncOpenContactDetail(favorites)
+                    }
                 }
             } finally {
                 if (generation == callLogLoadGeneration) {
-                    _hasLoadedCallLogs.value = true
+                    withContext(Dispatchers.Main) {
+                        _hasLoadedCallLogs.value = true
+                    }
                 }
             }
         }
