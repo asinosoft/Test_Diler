@@ -66,7 +66,7 @@ class CallService : InCallService() {
 
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
-        CallManager.setCall(call)
+        CallManager.onCallAdded(call)
 
         var wasRinging = (call.state == Call.STATE_RINGING)
         var wasAnswered = (call.state == Call.STATE_ACTIVE)
@@ -93,6 +93,7 @@ class CallService : InCallService() {
 
         call.registerCallback(object : Call.Callback() {
             override fun onStateChanged(call: Call, state: Int) {
+                CallManager.updateCallsState()
                 if (state == Call.STATE_RINGING) {
                     wasRinging = true
                     ringtonePlayer.start()
@@ -109,16 +110,33 @@ class CallService : InCallService() {
                 }
 
                 if (state == Call.STATE_DISCONNECTED) {
-                    ringtonePlayer.stop()
-                    unregisterSilenceReceiver()
-                    FloatingCallOverlayManager.hide()
-                    stopForeground(true)
-                    if (wasRinging && !wasAnswered && rawNumber.isNotBlank()) {
+                    if (CallManager.calls.value.none { it.state == Call.STATE_RINGING }) {
+                        ringtonePlayer.stop()
+                        unregisterSilenceReceiver()
+                        FloatingCallOverlayManager.hide()
+                    }
+                    val topCalls = CallManager.getDisplayableTopLevelCalls()
+                    if (topCalls.isEmpty() && CallManager.calls.value.none { it.state != Call.STATE_DISCONNECTED }) {
+                        stopForeground(true)
+                    }
+                    if (wasRinging && !wasAnswered && rawNumber.isNotBlank() && CallManager.calls.value.isEmpty()) {
                         notification.showMissedCallNotification(rawNumber)
                     }
                 } else {
                     notification.showCallNotification(CallState.fromSystemCall(call, this@CallService))
                 }
+            }
+
+            override fun onParentChanged(call: Call, parent: Call?) {
+                CallManager.updateCallsState()
+            }
+
+            override fun onChildrenChanged(call: Call, children: MutableList<Call>?) {
+                CallManager.updateCallsState()
+            }
+
+            override fun onDetailsChanged(call: Call, details: Call.Details?) {
+                CallManager.updateCallsState()
             }
         })
     }
@@ -321,11 +339,13 @@ class CallService : InCallService() {
 
     override fun onCallRemoved(call: Call) {
         super.onCallRemoved(call)
-        ringtonePlayer.stop()
-        unregisterSilenceReceiver()
-        FloatingCallOverlayManager.hide()
-        if (CallManager.currentCall.value == call) {
-            CallManager.setCall(null)
+        CallManager.onCallRemoved(call)
+        if (CallManager.calls.value.none { it.state == Call.STATE_RINGING }) {
+            ringtonePlayer.stop()
+            unregisterSilenceReceiver()
+            FloatingCallOverlayManager.hide()
+        }
+        if (CallManager.calls.value.isEmpty()) {
             stopForeground(true)
         }
     }

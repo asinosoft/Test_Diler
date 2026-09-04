@@ -7,13 +7,17 @@ import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
 import android.provider.ContactsContract
 import android.telecom.Call
 import android.telecom.CallAudioState
+import android.telecom.PhoneAccountHandle
+import android.telecom.TelecomManager
 import android.telephony.SubscriptionManager
+import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -48,27 +52,20 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.CallMerge
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import android.os.Bundle
-import android.telecom.PhoneAccountHandle
-import android.telecom.TelecomManager
-import android.widget.Toast
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Person
-import com.asinosoft.dialer.ui.components.OneUiPopupMenu
-import com.asinosoft.dialer.ui.components.OneUiPopupMenuItem
-import com.asinosoft.dialer.ui.recents.components.executeCustomSwipeAction
-import com.asinosoft.dialer.ui.recents.components.getCustomSwipeAction
-import com.asinosoft.dialer.ui.recents.components.getSwipeBackgroundVisuals
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -112,7 +109,12 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.asinosoft.dialer.MainActivity
 import com.asinosoft.dialer.service.CallManager
+import com.asinosoft.dialer.ui.components.OneUiPopupMenu
+import com.asinosoft.dialer.ui.components.OneUiPopupMenuItem
 import com.asinosoft.dialer.ui.components.SimIcon
+import com.asinosoft.dialer.ui.recents.components.executeCustomSwipeAction
+import com.asinosoft.dialer.ui.recents.components.getCustomSwipeAction
+import com.asinosoft.dialer.ui.recents.components.getSwipeBackgroundVisuals
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.ui.theme.SamsungSmsBlue
@@ -130,6 +132,7 @@ fun InCallScreen(
     onFinish: () -> Unit
 ) {
     val context = LocalContext.current
+    val allCalls by CallManager.calls.collectAsState()
     val activeCall by CallManager.currentCall.collectAsState()
 
     val isMuted by CallManager.isMuted.collectAsState()
@@ -140,6 +143,7 @@ fun InCallScreen(
     val currentBtName by CallManager.currentBluetoothDeviceName.collectAsState()
 
     var showBluetoothMenu by remember { mutableStateOf(false) }
+    var showCallWaitingAnswerSheet by remember { mutableStateOf(false) }
 
     var callState by remember { mutableIntStateOf(activeCall?.state ?: Call.STATE_DISCONNECTED) }
     var durationSeconds by remember { mutableIntStateOf(0) }
@@ -156,8 +160,20 @@ fun InCallScreen(
 
     val simNumber = remember(activeCall) { getSimNumberFromCall(activeCall, context) }
 
-    LaunchedEffect(rawNumber) {
-        if (rawNumber.isNotBlank()) {
+    val displayableCalls = remember(allCalls, activeCall) { CallManager.getDisplayableTopLevelCalls() }
+    val incomingWaitingCall = displayableCalls.firstOrNull { it.state == Call.STATE_RINGING && it != activeCall }
+    val isConference = remember(activeCall, allCalls) { CallManager.isConferenceCall(activeCall) || (displayableCalls.size == 1 && CallManager.isConferenceCall(displayableCalls.firstOrNull())) }
+
+    val hasAnyActiveCall = displayableCalls.any { it.state == Call.STATE_ACTIVE || it.state == Call.STATE_DIALING || it.state == Call.STATE_CONNECTING || it.state == Call.STATE_HOLDING || CallManager.isConferenceCall(it) }
+    val isCallDisconnected = displayableCalls.isEmpty() || !hasAnyActiveCall
+    val isCallActive = hasAnyActiveCall && !isCallDisconnected
+
+    LaunchedEffect(rawNumber, isConference) {
+        if (isConference) {
+            contactId = null
+            contactName = "Конференция"
+            contactPhotoBitmap = null
+        } else if (rawNumber.isNotBlank()) {
             withContext(Dispatchers.IO) {
                 val result = lookupContactInfo(context, rawNumber)
                 contactId = result.contactId
@@ -204,40 +220,30 @@ fun InCallScreen(
         }
     }
 
-    var isDisconnecting by remember { mutableStateOf(false) }
-
     // Call state callback listener
     DisposableEffect(activeCall) {
         val current = activeCall
         if (current == null) {
-            isDisconnecting = true
             return@DisposableEffect onDispose {}
         }
 
         val callback = object : Call.Callback() {
             override fun onStateChanged(call: Call, state: Int) {
                 callState = state
-                if (state == Call.STATE_DISCONNECTED || state == Call.STATE_DISCONNECTING) {
-                    isDisconnecting = true
-                }
             }
         }
 
         current.registerCallback(callback)
         callState = current.state
-        if (current.state == Call.STATE_DISCONNECTED || current.state == Call.STATE_DISCONNECTING) {
-            isDisconnecting = true
-        }
 
         onDispose {
             current.unregisterCallback(callback)
         }
     }
 
-    // Auto-finish after 2 seconds on disconnect
-    LaunchedEffect(isDisconnecting, activeCall) {
-        if (isDisconnecting || activeCall == null || callState == Call.STATE_DISCONNECTED) {
-            isDisconnecting = true
+    // Auto-finish after 2 seconds on disconnect when all calls have ended
+    LaunchedEffect(isCallDisconnected) {
+        if (isCallDisconnected) {
             callState = Call.STATE_DISCONNECTED
             delay(2000L)
             onFinish()
@@ -245,8 +251,8 @@ fun InCallScreen(
     }
 
     // Timer for active call duration
-    LaunchedEffect(callState) {
-        if (callState == Call.STATE_ACTIVE) {
+    LaunchedEffect(isCallActive) {
+        if (isCallActive) {
             while (true) {
                 delay(1000L.milliseconds)
                 durationSeconds++
@@ -255,9 +261,6 @@ fun InCallScreen(
     }
 
     ProximityScreenOffEffect(callState = callState, audioRoute = audioRoute)
-
-    val isCallDisconnected = isDisconnecting || callState == Call.STATE_DISCONNECTING || callState == Call.STATE_DISCONNECTED
-    val isCallActive = callState == Call.STATE_ACTIVE && !isCallDisconnected
 
     val contactKey = remember(contactId, rawNumber) {
         contactId?.ifBlank { rawNumber } ?: rawNumber
@@ -309,206 +312,238 @@ fun InCallScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Top Section: Avatar, Contact Name, (SIM Icon + Number), Status badge
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // Large One UI Circular Avatar (170dp)
-                Surface(
-                    modifier = Modifier
-                        .size(170.dp)
-                        .clip(CircleShape)
-                        .border(BorderStroke(2.5.dp, Color.White.copy(alpha = 0.18f)), CircleShape),
-                    shape = CircleShape,
-                    color = Color(0xFF282E3C),
-                    shadowElevation = 14.dp
+            // Top Section: Multiple Calls List OR Single Call Info
+            if (displayableCalls.size >= 2 && incomingWaitingCall == null && !isCallDisconnected) {
+                MultiCallCardsView(
+                    calls = displayableCalls,
+                    primaryCall = activeCall,
+                    durationSeconds = durationSeconds,
+                    context = context,
+                    onSelectCall = { CallManager.selectPrimaryCall(it) },
+                    onMergeCalls = { CallManager.mergeCalls() },
+                    onDisconnectCall = { CallManager.disconnectCall(it) }
+                )
+            } else {
+                // Top Section: Avatar, Contact Name, (SIM Icon + Number), Status badge
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(
-                        contentAlignment = Alignment.Center,
-                        modifier = Modifier.fillMaxSize()
+                    // Large One UI Circular Avatar (170dp)
+                    Surface(
+                        modifier = Modifier
+                            .size(170.dp)
+                            .clip(CircleShape)
+                            .border(BorderStroke(2.5.dp, Color.White.copy(alpha = 0.18f)), CircleShape),
+                        shape = CircleShape,
+                        color = Color(0xFF282E3C),
+                        shadowElevation = 14.dp
                     ) {
-                        if (contactPhotoBitmap != null) {
-                            Image(
-                                bitmap = contactPhotoBitmap!!,
-                                contentDescription = "Фото контакта",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        } else {
-                            val titleForInitial = contactName ?: (displayName.ifBlank { rawNumber })
-                            val initial =
-                                titleForInitial.trim().firstOrNull { it.isLetterOrDigit() }
-                                    ?.uppercaseChar()?.toString() ?: "?"
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(
-                                        Brush.linearGradient(
-                                            listOf(Color(0xFF3E4758), Color(0xFF262C38))
-                                        )
-                                    ),
-                                contentAlignment = Alignment.Center
-                            ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            if (contactPhotoBitmap != null) {
+                                Image(
+                                    bitmap = contactPhotoBitmap!!,
+                                    contentDescription = "Фото контакта",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else if (isConference) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.linearGradient(
+                                                listOf(Color(0xFF2E6B4F), Color(0xFF1E4634))
+                                            )
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    @Suppress("DEPRECATION")
+                                    Icon(
+                                        imageVector = Icons.Default.CallMerge,
+                                        contentDescription = "Конференция",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(72.dp)
+                                    )
+                                }
+                            } else {
+                                val titleForInitial = contactName ?: (displayName.ifBlank { rawNumber })
+                                val initial =
+                                    titleForInitial.trim().firstOrNull { it.isLetterOrDigit() }
+                                        ?.uppercaseChar()?.toString() ?: "?"
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(
+                                            Brush.linearGradient(
+                                                listOf(Color(0xFF3E4758), Color(0xFF262C38))
+                                            )
+                                        ),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = initial,
+                                        color = Color.White,
+                                        fontSize = 64.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    Text(
+                        text = formattedName,
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    // Phone number line with SIM icon in front (without "SIM" text)
+                    if (rawNumber.isNotBlank() && !isConference) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            if (activeSimCount > 1) {
+                                SimIcon(simNumber = simNumber, size = 15.dp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                            }
+                            val numberToDisplay = if (contactName != null || displayName != rawNumber) {
+                                PhoneNumberHelper.format(rawNumber)
+                            } else {
+                                ""
+                            }
+                            if (numberToDisplay.isNotBlank()) {
                                 Text(
-                                    text = initial,
-                                    color = Color.White,
-                                    fontSize = 64.sp,
-                                    fontWeight = FontWeight.Bold
+                                    text = numberToDisplay,
+                                    fontSize = 16.sp,
+                                    color = Color.White.copy(alpha = 0.65f),
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1
                                 )
                             }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
-                Text(
-                    text = formattedName,
-                    fontSize = 28.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    textAlign = TextAlign.Center,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
-                )
+                    // Call Status & Timer Badge
+                    val statusText = when {
+                        isCallDisconnected -> "Вызов завершен"
+                        isHold -> "На удержании"
+                        callState == Call.STATE_RINGING -> "Входящий вызов"
+                        callState == Call.STATE_DIALING -> "Вызов..."
+                        callState == Call.STATE_CONNECTING -> "Соединение..."
+                        isCallActive -> formatDuration(durationSeconds)
+                        else -> "Вызов завершен"
+                    }
 
-                // Phone number line with SIM icon in front (without "SIM" text)
-                if (rawNumber.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = when {
+                            isCallDisconnected -> Color.White.copy(alpha = 0.12f)
+                            isHold -> Color(0xFFFFB300).copy(alpha = 0.22f)
+                            isCallActive -> Color.White.copy(alpha = 0.12f)
+                            else -> SamsungGreen.copy(alpha = 0.18f)
+                        }
                     ) {
-                        if (activeSimCount > 1) {
-                            SimIcon(simNumber = simNumber, size = 15.dp)
-                            Spacer(modifier = Modifier.width(6.dp))
-                        }
-                        val numberToDisplay = if (contactName != null || displayName != rawNumber) {
-                            PhoneNumberHelper.format(rawNumber)
-                        } else {
-                            ""
-                        }
-                        if (numberToDisplay.isNotBlank()) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                        ) {
+                            if (isCallActive) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(CircleShape)
+                                        .background(SamsungGreen)
+                                )
+                            }
                             Text(
-                                text = numberToDisplay,
-                                fontSize = 16.sp,
-                                color = Color.White.copy(alpha = 0.65f),
-                                textAlign = TextAlign.Center,
-                                maxLines = 1
+                                text = statusText,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = when {
+                                    isCallDisconnected -> Color.White.copy(alpha = 0.85f)
+                                    isHold -> Color(0xFFFFC107)
+                                    isCallActive -> Color.White
+                                    else -> SamsungGreen
+                                }
                             )
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                    // 3 Quick Action Buttons placed directly under "Вызов завершен"
+                    if (isCallDisconnected) {
+                        Spacer(modifier = Modifier.height(32.dp))
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Button 1: Call (Swipe Right Action)
+                            InCallPostCallActionButton(
+                                icon = rightVisuals.icon,
+                                label = rightVisuals.label,
+                                containerColor = rightVisuals.backgroundColor,
+                                onClick = {
+                                    onFinish()
+                                    if (swipeRightAction != null) {
+                                        executeCustomSwipeAction(
+                                            context = context,
+                                            action = swipeRightAction,
+                                            onCall = { num, sim -> startCallFromInCallScreen(context, num, sim) },
+                                            onSms = { num -> startSmsFromInCallScreen(context, num) }
+                                        )
+                                    } else {
+                                        startCallFromInCallScreen(context, rawNumber, null)
+                                    }
+                                }
+                            )
 
-                // Call Status & Timer Badge
-                val statusText = when {
-                    isCallDisconnected -> "Вызов завершен"
-                    isHold -> "На удержании"
-                    callState == Call.STATE_RINGING -> "Входящий вызов"
-                    callState == Call.STATE_DIALING -> "Вызов..."
-                    callState == Call.STATE_CONNECTING -> "Соединение..."
-                    isCallActive -> formatDuration(durationSeconds)
-                    else -> "Вызов завершен"
-                }
+                            // Button 2: Message/Messenger (Swipe Left Action - Blue)
+                            InCallPostCallActionButton(
+                                icon = leftVisuals.icon,
+                                label = leftVisuals.label,
+                                containerColor = leftVisuals.backgroundColor,
+                                onClick = {
+                                    onFinish()
+                                    if (swipeLeftAction != null) {
+                                        executeCustomSwipeAction(
+                                            context = context,
+                                            action = swipeLeftAction,
+                                            onCall = { num, sim -> startCallFromInCallScreen(context, num, sim) },
+                                            onSms = { num -> startSmsFromInCallScreen(context, num) }
+                                        )
+                                    } else {
+                                        startSmsFromInCallScreen(context, rawNumber)
+                                    }
+                                }
+                            )
 
-                Surface(
-                    shape = RoundedCornerShape(16.dp),
-                    color = when {
-                        isCallDisconnected -> Color.White.copy(alpha = 0.12f)
-                        isHold -> Color(0xFFFFB300).copy(alpha = 0.22f)
-                        isCallActive -> Color.White.copy(alpha = 0.12f)
-                        else -> SamsungGreen.copy(alpha = 0.18f)
-                    }
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                    ) {
-                        if (isCallActive) {
-                            Box(
-                                modifier = Modifier
-                                    .size(8.dp)
-                                    .clip(CircleShape)
-                                    .background(SamsungGreen)
+                            // Button 3: Info -> opens ContactDetailDialog on Contact Tab (tab 0)
+                            InCallPostCallActionButton(
+                                icon = Icons.Default.Person,
+                                label = "Инфо",
+                                containerColor = Color.White.copy(alpha = 0.15f),
+                                onClick = {
+                                    onFinish()
+                                    openContactInApp(context, rawNumber, contactName, contactId)
+                                }
                             )
                         }
-                        Text(
-                            text = statusText,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.SemiBold,
-                            color = when {
-                                isCallDisconnected -> Color.White.copy(alpha = 0.85f)
-                                isHold -> Color(0xFFFFC107)
-                                isCallActive -> Color.White
-                                else -> SamsungGreen
-                            }
-                        )
-                    }
-                }
-
-                // 3 Quick Action Buttons placed directly under "Вызов завершен"
-                if (isCallDisconnected) {
-                    Spacer(modifier = Modifier.height(32.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.SpaceEvenly,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Button 1: Call (Swipe Right Action)
-                        InCallPostCallActionButton(
-                            icon = rightVisuals.icon,
-                            label = rightVisuals.label,
-                            containerColor = rightVisuals.backgroundColor,
-                            onClick = {
-                                onFinish()
-                                if (swipeRightAction != null) {
-                                    executeCustomSwipeAction(
-                                        context = context,
-                                        action = swipeRightAction,
-                                        onCall = { num, sim -> startCallFromInCallScreen(context, num, sim) },
-                                        onSms = { num -> startSmsFromInCallScreen(context, num) }
-                                    )
-                                } else {
-                                    startCallFromInCallScreen(context, rawNumber, null)
-                                }
-                            }
-                        )
-
-                        // Button 2: Message/Messenger (Swipe Left Action - Blue)
-                        InCallPostCallActionButton(
-                            icon = leftVisuals.icon,
-                            label = leftVisuals.label,
-                            containerColor = leftVisuals.backgroundColor,
-                            onClick = {
-                                onFinish()
-                                if (swipeLeftAction != null) {
-                                    executeCustomSwipeAction(
-                                        context = context,
-                                        action = swipeLeftAction,
-                                        onCall = { num, sim -> startCallFromInCallScreen(context, num, sim) },
-                                        onSms = { num -> startSmsFromInCallScreen(context, num) }
-                                    )
-                                } else {
-                                    startSmsFromInCallScreen(context, rawNumber)
-                                }
-                            }
-                        )
-
-                        // Button 3: Info -> opens ContactDetailDialog on Contact Tab (tab 0)
-                        InCallPostCallActionButton(
-                            icon = Icons.Default.Person,
-                            label = "Инфо",
-                            containerColor = Color.White.copy(alpha = 0.15f),
-                            onClick = {
-                                onFinish()
-                                openContactInApp(context, rawNumber, contactName, contactId)
-                            }
-                        )
                     }
                 }
             }
@@ -533,13 +568,12 @@ fun InCallScreen(
                             onClick = { CallManager.toggleRecord() }
                         )
 
-                        // 2. Hold
+                        // 2. Add Call Button (replaces Hold button)
                         InCallActionButton(
-                            icon = if (isHold) Icons.Default.PlayArrow else Icons.Default.Pause,
-                            label = if (isHold) "Продолжить" else "Удержание",
-                            isActive = isHold,
-                            activeColor = Color(0xFFFFB300),
-                            onClick = { CallManager.toggleHold() }
+                            icon = Icons.Default.Add,
+                            label = "Добавить",
+                            isActive = false,
+                            onClick = { CallManager.openNewCallScreen(context) }
                         )
 
                         // 3. Bluetooth
@@ -648,6 +682,13 @@ fun InCallScreen(
                     isCallDisconnected -> {
                         // Handled above directly under "Вызов завершен"
                     }
+                    incomingWaitingCall != null -> {
+                        // Call Waiting: Second incoming call banner with swipe controls
+                        SamsungSwipeAnswerDeclineRow(
+                            onAnswer = { showCallWaitingAnswerSheet = true },
+                            onDecline = { incomingWaitingCall.disconnect() }
+                        )
+                    }
                     callState == Call.STATE_RINGING -> {
                         SamsungSwipeAnswerDeclineRow(
                             onAnswer = { CallManager.answer() },
@@ -675,6 +716,22 @@ fun InCallScreen(
         }
     }
 
+    // Call Waiting Answer Bottom Sheet
+    if (showCallWaitingAnswerSheet && incomingWaitingCall != null) {
+        CallWaitingAnswerBottomSheet(
+            activeContactName = formattedName,
+            onHoldAndAnswer = {
+                CallManager.holdAndAnswer(incomingWaitingCall)
+                showCallWaitingAnswerSheet = false
+            },
+            onEndAndAnswer = {
+                CallManager.endAndAnswer(incomingWaitingCall)
+                showCallWaitingAnswerSheet = false
+            },
+            onDismiss = { showCallWaitingAnswerSheet = false }
+        )
+    }
+
     // DTMF Dialpad Bottom Sheet Overlay
     if (showKeypadSheet) {
         InCallKeypadSheet(
@@ -683,6 +740,284 @@ fun InCallScreen(
             },
             onDismiss = { showKeypadSheet = false }
         )
+    }
+}
+
+/**
+ * Multi-call list showing active call (bright) and held call (dimmed) with conference merge button.
+ */
+@Composable
+private fun MultiCallCardsView(
+    calls: List<Call>,
+    primaryCall: Call?,
+    durationSeconds: Int,
+    context: Context,
+    onSelectCall: (Call) -> Unit,
+    onMergeCalls: () -> Unit,
+    onDisconnectCall: (Call) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 12.dp, bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        calls.forEach { call ->
+            val isCurrent = (call == primaryCall) || (call.state == Call.STATE_ACTIVE)
+            val isHeld = call.state == Call.STATE_HOLDING
+            val rawNum = call.details?.handle?.schemeSpecificPart.orEmpty()
+            var cName by remember(rawNum) { mutableStateOf<String?>(null) }
+
+            LaunchedEffect(rawNum) {
+                if (rawNum.isNotBlank()) {
+                    withContext(Dispatchers.IO) {
+                        cName = lookupContactInfo(context, rawNum).name
+                    }
+                }
+            }
+
+            val isConf = CallManager.isConferenceCall(call)
+            val title = if (isConf) {
+                "Конференция"
+            } else {
+                cName ?: if (rawNum.isNotBlank()) PhoneNumberHelper.format(rawNum) else "Неизвестный"
+            }
+
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = if (isCurrent) Color.White.copy(alpha = 0.16f) else Color.White.copy(alpha = 0.07f),
+                tonalElevation = if (isCurrent) 4.dp else 0.dp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable { onSelectCall(call) }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(if (isCurrent) SamsungGreen.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.1f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isConf) Icons.Default.Person else if (isCurrent) Icons.Default.Call else Icons.Default.Pause,
+                                contentDescription = null,
+                                tint = if (isCurrent) SamsungGreen else Color.White.copy(alpha = 0.6f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+
+                        Column {
+                            Text(
+                                text = title,
+                                fontSize = 17.sp,
+                                fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isCurrent) Color.White else Color.White.copy(alpha = 0.65f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = when {
+                                    isHeld -> "На удержании"
+                                    isCurrent -> formatDuration(durationSeconds)
+                                    call.state == Call.STATE_DIALING -> "Вызов..."
+                                    else -> "Соединение..."
+                                },
+                                fontSize = 13.sp,
+                                color = if (isHeld) Color(0xFFFFC107) else if (isCurrent) SamsungGreen else Color.White.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+
+                    // Disconnect specific call icon
+                    IconButton(
+                        onClick = { onDisconnectCall(call) },
+                        modifier = Modifier.size(36.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Завершить",
+                            tint = MissedRed.copy(alpha = 0.8f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        // Merge Conference Button (only when at least 2 top level calls can be merged)
+        if (calls.size >= 2) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White.copy(alpha = 0.12f),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(14.dp))
+                        .clickable { onMergeCalls() }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        @Suppress("DEPRECATION")
+                        Icon(
+                            imageVector = Icons.Default.CallMerge,
+                            contentDescription = "Объединить",
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Text(
+                            text = "Объединить",
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Call waiting confirmation bottom sheet: Hold vs End current call.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CallWaitingAnswerBottomSheet(
+    activeContactName: String,
+    onHoldAndAnswer: () -> Unit,
+    onEndAndAnswer: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color(0xFF222834),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 36.dp)
+        ) {
+            Text(
+                text = "Ответить на вызов и:",
+                fontSize = 19.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.White,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            // Option 1: Hold current call
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White.copy(alpha = 0.12f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable {
+                        onHoldAndAnswer()
+                    }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFFFB300).copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Pause,
+                            contentDescription = null,
+                            tint = Color(0xFFFFC107),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    Text(
+                        text = "Поместить «$activeContactName» на удержание",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Option 2: End current call
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = Color.White.copy(alpha = 0.12f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable {
+                        onEndAndAnswer()
+                    }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(MissedRed.copy(alpha = 0.2f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.CallEnd,
+                            contentDescription = null,
+                            tint = MissedRed,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    Text(
+                        text = "Завершить вызов с «$activeContactName»",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+            }
+        }
     }
 }
 
