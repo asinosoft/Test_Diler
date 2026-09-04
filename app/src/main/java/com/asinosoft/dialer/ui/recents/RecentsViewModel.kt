@@ -652,6 +652,13 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    fun reorderTabs(newTabs: List<FavoriteTab>) {
+        _tabs.value = newTabs
+        viewModelScope.launch {
+            favoritesRepository.saveTabs(newTabs)
+        }
+    }
+
     fun deleteTab(id: String) {
         viewModelScope.launch {
             _tabs.value = favoritesRepository.deleteTab(id)

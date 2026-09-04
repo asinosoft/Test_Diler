@@ -95,6 +95,7 @@ import com.asinosoft.dialer.ui.theme.SamsungGreen
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -790,6 +791,7 @@ fun RecentsScreen(
                 onAddTab = { viewModel.addTab(it) },
                 onRenameTab = { id, name -> viewModel.renameTab(id, name) },
                 onDeleteTab = { viewModel.deleteTab(it) },
+                onReorderTabs = { viewModel.reorderTabs(it) },
                 onDismiss = { viewModel.closeAppSettings() }
             )
         }
@@ -943,8 +945,19 @@ fun RecentsScreen(
 private val dateHeaderDayFormatter = ThreadLocal.withInitial {
     SimpleDateFormat("d MMMM", Locale.forLanguageTag("ru"))
 }
-private val dateHeaderWeekdayFormatter = ThreadLocal.withInitial {
-    SimpleDateFormat("EEEE", Locale.forLanguageTag("ru"))
+
+private fun formatShortWeekday(timestamp: Long): String {
+    val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
+    return when (cal.get(Calendar.DAY_OF_WEEK)) {
+        Calendar.MONDAY -> "пн"
+        Calendar.TUESDAY -> "вт"
+        Calendar.WEDNESDAY -> "ср"
+        Calendar.THURSDAY -> "чт"
+        Calendar.FRIDAY -> "пт"
+        Calendar.SATURDAY -> "сб"
+        Calendar.SUNDAY -> "вс"
+        else -> ""
+    }
 }
 
 private fun formatDateHeader(timestamp: Long): String {
@@ -952,10 +965,8 @@ private fun formatDateHeader(timestamp: Long): String {
     if (DateUtils.isToday(timestamp)) return "Сегодня"
     if (DateUtils.isToday(timestamp + 24 * 3600 * 1000L)) return "Вчера"
 
-    val ruLocale = Locale.forLanguageTag("ru")
     val dateStr = dateHeaderDayFormatter.get()!!.format(Date(timestamp))
-    val dayOfWeek = dateHeaderWeekdayFormatter.get()!!.format(Date(timestamp))
-        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(ruLocale) else it.toString() }
+    val shortWeekday = formatShortWeekday(timestamp)
 
-    return "$dateStr, $dayOfWeek"
+    return if (shortWeekday.isNotEmpty()) "$dateStr, $shortWeekday" else dateStr
 }

@@ -164,6 +164,7 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
@@ -2673,6 +2674,20 @@ private fun openSystemContact(context: Context, contactNumber: String) {
     }
 }
 
+private fun formatShortWeekday(timestamp: Long): String {
+    val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
+    return when (cal.get(Calendar.DAY_OF_WEEK)) {
+        Calendar.MONDAY -> "пн"
+        Calendar.TUESDAY -> "вт"
+        Calendar.WEDNESDAY -> "ср"
+        Calendar.THURSDAY -> "чт"
+        Calendar.FRIDAY -> "пт"
+        Calendar.SATURDAY -> "сб"
+        Calendar.SUNDAY -> "вс"
+        else -> ""
+    }
+}
+
 private fun formatDateHeader(timestamp: Long): String {
     if (timestamp == 0L) return ""
     if (android.text.format.DateUtils.isToday(timestamp)) return "Сегодня"
@@ -2680,10 +2695,9 @@ private fun formatDateHeader(timestamp: Long): String {
 
     val ruLocale = Locale.forLanguageTag("ru")
     val dateStr = SimpleDateFormat("d MMMM", ruLocale).format(Date(timestamp))
-    val dayOfWeek = SimpleDateFormat("EEEE", ruLocale).format(Date(timestamp))
-        .replaceFirstChar { if (it.isLowerCase()) it.titlecase(ruLocale) else it.toString() }
+    val shortWeekday = formatShortWeekday(timestamp)
 
-    return "$dateStr, $dayOfWeek"
+    return if (shortWeekday.isNotEmpty()) "$dateStr, $shortWeekday" else dateStr
 }
 
 private fun formatTimeOnly(timestamp: Long): String {

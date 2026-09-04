@@ -3,6 +3,7 @@ package com.asinosoft.dialer.ui.recents.components
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -22,6 +23,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Phone
@@ -43,7 +45,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -52,15 +56,23 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.DialerOpenMode
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.ui.theme.SamsungGreen
+import kotlin.math.roundToInt
 
 private enum class SettingsTab(val title: String) {
     MAIN("Основное"),
@@ -81,6 +93,7 @@ fun AppSettingsDialog(
     onAddTab: (String) -> Unit = {},
     onRenameTab: (String, String) -> Unit = { _, _ -> },
     onDeleteTab: (String) -> Unit = {},
+    onReorderTabs: (List<FavoriteTab>) -> Unit = {},
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -174,7 +187,8 @@ fun AppSettingsDialog(
                             tabToRename = tab
                             renameTabInput = tab.name
                         },
-                        onDeleteTab = onDeleteTab
+                        onDeleteTab = onDeleteTab,
+                        onReorderTabs = onReorderTabs
                     )
 
                     SettingsTab.ABOUT -> AboutSettingsTab()
@@ -392,8 +406,20 @@ private fun FavoritesSettingsTab(
     onRowsCountSelected: (Int) -> Unit,
     onAddTabClick: () -> Unit,
     onRenameTabClick: (FavoriteTab) -> Unit,
-    onDeleteTab: (String) -> Unit
+    onDeleteTab: (String) -> Unit,
+    onReorderTabs: (List<FavoriteTab>) -> Unit = {}
 ) {
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+
+    var editableTabs by remember(tabs) { mutableStateOf(tabs) }
+    var draggingTabIndex by remember { mutableStateOf<Int?>(null) }
+    var tabDragOffsetY by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(tabs) {
+        editableTabs = tabs
+    }
+
     Surface(
         modifier = Modifier
             .fillMaxWidth()
@@ -468,7 +494,7 @@ private fun FavoritesSettingsTab(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Вкладки (${tabs.size})",
+                    text = "Вкладки (${editableTabs.size})",
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -493,46 +519,114 @@ private fun FavoritesSettingsTab(
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            tabs.forEach { tab ->
-                Row(
+            editableTabs.forEachIndexed { index, tab ->
+                val isDragging = draggingTabIndex == index
+
+                Surface(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 4.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = tab.name,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        modifier = Modifier.weight(1f)
-                    )
+                        .padding(vertical = 3.dp)
+                        .graphicsLayer {
+                            if (isDragging) {
+                                translationY = tabDragOffsetY
+                                shadowElevation = 10f
+                                scaleX = 1.02f
+                                scaleY = 1.02f
+                            }
+                        }
+                        .zIndex(if (isDragging) 10f else 1f)
+                        .pointerInput(index, editableTabs.size) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    draggingTabIndex = index
+                                    tabDragOffsetY = 0f
+                                },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    tabDragOffsetY += dragAmount.y
+                                    val currentList = editableTabs.toMutableList()
+                                    val currentIndex = draggingTabIndex ?: index
+                                    val rowHeightPx = with(density) { 52.dp.toPx() }
+                                    val shift = (tabDragOffsetY / rowHeightPx).roundToInt()
+                                    val targetIndex = (currentIndex + shift).coerceIn(0, currentList.size - 1)
 
-                    Row {
-                        IconButton(
-                            onClick = { onRenameTabClick(tab) },
-                            modifier = Modifier.size(32.dp)
+                                    if (targetIndex != currentIndex) {
+                                        val item = currentList.removeAt(currentIndex)
+                                        currentList.add(targetIndex, item)
+                                        editableTabs = currentList
+                                        onReorderTabs(currentList)
+                                        tabDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
+                                        draggingTabIndex = targetIndex
+                                    }
+                                },
+                                onDragEnd = {
+                                    draggingTabIndex = null
+                                    tabDragOffsetY = 0f
+                                },
+                                onDragCancel = {
+                                    draggingTabIndex = null
+                                    tabDragOffsetY = 0f
+                                }
+                            )
+                        },
+                    shape = RoundedCornerShape(14.dp),
+                    color = if (isDragging) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
+                    tonalElevation = if (isDragging) 4.dp else 0.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.weight(1f)
                         ) {
                             Icon(
-                                imageVector = Icons.Default.Edit,
-                                contentDescription = "Переименовать",
-                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                modifier = Modifier.size(18.dp)
+                                imageVector = Icons.Default.DragHandle,
+                                contentDescription = "Перетащить",
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                text = tab.name,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
 
-                        if (tabs.size > 1) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             IconButton(
-                                onClick = { onDeleteTab(tab.id) },
+                                onClick = { onRenameTabClick(tab) },
                                 modifier = Modifier.size(32.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Delete,
-                                    contentDescription = "Удалить",
-                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                    imageVector = Icons.Default.Edit,
+                                    contentDescription = "Переименовать",
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                     modifier = Modifier.size(18.dp)
                                 )
+                            }
+
+                            if (editableTabs.size > 1) {
+                                IconButton(
+                                    onClick = { onDeleteTab(tab.id) },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Delete,
+                                        contentDescription = "Удалить",
+                                        tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
                             }
                         }
                     }
@@ -561,9 +655,7 @@ private fun AboutSettingsTab() {
             "1.0"
         }
     }
-    val appName = remember {
-        context.getString(R.string.app_name)
-    }
+    val appName = stringResource(R.string.app_name)
 
     Column(
         modifier = Modifier
