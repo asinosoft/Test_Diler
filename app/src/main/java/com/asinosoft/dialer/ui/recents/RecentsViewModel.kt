@@ -223,18 +223,18 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         val query = SearchDialerItem.Matcher(query)
         if (query.isBlank()) {
             SearchResults(
-                calls = logs.map { log ->
+                contacts = contacts.map { fav ->
                     SearchDialerItem(
-                        id = "log_${log.id}",
-                        name = log.name ?: log.number,
-                        number = log.number,
-                        photoUri = log.photoUri,
-                        timestamp = log.timestamp,
-                        simSlot = log.simNumber,
-                        callType = log.type,
-                        isFavorite = contacts.any { it.number == log.number }
+                        id = "fav_${fav.id}",
+                        name = fav.name,
+                        number = fav.number,
+                        photoUri = fav.photoUri,
+                        timestamp = 0L,
+                        simSlot = null,
+                        callType = null,
+                        isFavorite = true
                     )
-                }.distinctBy { it.number }
+                }.sortedBy { query.order(it) }
             )
         } else {
             val matchedContacts = contacts.filter {
