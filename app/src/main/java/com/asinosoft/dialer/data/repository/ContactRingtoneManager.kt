@@ -6,6 +6,8 @@ import android.net.Uri
 import android.provider.ContactsContract
 import androidx.core.content.edit
 import androidx.core.net.toUri
+import org.json.JSONArray
+import org.json.JSONObject
 
 object ContactRingtoneManager {
     private const val PREFS_NAME = "contact_custom_ringtones"
@@ -31,8 +33,48 @@ object ContactRingtoneManager {
         }
     }
 
+    fun getSavedCustomRingtones(context: Context): List<Pair<String, String>> {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val jsonStr = prefs.getString("user_added_ringtones_json", null) ?: return emptyList()
+        return try {
+            val arr = JSONArray(jsonStr)
+            val list = mutableListOf<Pair<String, String>>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val uri = obj.optString("uri")
+                val title = obj.optString("title")
+                if (uri.isNotBlank() && title.isNotBlank()) {
+                    list.add(Pair(uri, title))
+                }
+            }
+            list
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    fun saveCustomRingtone(context: Context, uriStr: String, title: String) {
+        val current = getSavedCustomRingtones(context).filter { it.first != uriStr }.toMutableList()
+        current.add(0, Pair(uriStr, title))
+        val arr = JSONArray()
+        current.forEach { (uri, name) ->
+            val obj = JSONObject().apply {
+                put("uri", uri)
+                put("title", name)
+            }
+            arr.put(obj)
+        }
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit { putString("user_added_ringtones_json", arr.toString()) }
+    }
+
     fun getRingtoneTitle(context: Context, uriString: String?): String {
         if (uriString.isNullOrBlank()) return "По умолчанию"
+        // Check user added ringtones first
+        val userRingtones = getSavedCustomRingtones(context)
+        val foundUser = userRingtones.find { it.first == uriString }
+        if (foundUser != null) return foundUser.second
+
         return try {
             val ringtone = RingtoneManager.getRingtone(context, uriString.toUri())
             ringtone?.getTitle(context) ?: "По умолчанию"

@@ -51,6 +51,7 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
@@ -114,6 +115,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import android.media.RingtoneManager
 import android.provider.BlockedNumberContract
+import android.provider.OpenableColumns
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -2698,7 +2700,7 @@ private fun OptionRow(
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.weight(1f)
+            modifier = if (value.isNullOrBlank()) Modifier.weight(1f) else Modifier.weight(1f)
         ) {
             Icon(
                 imageVector = icon,
@@ -2713,19 +2715,23 @@ private fun OptionRow(
                 text = label,
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Medium,
-                color = labelColor
+                color = labelColor,
+                maxLines = 1,
+                softWrap = false
             )
         }
 
         if (!value.isNullOrBlank()) {
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(12.dp))
             Text(
                 text = value,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Normal,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.End,
+                modifier = Modifier.widthIn(max = 110.dp)
             )
         }
     }
@@ -6751,12 +6757,20 @@ private fun OneUiRingtonePickerDialog(
 ) {
     data class RingtoneEntry(
         val uri: String?,
-        val title: String
+        val title: String,
+        val isUserAdded: Boolean = false
     )
 
-    val ringtoneList = remember {
+    fun loadAllRingtones(): List<RingtoneEntry> {
         val list = mutableListOf<RingtoneEntry>()
         list.add(RingtoneEntry(null, "По умолчанию"))
+
+        // Add user-added custom ringtones at the top
+        val userAdded = ContactRingtoneManager.getSavedCustomRingtones(context)
+        userAdded.forEach { (u, t) ->
+            list.add(RingtoneEntry(u, t, isUserAdded = true))
+        }
+
         try {
             val rm = RingtoneManager(context).apply {
                 setType(RingtoneManager.TYPE_RINGTONE)
@@ -6766,19 +6780,94 @@ private fun OneUiRingtonePickerDialog(
                 val pos = cursor.position
                 val ringtoneUri = rm.getRingtoneUri(pos)
                 val title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX)
-                list.add(RingtoneEntry(ringtoneUri.toString(), title ?: "Мелодия"))
+                val uriStr = ringtoneUri.toString()
+                if (userAdded.none { it.first == uriStr }) {
+                    list.add(RingtoneEntry(uriStr, title ?: "Мелодия"))
+                }
             }
         } catch (_: Exception) {
             // ignore
         }
-        list
+        return list
     }
 
-    var selectedEntry by remember(currentUri) {
+    var ringtoneList by remember { mutableStateOf(loadAllRingtones()) }
+
+    var selectedEntry by remember(currentUri, ringtoneList) {
         mutableStateOf(ringtoneList.find { it.uri == currentUri } ?: ringtoneList.first())
     }
 
     var previewPlayer by remember { mutableStateOf<Ringtone?>(null) }
+
+    fun playPreview(uriStr: String?) {
+        try {
+            previewPlayer?.stop()
+            val playUri = if (uriStr != null) {
+                uriStr.toUri()
+            } else {
+                RingtoneManager.getActualDefaultRingtoneUri(
+                    context,
+                    RingtoneManager.TYPE_RINGTONE
+                )
+            }
+            val r = RingtoneManager.getRingtone(context, playUri)
+            r?.audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            r?.play()
+            previewPlayer = r
+        } catch (_: Exception) {
+            // ignore
+        }
+    }
+
+    val audioPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { pickedUri ->
+        if (pickedUri != null) {
+            try {
+                // Take persistable permission if possible
+                try {
+                    val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    context.contentResolver.takePersistableUriPermission(pickedUri, flags)
+                } catch (_: Exception) {
+                    // ignore
+                }
+
+                // Resolve display name
+                var displayName = ""
+                try {
+                    val projection = arrayOf(OpenableColumns.DISPLAY_NAME)
+                    context.contentResolver.query(pickedUri, projection, null, null, null)?.use { cursor ->
+                        if (cursor.moveToFirst()) {
+                            displayName = cursor.getString(0).orEmpty()
+                        }
+                    }
+                } catch (_: Exception) {
+                    // ignore
+                }
+
+                val title = if (displayName.isNotBlank()) {
+                    displayName.substringBeforeLast(".")
+                } else {
+                    RingtoneManager.getRingtone(context, pickedUri)?.getTitle(context) ?: "Пользовательская мелодия"
+                }
+
+                val uriString = pickedUri.toString()
+                ContactRingtoneManager.saveCustomRingtone(context, uriString, title)
+
+                // Refresh list and select new ringtone
+                val updated = loadAllRingtones()
+                ringtoneList = updated
+                val newEntry = updated.find { it.uri == uriString } ?: RingtoneEntry(uriString, title, true)
+                selectedEntry = newEntry
+                playPreview(uriString)
+            } catch (_: Exception) {
+                Toast.makeText(context, "Не удалось добавить мелодию", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -6811,7 +6900,7 @@ private fun OneUiRingtonePickerDialog(
                 .background(MaterialTheme.colorScheme.background)
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                // Top One UI Bar: Arrow back + Title
+                // Top One UI Bar: Arrow back + Title + Add Button aligned to the right
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = MaterialTheme.colorScheme.background
@@ -6819,33 +6908,54 @@ private fun OneUiRingtonePickerDialog(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 8.dp, end = 16.dp, top = 42.dp, bottom = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
+                            .padding(start = 8.dp, end = 12.dp, top = 42.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        IconButton(
-                            onClick = {
-                                try {
-                                    previewPlayer?.stop()
-                                } catch (_: Exception) {
-                                    // ignore
-                                }
-                                onDismiss()
-                            },
-                            modifier = Modifier.size(44.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Назад",
-                                tint = MaterialTheme.colorScheme.onBackground
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = {
+                                    try {
+                                        previewPlayer?.stop()
+                                    } catch (_: Exception) {
+                                        // ignore
+                                    }
+                                    onDismiss()
+                                },
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Назад",
+                                    tint = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Мелодия звонка",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
                             )
                         }
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Мелодия звонка",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onBackground
-                        )
+
+                        // Add Custom Ringtone "+" Button
+                        IconButton(
+                            onClick = {
+                                audioPickerLauncher.launch(arrayOf("audio/*"))
+                            },
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(SamsungGreen.copy(alpha = 0.12f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Добавить мелодию",
+                                tint = SamsungGreen,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
 
@@ -6871,27 +6981,7 @@ private fun OneUiRingtonePickerDialog(
                                 .clip(RoundedCornerShape(16.dp))
                                 .clickable {
                                     selectedEntry = entry
-                                    // Play sound preview
-                                    try {
-                                        previewPlayer?.stop()
-                                        val playUri = if (entry.uri != null) {
-                                            entry.uri.toUri()
-                                        } else {
-                                            RingtoneManager.getActualDefaultRingtoneUri(
-                                                context,
-                                                RingtoneManager.TYPE_RINGTONE
-                                            )
-                                        }
-                                        val r = RingtoneManager.getRingtone(context, playUri)
-                                        r?.audioAttributes = AudioAttributes.Builder()
-                                            .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
-                                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                                            .build()
-                                        r?.play()
-                                        previewPlayer = r
-                                    } catch (_: Exception) {
-                                        // ignore
-                                    }
+                                    playPreview(entry.uri)
                                 }
                         ) {
                             Row(
