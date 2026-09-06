@@ -265,7 +265,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                         isFavorite = contacts.any { it.number == log.number }
                     )
                 }
-                .distinctBy { it.number }
+                .distinctBy { it.name }
                 .sortedBy { query.order(it) }
 
             val calledNumbers = matchedLogs.map { it.number }
