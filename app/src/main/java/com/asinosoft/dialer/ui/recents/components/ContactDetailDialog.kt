@@ -2578,7 +2578,7 @@ private fun SettingsTabContent(
 
                 OptionRow(
                     icon = Icons.Default.AddHome,
-                    label = "Добавить контакт на главный экран",
+                    label = "Добавить на главный экран",
                     onClick = {
                         addContactShortcutToHomeScreen(context, contact, avatarBitmap?.asAndroidBitmap())
                     }
