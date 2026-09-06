@@ -283,21 +283,21 @@ fun InCallScreen(
     val contactKey = remember(contactId, rawNumber) {
         contactId?.ifBlank { rawNumber } ?: rawNumber
     }
-    val swipeRightAction = remember(contactKey, rawNumber, contactId) {
+    val swipeRightAction = remember(contactKey, rawNumber, contactId, contactName) {
         if (rawNumber.isNotBlank() || !contactId.isNullOrBlank()) {
-            getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = rawNumber)
+            getCustomSwipeAction(context, contactKey, isRight = true, fallbackNumber = rawNumber, contactName = contactName)
         } else null
     }
-    val swipeLeftAction = remember(contactKey, rawNumber, contactId) {
+    val swipeLeftAction = remember(contactKey, rawNumber, contactId, contactName) {
         if (rawNumber.isNotBlank() || !contactId.isNullOrBlank()) {
-            getCustomSwipeAction(context, contactKey, isRight = false, fallbackNumber = rawNumber)
+            getCustomSwipeAction(context, contactKey, isRight = false, fallbackNumber = rawNumber, contactName = contactName)
         } else null
     }
     val rightVisuals = remember(swipeRightAction) {
-        getSwipeBackgroundVisuals(swipeRightAction, defaultIsRight = true)
+        getSwipeBackgroundVisuals(swipeRightAction, defaultIsRight = true, context = context)
     }
     val leftVisuals = remember(swipeLeftAction) {
-        getSwipeBackgroundVisuals(swipeLeftAction, defaultIsRight = false)
+        getSwipeBackgroundVisuals(swipeLeftAction, defaultIsRight = false, context = context)
     }
 
     val formattedName = contactName ?: if (displayName.isBlank()) {
@@ -531,10 +531,11 @@ fun InCallScreen(
                                 }
                             )
 
-                            // Button 2: Message/Messenger (Swipe Left Action - Blue)
+                            // Button 2: Message/Messenger (Swipe Left Action)
                             InCallPostCallActionButton(
                                 icon = leftVisuals.icon,
-                                label = leftVisuals.label,
+                                iconBitmap = leftVisuals.iconBitmap,
+                                label = "Сообщение",
                                 containerColor = leftVisuals.backgroundColor,
                                 onClick = {
                                     onFinish()
@@ -577,13 +578,24 @@ fun InCallScreen(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceEvenly
                     ) {
-                        // 1. Record
+                        // 1. Message (Swipe Left Action) instead of Record
                         InCallActionButton(
-                            icon = if (isRecording) Icons.Default.Pause else Icons.Default.PlayArrow,
-                            label = if (isRecording) "Запись..." else "Запись",
-                            isActive = isRecording,
-                            activeColor = MissedRed,
-                            onClick = { CallManager.toggleRecord() }
+                            icon = leftVisuals.icon,
+                            iconBitmap = leftVisuals.iconBitmap,
+                            label = "Сообщение",
+                            isActive = false,
+                            onClick = {
+                                if (swipeLeftAction != null) {
+                                    executeCustomSwipeAction(
+                                        context = context,
+                                        action = swipeLeftAction,
+                                        onCall = { num, sim -> startCallFromInCallScreen(context, num, sim) },
+                                        onSms = { num -> startSmsFromInCallScreen(context, num) }
+                                    )
+                                } else {
+                                    startSmsFromInCallScreen(context, rawNumber)
+                                }
+                            }
                         )
 
                         // 2. Add Call Button (replaces Hold button)
@@ -1267,7 +1279,8 @@ private fun SamsungSwipeAnswerDeclineRow(
 
 @Composable
 private fun InCallActionButton(
-    icon: ImageVector,
+    icon: ImageVector? = null,
+    iconBitmap: ImageBitmap? = null,
     label: String,
     isActive: Boolean = false,
     activeColor: Color = SamsungGreen,
@@ -1290,12 +1303,23 @@ private fun InCallActionButton(
             shadowElevation = if (isActive) 6.dp else 0.dp
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = Color.White,
-                    modifier = Modifier.size(28.dp)
-                )
+                if (iconBitmap != null) {
+                    Image(
+                        bitmap = iconBitmap,
+                        contentDescription = label,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else if (icon != null) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = Color.White,
+                        modifier = Modifier.size(28.dp)
+                    )
+                }
             }
         }
 
@@ -1595,7 +1619,8 @@ private fun performSwipeActionVibration(context: Context) {
 
 @Composable
 private fun InCallPostCallActionButton(
-    icon: ImageVector,
+    icon: ImageVector? = null,
+    iconBitmap: ImageBitmap? = null,
     label: String,
     containerColor: Color,
     contentColor: Color = Color.White,
@@ -1617,12 +1642,23 @@ private fun InCallPostCallActionButton(
             shadowElevation = 4.dp
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(
-                    imageVector = icon,
-                    contentDescription = label,
-                    tint = contentColor,
-                    modifier = Modifier.size(26.dp)
-                )
+                if (iconBitmap != null) {
+                    Image(
+                        bitmap = iconBitmap,
+                        contentDescription = label,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .clip(CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else if (icon != null) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = contentColor,
+                        modifier = Modifier.size(26.dp)
+                    )
+                }
             }
         }
 

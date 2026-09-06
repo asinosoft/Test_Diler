@@ -3210,7 +3210,7 @@ private fun getMessengerBrandColor(messengerName: String): Color {
     }
 }
 
-private fun getApplicationIconBitmap(context: Context, packageName: String): ImageBitmap? {
+fun getApplicationIconBitmap(context: Context, packageName: String): ImageBitmap? {
     return try {
         val drawable = context.packageManager.getApplicationIcon(packageName)
         val bitmap = if (drawable is android.graphics.drawable.BitmapDrawable) {
@@ -3999,12 +3999,14 @@ fun executeCustomSwipeAction(
 data class SwipeBackgroundVisuals(
     val icon: ImageVector,
     val backgroundColor: Color,
-    val label: String
+    val label: String,
+    val iconBitmap: ImageBitmap? = null
 )
 
 fun getSwipeBackgroundVisuals(
     customAction: CustomSwipeAction?,
-    defaultIsRight: Boolean
+    defaultIsRight: Boolean,
+    context: Context? = null
 ): SwipeBackgroundVisuals {
     if (customAction == null) {
         return if (defaultIsRight) {
@@ -4043,10 +4045,27 @@ fun getSwipeBackgroundVisuals(
 
         "messenger_chat" -> {
             val messenger = customAction.messengerName ?: "Сообщение"
+            val appIcon = if (context != null) {
+                val candidate = "${customAction.messengerName} ${customAction.targetValue} ${customAction.label}".lowercase(Locale.getDefault())
+                val pkg = when {
+                    candidate.contains("telegram") || candidate.contains("tg") -> "org.telegram.messenger"
+                    candidate.contains("whatsapp") || candidate.contains("wa") -> "com.whatsapp"
+                    candidate.contains("viber") -> "com.viber.voip"
+                    candidate.contains("max") -> "ru.oneme.app"
+                    candidate.contains("vk") || candidate.contains("вконтакте") -> "com.vk.im"
+                    candidate.contains("skype") -> "com.skype.raider"
+                    candidate.contains("signal") -> "org.thoughtcrime.securesms"
+                    candidate.contains("snapchat") -> "com.snapchat.android"
+                    candidate.contains("wechat") -> "com.tencent.mm"
+                    else -> null
+                }
+                pkg?.let { getApplicationIconBitmap(context, it) }
+            } else null
             SwipeBackgroundVisuals(
                 icon = Icons.AutoMirrored.Filled.Message,
                 backgroundColor = SamsungSmsBlue,
-                label = messenger
+                label = messenger,
+                iconBitmap = appIcon
             )
         }
 
