@@ -3,10 +3,14 @@ package com.asinosoft.dialer.ui.recents.components
 import android.Manifest
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.media.AudioAttributes
+import android.media.Ringtone
 import android.net.Uri
 import android.provider.ContactsContract
 import android.telephony.SubscriptionManager
@@ -19,11 +23,21 @@ import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -51,7 +65,9 @@ import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.automirrored.filled.CallReceived
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddHome
 import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.ContentCopy
@@ -62,6 +78,7 @@ import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FolderSpecial
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -76,6 +93,8 @@ import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -93,7 +112,11 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
+import android.media.RingtoneManager
+import android.provider.BlockedNumberContract
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -101,6 +124,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -133,15 +157,22 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import androidx.core.content.edit
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.IconCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.asinosoft.dialer.MainActivity
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.CallLogItem
 import com.asinosoft.dialer.data.model.CallType
 import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.data.repository.CallLogRepository
+import com.asinosoft.dialer.data.repository.ContactRingtoneManager
 import com.asinosoft.dialer.data.repository.ContactsRepository
 import com.asinosoft.dialer.data.repository.ContactsWriteRepository
 import com.asinosoft.dialer.ui.components.Header
@@ -150,6 +181,7 @@ import com.asinosoft.dialer.ui.components.OneUiPopupMenu
 import com.asinosoft.dialer.ui.components.OneUiPopupMenuDivider
 import com.asinosoft.dialer.ui.components.OneUiPopupMenuItem
 import com.asinosoft.dialer.ui.components.SimIcon
+import com.asinosoft.dialer.ui.theme.BlockedRed
 import com.asinosoft.dialer.ui.theme.IncomingGreen
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
@@ -160,9 +192,11 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -314,7 +348,7 @@ fun ContactDetailDialog(
                 CallTypeFilter.ALL -> true
                 CallTypeFilter.INCOMING -> item.type == CallType.INCOMING
                 CallTypeFilter.OUTGOING -> item.type == CallType.OUTGOING
-                CallTypeFilter.MISSED -> item.type == CallType.MISSED || item.type == CallType.REJECTED
+                CallTypeFilter.MISSED -> item.type == CallType.MISSED || item.type == CallType.REJECTED || item.type == CallType.BLOCKED
             }
             val matchesSim = when (simFilter) {
                 SimFilter.ALL -> true
@@ -354,11 +388,53 @@ fun ContactDetailDialog(
         val listState = rememberLazyListState()
         val density = LocalDensity.current
         val topBarrierPx = with(density) { 86.dp.toPx() }
+        val haptic = LocalHapticFeedback.current
+        var totalHorizontalDrag by remember { mutableFloatStateOf(0f) }
+        var swipeConsumed by remember { mutableStateOf(false) }
 
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
+                .pointerInput(selectedTab) {
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            totalHorizontalDrag = 0f
+                            swipeConsumed = false
+                        },
+                        onDragEnd = {
+                            totalHorizontalDrag = 0f
+                            swipeConsumed = false
+                        },
+                        onDragCancel = {
+                            totalHorizontalDrag = 0f
+                            swipeConsumed = false
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            if (!swipeConsumed) {
+                                totalHorizontalDrag += dragAmount
+                                val threshold = 55.dp.toPx()
+                                if (totalHorizontalDrag < -threshold) {
+                                    // Swipe left -> next tab
+                                    if (selectedTab < 2) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        selectedTab++
+                                        swipeConsumed = true
+                                        change.consume()
+                                    }
+                                } else if (totalHorizontalDrag > threshold) {
+                                    // Swipe right -> previous tab
+                                    if (selectedTab > 0) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        selectedTab--
+                                        swipeConsumed = true
+                                        change.consume()
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
         ) {
             LazyColumn(
                 state = listState,
@@ -463,92 +539,113 @@ fun ContactDetailDialog(
                                 Spacer(modifier = Modifier.height(24.dp))
                             }
 
-                            when (selectedTab) {
-                                0 -> {
-                                    ContactTabContent(
-                                        phoneNumbersList = phoneNumbersList,
-                                        messengerAccountsList = messengerAccountsList,
-                                        onUpdateMessengerAccounts = { messengerAccountsList = it },
-                                        onUpdatePhoneNumbers = { phoneNumbersList = it },
-                                        onUpdateEmails = { emailsList = it },
-                                        emailsList = emailsList,
-                                        birthdayInfo = birthdayInfo,
-                                        importantDatesList = importantDatesList,
-                                        activeSimCount = activeSimCount,
-                                        contact = contact,
-                                        context = context,
-                                        onCall = onCall,
-                                        onSms = onSms,
-                                        onDismiss = onDismiss,
-                                        onRemoveFavorite = onRemoveFavorite
-                                    )
-                                    Spacer(modifier = Modifier.height(40.dp))
-                                }
-
-                                1 -> {
-                                    when {
-                                        isLoadingHistory -> {
-                                            Box(
-                                                modifier = Modifier
-                                                    .fillMaxWidth()
-                                                    .height(120.dp),
-                                                contentAlignment = Alignment.Center
-                                            ) {
-                                                Text(
-                                                    text = "Загрузка истории...",
-                                                    fontSize = 15.sp,
-                                                    color = MaterialTheme.colorScheme.onBackground.copy(
-                                                        alpha = 0.5f
-                                                    )
-                                                )
-                                            }
-                                        }
-
-                                        historyLogs.isEmpty() -> {
-                                            Surface(
-                                                modifier = Modifier.fillMaxWidth(),
-                                                shape = RoundedCornerShape(20.dp),
-                                                color = MaterialTheme.colorScheme.surface,
-                                                tonalElevation = 1.dp
-                                            ) {
-                                                Box(
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .padding(vertical = 32.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
-                                                    Text(
-                                                        text = "История вызовов отсутствует",
-                                                        fontSize = 15.sp,
-                                                        color = MaterialTheme.colorScheme.onSurface.copy(
-                                                            alpha = 0.5f
-                                                        )
-                                                    )
-                                                }
-                                            }
+                            AnimatedContent(
+                                targetState = selectedTab,
+                                transitionSpec = {
+                                    if (targetState > initialState) {
+                                        (slideInHorizontally(animationSpec = tween(260)) { width -> width } + fadeIn(tween(260)))
+                                            .togetherWith(slideOutHorizontally(animationSpec = tween(260)) { width -> -width } + fadeOut(tween(260)))
+                                    } else {
+                                        (slideInHorizontally(animationSpec = tween(260)) { width -> -width } + fadeIn(tween(260)))
+                                            .togetherWith(slideOutHorizontally(animationSpec = tween(260)) { width -> width } + fadeOut(tween(260)))
+                                    }.using(SizeTransform(clip = false))
+                                },
+                                label = "tabTransition"
+                            ) { targetTab ->
+                                when (targetTab) {
+                                    0 -> {
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            ContactTabContent(
+                                                phoneNumbersList = phoneNumbersList,
+                                                messengerAccountsList = messengerAccountsList,
+                                                onUpdateMessengerAccounts = { messengerAccountsList = it },
+                                                onUpdatePhoneNumbers = { phoneNumbersList = it },
+                                                onUpdateEmails = { emailsList = it },
+                                                emailsList = emailsList,
+                                                birthdayInfo = birthdayInfo,
+                                                importantDatesList = importantDatesList,
+                                                activeSimCount = activeSimCount,
+                                                contact = contact,
+                                                context = context,
+                                                onCall = onCall,
+                                                onSms = onSms,
+                                                onDismiss = onDismiss,
+                                                onRemoveFavorite = onRemoveFavorite
+                                            )
                                             Spacer(modifier = Modifier.height(40.dp))
                                         }
                                     }
-                                }
 
-                                2 -> {
-                                    SettingsTabContent(
-                                        contact = contact,
-                                        isFavoriteInitial = isFavorite,
-                                        phoneNumbersList = phoneNumbersList,
-                                        messengerAccountsList = messengerAccountsList,
-                                        onUpdateMessengerAccounts = { messengerAccountsList = it },
-                                        emailsList = emailsList,
-                                        activeSimCount = activeSimCount,
-                                        context = context,
-                                        tabs = tabs,
-                                        onDismiss = onDismiss,
-                                        onRemoveFavorite = onRemoveFavorite,
-                                        onToggleFavorite = onToggleFavorite,
-                                        onUpdateContact = onUpdateContact,
-                                        onAddTab = onAddTab
-                                    )
-                                    Spacer(modifier = Modifier.height(40.dp))
+                                    1 -> {
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            when {
+                                                isLoadingHistory -> {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(120.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = "Загрузка истории...",
+                                                            fontSize = 15.sp,
+                                                            color = MaterialTheme.colorScheme.onBackground.copy(
+                                                                alpha = 0.5f
+                                                            )
+                                                        )
+                                                    }
+                                                }
+
+                                                historyLogs.isEmpty() -> {
+                                                    Surface(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        shape = RoundedCornerShape(20.dp),
+                                                        color = MaterialTheme.colorScheme.surface,
+                                                        tonalElevation = 1.dp
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(vertical = 32.dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = "История вызовов отсутствует",
+                                                                fontSize = 15.sp,
+                                                                color = MaterialTheme.colorScheme.onSurface.copy(
+                                                                    alpha = 0.5f
+                                                                )
+                                                            )
+                                                        }
+                                                    }
+                                                    Spacer(modifier = Modifier.height(40.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    2 -> {
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            SettingsTabContent(
+                                                contact = contact,
+                                                isFavoriteInitial = isFavorite,
+                                                phoneNumbersList = phoneNumbersList,
+                                                messengerAccountsList = messengerAccountsList,
+                                                onUpdateMessengerAccounts = { messengerAccountsList = it },
+                                                emailsList = emailsList,
+                                                activeSimCount = activeSimCount,
+                                                context = context,
+                                                tabs = tabs,
+                                                avatarBitmap = avatarBitmap,
+                                                onDismiss = onDismiss,
+                                                onRemoveFavorite = onRemoveFavorite,
+                                                onToggleFavorite = onToggleFavorite,
+                                                onUpdateContact = onUpdateContact,
+                                                onAddTab = onAddTab
+                                            )
+                                            Spacer(modifier = Modifier.height(40.dp))
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -682,6 +779,8 @@ fun ContactDetailDialog(
 
             var showEditContactDialog by remember { mutableStateOf(false) }
             var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+            var showShareFormatDialog by remember { mutableStateOf(false) }
+            var showShareTextSelectionDialog by remember { mutableStateOf(false) }
 
             // TOP FLOATING TOOLBAR OVER PHOTO (Back Button & Three Dots Menu)
             Box(
@@ -750,26 +849,7 @@ fun ContactDetailDialog(
                                 label = "Поделиться",
                                 onClick = {
                                     topMenuExpanded = false
-                                    try {
-                                        val shareText = "${contact.name}\n${contact.number}"
-                                        val sendIntent = Intent().apply {
-                                            action = Intent.ACTION_SEND
-                                            putExtra(Intent.EXTRA_TEXT, shareText)
-                                            type = "text/plain"
-                                        }
-                                        context.startActivity(
-                                            Intent.createChooser(
-                                                sendIntent,
-                                                "Поделиться контактом"
-                                            )
-                                        )
-                                    } catch (_: Exception) {
-                                        Toast.makeText(
-                                            context,
-                                            "Не удалось поделиться контактом",
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    }
+                                    showShareFormatDialog = true
                                 }
                             )
                             OneUiPopupMenuItem(
@@ -883,6 +963,42 @@ fun ContactDetailDialog(
                         showEditContactDialog = false
                     },
                     onDismiss = { showEditContactDialog = false }
+                )
+            }
+
+            if (showShareFormatDialog) {
+                ShareFormatChoiceDialog(
+                    onShareVCard = {
+                        showShareFormatDialog = false
+                        shareContactAsVCard(
+                            context = context,
+                            contact = contact,
+                            phoneNumbers = phoneNumbersList,
+                            emails = emailsList,
+                            birthday = birthdayInfo?.dateString
+                        )
+                    },
+                    onShareText = {
+                        showShareFormatDialog = false
+                        showShareTextSelectionDialog = true
+                    },
+                    onDismiss = { showShareFormatDialog = false }
+                )
+            }
+
+            if (showShareTextSelectionDialog) {
+                ShareTextSelectionDialog(
+                    contact = contact,
+                    phoneNumbers = phoneNumbersList,
+                    emails = emailsList,
+                    birthday = birthdayInfo,
+                    importantDates = importantDatesList,
+                    messengers = messengerAccountsList,
+                    onSend = { selectedText ->
+                        showShareTextSelectionDialog = false
+                        shareContactText(context, selectedText)
+                    },
+                    onDismiss = { showShareTextSelectionDialog = false }
                 )
             }
 
@@ -1728,7 +1844,7 @@ private fun ContactTabContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // Additional Options Card
+        // Additional Options Card: Скопировать данные контакта
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -1738,30 +1854,21 @@ private fun ContactTabContent(
             Column {
                 OptionRow(
                     icon = Icons.Default.ContentCopy,
-                    label = "Скопировать номер",
+                    label = "Скопировать данные контакта",
                     onClick = {
+                        val contactFullText = buildContactShareText(
+                            contact = contact,
+                            phoneNumbers = editablePhoneList,
+                            emails = editableEmailList,
+                            birthday = birthdayInfo,
+                            importantDates = importantDatesList,
+                            messengers = visibleMessengerList
+                        )
                         val clipboard =
                             context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText("Phone Number", primaryNumber)
+                        val clip = ClipData.newPlainText("Contact Data", contactFullText)
                         clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "Номер скопирован", Toast.LENGTH_SHORT).show()
-                    }
-                )
-
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                    thickness = 1.dp,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-
-                OptionRow(
-                    icon = Icons.Default.Delete,
-                    label = "Удалить из избранных",
-                    labelColor = MaterialTheme.colorScheme.error,
-                    iconTint = MaterialTheme.colorScheme.error,
-                    onClick = {
-                        onDismiss()
-                        onRemoveFavorite(contact)
+                        Toast.makeText(context, "Данные контакта скопированы", Toast.LENGTH_SHORT).show()
                     }
                 )
             }
@@ -1769,7 +1876,20 @@ private fun ContactTabContent(
 
         Spacer(modifier = Modifier.height(28.dp))
 
-        // Quick Action Buttons Row (Call, SMS, Info) placed at the bottom
+        // Quick Action Buttons Row (Call, Swipe Left Action / SMS, Info) placed at the bottom
+        val contactKey = remember(contact) { getContactCustomKey(contact) }
+        val swipeLeftAction = remember(contactKey, primaryNumber) {
+            getCustomSwipeAction(
+                context,
+                contactKey,
+                isRight = false,
+                fallbackNumber = primaryNumber
+            )
+        }
+        val leftVisuals = remember(swipeLeftAction) {
+            getSwipeBackgroundVisuals(swipeLeftAction, defaultIsRight = false)
+        }
+
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -1787,13 +1907,22 @@ private fun ContactTabContent(
             )
 
             ActionButtonItem(
-                icon = Icons.AutoMirrored.Filled.Message,
-                label = "SMS",
-                containerColor = SamsungSmsBlue,
+                icon = leftVisuals.icon,
+                label = leftVisuals.label,
+                containerColor = leftVisuals.backgroundColor,
                 contentColor = Color.White,
                 onClick = {
                     onDismiss()
-                    onSms(primaryNumber)
+                    if (swipeLeftAction != null) {
+                        executeCustomSwipeAction(
+                            context = context,
+                            action = swipeLeftAction,
+                            onCall = { num, sim -> onCall(num, sim) },
+                            onSms = { num -> onSms(num) }
+                        )
+                    } else {
+                        onSms(primaryNumber)
+                    }
                 }
             )
 
@@ -1860,6 +1989,12 @@ private fun HistoryCallRow(item: CallLogItem) {
                     MissedRed,
                     "Отклоненный"
                 )
+
+                CallType.BLOCKED -> Triple(
+                    Icons.Default.Block,
+                    BlockedRed,
+                    "Заблокированный"
+                )
             }
 
             Icon(
@@ -1876,8 +2011,8 @@ private fun HistoryCallRow(item: CallLogItem) {
                     text = formatTimeOnly(item.timestamp),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = if (item.type == CallType.MISSED || item.type == CallType.REJECTED) {
-                        MissedRed
+                    color = if (item.type == CallType.MISSED || item.type == CallType.REJECTED || item.type == CallType.BLOCKED) {
+                        BlockedRed
                     } else {
                         MaterialTheme.colorScheme.onSurface
                     }
@@ -1920,6 +2055,7 @@ private fun SettingsTabContent(
     activeSimCount: Int,
     context: Context,
     tabs: List<FavoriteTab>,
+    avatarBitmap: ImageBitmap?,
     onDismiss: () -> Unit,
     onRemoveFavorite: (FavoriteContact) -> Unit,
     onToggleFavorite: (FavoriteContact, Boolean) -> Unit,
@@ -1971,9 +2107,6 @@ private fun SettingsTabContent(
                         onCheckedChange = { checked ->
                             isFavorite = checked
                             onToggleFavorite(contact, checked)
-                            if (!checked) {
-                                onDismiss()
-                            }
                         },
                         colors = SwitchDefaults.colors(
                             checkedThumbColor = Color.White,
@@ -2408,6 +2541,17 @@ private fun SettingsTabContent(
         Spacer(modifier = Modifier.height(16.dp))
 
         // Card 2: Contact Options
+        val ringtoneData = remember(contactKey) {
+            ContactRingtoneManager.getContactRingtone(context, contactKey)
+        }
+        var customRingtoneUri by remember(contactKey) { mutableStateOf(ringtoneData.first) }
+        var ringtoneTitle by remember(customRingtoneUri, contactKey) {
+            mutableStateOf(
+                ContactRingtoneManager.getRingtoneTitle(context, customRingtoneUri)
+            )
+        }
+        var showRingtonePickerDialog by remember { mutableStateOf(false) }
+
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
@@ -2416,17 +2560,11 @@ private fun SettingsTabContent(
         ) {
             Column {
                 OptionRow(
-                    icon = Icons.Default.ContentCopy,
-                    label = "Скопировать данные контакта",
+                    icon = Icons.Default.MusicNote,
+                    label = "Мелодия звонка",
+                    value = ringtoneTitle,
                     onClick = {
-                        val clipboard =
-                            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        val clip = ClipData.newPlainText(
-                            "Contact Info",
-                            "${contact.name}: ${contact.number}"
-                        )
-                        clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "Данные скопированы", Toast.LENGTH_SHORT).show()
+                        showRingtonePickerDialog = true
                     }
                 )
 
@@ -2437,10 +2575,10 @@ private fun SettingsTabContent(
                 )
 
                 OptionRow(
-                    icon = Icons.Default.Person,
-                    label = "Открыть в контактах устройства",
+                    icon = Icons.Default.AddHome,
+                    label = "Добавить контакт на главный экран",
                     onClick = {
-                        openSystemContact(context, contact.number)
+                        addContactShortcutToHomeScreen(context, contact, avatarBitmap?.asAndroidBitmap())
                     }
                 )
 
@@ -2450,17 +2588,55 @@ private fun SettingsTabContent(
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
 
+                var isContactBlocked by remember(contact.number) {
+                    mutableStateOf(isNumberBlockedInSystem(context, contact.number))
+                }
+
                 OptionRow(
-                    icon = Icons.Default.Delete,
-                    label = "Удалить из списка избранных",
-                    labelColor = MaterialTheme.colorScheme.error,
-                    iconTint = MaterialTheme.colorScheme.error,
+                    icon = Icons.Default.Block,
+                    label = if (isContactBlocked) "Контакт заблокирован" else "Заблокировать контакт",
+                    labelColor = if (isContactBlocked) SamsungGreen else MaterialTheme.colorScheme.error,
+                    iconTint = if (isContactBlocked) SamsungGreen else MaterialTheme.colorScheme.error,
                     onClick = {
-                        onDismiss()
-                        onRemoveFavorite(contact)
+                        if (!isContactBlocked) {
+                            val ok = blockContactNumber(context, contact.number)
+                            if (ok) {
+                                isContactBlocked = true
+                                Toast.makeText(context, "Контакт заблокирован", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Не удалось заблокировать номер", Toast.LENGTH_SHORT).show()
+                            }
+                        } else {
+                            val ok = unblockContactNumber(context, contact.number)
+                            if (ok) {
+                                isContactBlocked = false
+                                Toast.makeText(context, "Контакт разблокирован", Toast.LENGTH_SHORT).show()
+                            } else {
+                                Toast.makeText(context, "Не удалось разблокировать номер", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
                 )
             }
+        }
+
+        if (showRingtonePickerDialog) {
+            OneUiRingtonePickerDialog(
+                context = context,
+                currentUri = customRingtoneUri,
+                onRingtoneSelected = { uri, title ->
+                    customRingtoneUri = uri
+                    ringtoneTitle = title
+                    ContactRingtoneManager.setContactRingtone(
+                        context,
+                        contactKey,
+                        uri,
+                        title
+                    )
+                    showRingtonePickerDialog = false
+                },
+                onDismiss = { showRingtonePickerDialog = false }
+            )
         }
     }
 }
@@ -2507,6 +2683,7 @@ private fun ActionButtonItem(
 private fun OptionRow(
     icon: ImageVector,
     label: String,
+    value: String? = null,
     labelColor: Color = MaterialTheme.colorScheme.onSurface,
     iconTint: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
     onClick: () -> Unit
@@ -2516,23 +2693,41 @@ private fun OptionRow(
             .fillMaxWidth()
             .clickable { onClick() }
             .padding(horizontal = 18.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Icon(
-            imageVector = icon,
-            contentDescription = label,
-            tint = iconTint,
-            modifier = Modifier.size(22.dp)
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = iconTint,
+                modifier = Modifier.size(22.dp)
+            )
 
-        Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
-        Text(
-            text = label,
-            fontSize = 15.sp,
-            fontWeight = FontWeight.Medium,
-            color = labelColor
-        )
+            Text(
+                text = label,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                color = labelColor
+            )
+        }
+
+        if (!value.isNullOrBlank()) {
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = value,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
@@ -6022,3 +6217,898 @@ private fun EditCustomMessengerLinkDialog(
         }
     )
 }
+
+/**
+ * Диалог выбора формата отправки контакта (vCard или Текст)
+ */
+@Composable
+private fun ShareFormatChoiceDialog(
+    onShareVCard: () -> Unit,
+    onShareText: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = "Поделиться контактом",
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onShareVCard() },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                text = "Файл vCard (VCF)",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Для сохранения в телефонную книгу",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onShareText() },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Message,
+                            contentDescription = null,
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                text = "Текст",
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = "Выбрать поля для отправки сообщением",
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Отмена", color = SamsungGreen)
+            }
+        }
+    )
+}
+
+/**
+ * Окно One UI выбора контактной информации для отправки в виде текста
+ */
+@Composable
+private fun ShareTextSelectionDialog(
+    contact: FavoriteContact,
+    phoneNumbers: List<ContactPhoneNumber>,
+    emails: List<ContactEmail>,
+    birthday: ContactBirthday?,
+    importantDates: List<ContactImportantDate>,
+    messengers: List<MessengerAccount>,
+    onSend: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    data class ShareFieldItem(
+        val id: String,
+        val title: String,
+        val subtitle: String,
+        val isName: Boolean = false
+    )
+
+    val items = remember(contact, phoneNumbers, emails, birthday, importantDates, messengers) {
+        val list = mutableListOf<ShareFieldItem>()
+        // 1. Имя
+        if (contact.name.isNotBlank()) {
+            list.add(
+                ShareFieldItem(
+                    id = "name",
+                    title = "Имя контакта",
+                    subtitle = contact.name,
+                    isName = true
+                )
+            )
+        }
+        // 2. Телефоны
+        phoneNumbers.forEachIndexed { idx, p ->
+            if (p.number.isNotBlank()) {
+                val labelText = if (p.label.isNotBlank()) p.label else "Телефон"
+                list.add(
+                    ShareFieldItem(
+                        id = "phone_$idx",
+                        title = labelText,
+                        subtitle = PhoneNumberHelper.format(p.number)
+                    )
+                )
+            }
+        }
+        // 3. Email
+        emails.forEachIndexed { idx, e ->
+            if (e.email.isNotBlank()) {
+                val labelText = if (e.label.isNotBlank()) e.label else "Email"
+                list.add(
+                    ShareFieldItem(
+                        id = "email_$idx",
+                        title = labelText,
+                        subtitle = e.email
+                    )
+                )
+            }
+        }
+        // 4. День рождения
+        if (birthday != null && birthday.dateString.isNotBlank()) {
+            list.add(
+                ShareFieldItem(
+                    id = "birthday",
+                    title = "День рождения",
+                    subtitle = birthday.dateString
+                )
+            )
+        }
+        // 5. Памятные даты
+        importantDates.forEachIndexed { idx, d ->
+            if (d.dateString.isNotBlank()) {
+                list.add(
+                    ShareFieldItem(
+                        id = "date_$idx",
+                        title = d.label.ifBlank { "Дата" },
+                        subtitle = d.dateString
+                    )
+                )
+            }
+        }
+        // 6. Мессенджеры
+        messengers.forEachIndexed { idx, m ->
+            if (m.accountDetail.isNotBlank()) {
+                list.add(
+                    ShareFieldItem(
+                        id = "messenger_$idx",
+                        title = m.messengerName,
+                        subtitle = m.accountDetail
+                    )
+                )
+            }
+        }
+        list
+    }
+
+    // По умолчанию все поля включены
+    var selectedIds by remember(items) {
+        mutableStateOf(items.map { it.id }.toSet())
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Top One UI Bar: Arrow back + Title
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 8.dp, end = 16.dp, top = 42.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Назад",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Выбор контактной информации для отправки",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                // Scrollable List of Contact Fields
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items.forEach { item ->
+                        val isChecked = selectedIds.contains(item.id)
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 1.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    selectedIds = if (isChecked) {
+                                        selectedIds - item.id
+                                    } else {
+                                        selectedIds + item.id
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = { checked ->
+                                        selectedIds = if (checked) {
+                                            selectedIds + item.id
+                                        } else {
+                                            selectedIds - item.id
+                                        }
+                                    },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = SamsungGreen,
+                                        checkmarkColor = Color.White
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.subtitle,
+                                        fontSize = 16.sp,
+                                        fontWeight = if (item.isName) FontWeight.Bold else FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = item.title,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(100.dp))
+                }
+            }
+
+            // Floating Bottom Buttons: Отмена и Готово
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 24.dp),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 8.dp,
+                tonalElevation = 4.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
+                        )
+                    ) {
+                        Text(
+                            text = "Отмена",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            val selectedItems = items.filter { selectedIds.contains(it.id) }
+                            val sb = StringBuilder()
+                            val nameItem = selectedItems.find { it.isName }
+                            if (nameItem != null) {
+                                sb.append(nameItem.subtitle).append("\n")
+                            }
+                            selectedItems.filter { !it.isName }.forEach { itm ->
+                                sb.append("${itm.title}: ${itm.subtitle}\n")
+                            }
+                            onSend(sb.toString().trim())
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SamsungGreen,
+                            contentColor = Color.White
+                        ),
+                        enabled = selectedIds.isNotEmpty()
+                    ) {
+                        Text(
+                            text = "Готово",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Отправка контакта в формате vCard (.vcf) через системный FileProvider
+ */
+private fun shareContactAsVCard(
+    context: Context,
+    contact: FavoriteContact,
+    phoneNumbers: List<ContactPhoneNumber>,
+    emails: List<ContactEmail>,
+    birthday: String?
+) {
+    try {
+        val vcardBuilder = StringBuilder()
+        vcardBuilder.append("BEGIN:VCARD\n")
+        vcardBuilder.append("VERSION:3.0\n")
+        vcardBuilder.append("FN:${contact.name}\n")
+        vcardBuilder.append("N:;${contact.name};;;\n")
+
+        val validPhones = phoneNumbers.filter { it.number.isNotBlank() }.ifEmpty {
+            listOf(ContactPhoneNumber(contact.number, "Мобильный"))
+        }
+        validPhones.forEach { p ->
+            val vcardType = when (p.label.lowercase(Locale.getDefault())) {
+                "домашний", "home" -> "HOME"
+                "рабочий", "work" -> "WORK"
+                else -> "CELL"
+            }
+            vcardBuilder.append("TEL;TYPE=$vcardType:${p.number}\n")
+        }
+
+        emails.filter { it.email.isNotBlank() }.forEach { e ->
+            val vcardType = when (e.label.lowercase(Locale.getDefault())) {
+                "домашний", "home" -> "HOME"
+                "рабочий", "work" -> "WORK"
+                else -> "INTERNET"
+            }
+            vcardBuilder.append("EMAIL;TYPE=$vcardType:${e.email}\n")
+        }
+
+        if (!birthday.isNullOrBlank()) {
+            vcardBuilder.append("BDAY:$birthday\n")
+        }
+
+        vcardBuilder.append("END:VCARD\n")
+
+        val cacheDir = File(context.cacheDir, "vcards").apply { mkdirs() }
+        val safeName = contact.name.ifBlank { "contact" }.replace(Regex("[^a-zA-Z0-9а-яА-ЯёЁ_\\-]"), "_")
+        val vcardFile = File(cacheDir, "${safeName}.vcf")
+        vcardFile.writeText(vcardBuilder.toString(), Charsets.UTF_8)
+
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            vcardFile
+        )
+
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/x-vcard"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, contact.name)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        context.startActivity(Intent.createChooser(intent, "Поделиться vCard"))
+    } catch (_: Exception) {
+        Toast.makeText(context, "Не удалось создать файл vCard", Toast.LENGTH_SHORT).show()
+    }
+}
+
+/**
+ * Отправка контакта в виде текста
+ */
+private fun shareContactText(context: Context, text: String) {
+    if (text.isBlank()) return
+    try {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        context.startActivity(Intent.createChooser(intent, "Поделиться контактом"))
+    } catch (_: Exception) {
+        Toast.makeText(context, "Не удалось отправить контакт", Toast.LENGTH_SHORT).show()
+    }
+}
+
+/**
+ * Формирование полного текста со всеми данными контакта (как при отправке текстом)
+ */
+private fun buildContactShareText(
+    contact: FavoriteContact,
+    phoneNumbers: List<ContactPhoneNumber>,
+    emails: List<ContactEmail>,
+    birthday: ContactBirthday?,
+    importantDates: List<ContactImportantDate>,
+    messengers: List<MessengerAccount>
+): String {
+    val sb = StringBuilder()
+    if (contact.name.isNotBlank()) {
+        sb.append(contact.name).append("\n")
+    }
+    phoneNumbers.filter { it.number.isNotBlank() }.forEach { p ->
+        val labelText = if (p.label.isNotBlank()) p.label else "Телефон"
+        sb.append("$labelText: ${PhoneNumberHelper.format(p.number)}\n")
+    }
+    emails.filter { it.email.isNotBlank() }.forEach { e ->
+        val labelText = if (e.label.isNotBlank()) e.label else "Email"
+        sb.append("$labelText: ${e.email}\n")
+    }
+    if (birthday != null && birthday.dateString.isNotBlank()) {
+        sb.append("День рождения: ${birthday.dateString}\n")
+    }
+    importantDates.filter { it.dateString.isNotBlank() }.forEach { d ->
+        val label = d.label.ifBlank { "Дата" }
+        sb.append("$label: ${d.dateString}\n")
+    }
+    messengers.filter { it.accountDetail.isNotBlank() }.forEach { m ->
+        sb.append("${m.messengerName}: ${m.accountDetail}\n")
+    }
+    return sb.toString().trim()
+}
+
+/**
+ * Диалог выбора мелодии звонка в стиле Samsung One UI
+ */
+@Composable
+private fun OneUiRingtonePickerDialog(
+    context: Context,
+    currentUri: String?,
+    onRingtoneSelected: (String?, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    data class RingtoneEntry(
+        val uri: String?,
+        val title: String
+    )
+
+    val ringtoneList = remember {
+        val list = mutableListOf<RingtoneEntry>()
+        list.add(RingtoneEntry(null, "По умолчанию"))
+        try {
+            val rm = RingtoneManager(context).apply {
+                setType(RingtoneManager.TYPE_RINGTONE)
+            }
+            val cursor = rm.cursor
+            while (cursor != null && cursor.moveToNext()) {
+                val pos = cursor.position
+                val ringtoneUri = rm.getRingtoneUri(pos)
+                val title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX)
+                list.add(RingtoneEntry(ringtoneUri.toString(), title ?: "Мелодия"))
+            }
+        } catch (_: Exception) {
+            // ignore
+        }
+        list
+    }
+
+    var selectedEntry by remember(currentUri) {
+        mutableStateOf(ringtoneList.find { it.uri == currentUri } ?: ringtoneList.first())
+    }
+
+    var previewPlayer by remember { mutableStateOf<Ringtone?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                previewPlayer?.stop()
+            } catch (_: Exception) {
+                // ignore
+            }
+            previewPlayer = null
+        }
+    }
+
+    Dialog(
+        onDismissRequest = {
+            try {
+                previewPlayer?.stop()
+            } catch (_: Exception) {
+                // ignore
+            }
+            onDismiss()
+        },
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Top One UI Bar: Arrow back + Title
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 8.dp, end = 16.dp, top = 42.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = {
+                                try {
+                                    previewPlayer?.stop()
+                                } catch (_: Exception) {
+                                    // ignore
+                                }
+                                onDismiss()
+                            },
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Назад",
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Мелодия звонка",
+                            fontSize = 20.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                // Ringtone List
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    ringtoneList.forEach { entry ->
+                        val isSelected = (entry.uri == selectedEntry.uri)
+
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isSelected) SamsungGreen.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+                            tonalElevation = if (isSelected) 2.dp else 1.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    selectedEntry = entry
+                                    // Play sound preview
+                                    try {
+                                        previewPlayer?.stop()
+                                        val playUri = if (entry.uri != null) {
+                                            entry.uri.toUri()
+                                        } else {
+                                            RingtoneManager.getActualDefaultRingtoneUri(
+                                                context,
+                                                RingtoneManager.TYPE_RINGTONE
+                                            )
+                                        }
+                                        val r = RingtoneManager.getRingtone(context, playUri)
+                                        r?.audioAttributes = AudioAttributes.Builder()
+                                            .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                                            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                                            .build()
+                                        r?.play()
+                                        previewPlayer = r
+                                    } catch (_: Exception) {
+                                        // ignore
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = entry.title,
+                                    fontSize = 15.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) SamsungGreen else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Выбрано",
+                                        tint = SamsungGreen,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(100.dp))
+                }
+            }
+
+            // Floating Bottom Buttons: Отмена и Сохранить
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 24.dp),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 8.dp,
+                tonalElevation = 4.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                previewPlayer?.stop()
+                            } catch (_: Exception) {
+                                // ignore
+                            }
+                            onDismiss()
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
+                        )
+                    ) {
+                        Text(
+                            text = "Отмена",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            try {
+                                previewPlayer?.stop()
+                            } catch (_: Exception) {
+                                // ignore
+                            }
+                            onRingtoneSelected(selectedEntry.uri, selectedEntry.title)
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SamsungGreen,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text(
+                            text = "Сохранить",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Добавление ярлыка контакта на главный экран устройства (Home Screen Shortcut)
+ */
+private fun addContactShortcutToHomeScreen(
+    context: Context,
+    contact: FavoriteContact,
+    avatarBitmap: Bitmap?
+) {
+    try {
+        if (!ShortcutManagerCompat.isRequestPinShortcutSupported(context)) {
+            Toast.makeText(context, "Создание ярлыков не поддерживается лаунчером", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        val launchIntent = Intent(context, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_OPEN_CONTACT_NUMBER, contact.number)
+            putExtra(MainActivity.EXTRA_OPEN_CONTACT_NAME, contact.name)
+            if (contact.id.isNotBlank()) {
+                putExtra(MainActivity.EXTRA_OPEN_CONTACT_ID, contact.id)
+            }
+        }
+
+        val iconCompat = if (avatarBitmap != null) {
+            IconCompat.createWithAdaptiveBitmap(avatarBitmap)
+        } else {
+            IconCompat.createWithResource(
+                context,
+                R.mipmap.ic_launcher
+            )
+        }
+
+        val shortcutInfo = ShortcutInfoCompat.Builder(
+            context,
+            "contact_shortcut_${contact.id.ifBlank { contact.number.replace(Regex("[^0-9+]"), "") }}"
+        )
+            .setShortLabel(contact.name.ifBlank { contact.number })
+            .setLongLabel(contact.name.ifBlank { contact.number })
+            .setIcon(iconCompat)
+            .setIntent(launchIntent)
+            .build()
+
+        ShortcutManagerCompat.requestPinShortcut(context, shortcutInfo, null)
+        Toast.makeText(context, "Запрос на добавление ярлыка отправлен", Toast.LENGTH_SHORT).show()
+    } catch (_: Exception) {
+        Toast.makeText(context, "Не удалось добавить ярлык на главный экран", Toast.LENGTH_SHORT).show()
+    }
+}
+
+/**
+ * Проверка, заблокирован ли номер в системной базе данных
+ */
+private fun isNumberBlockedInSystem(context: Context, phoneNumber: String): Boolean {
+    val number = phoneNumber.trim()
+    if (number.isBlank()) return false
+    return try {
+        if (!BlockedNumberContract.canCurrentUserBlockNumbers(context)) {
+            return false
+        }
+        BlockedNumberContract.isBlocked(context, number)
+    } catch (_: Exception) {
+        false
+    }
+}
+
+/**
+ * Блокировка контакта в системной базе
+ */
+private fun blockContactNumber(context: Context, phoneNumber: String): Boolean {
+    val number = phoneNumber.trim()
+    if (number.isBlank()) return false
+    return try {
+        if (!BlockedNumberContract.canCurrentUserBlockNumbers(context)) {
+            return false
+        }
+        val values = ContentValues().apply {
+            put(
+                BlockedNumberContract.BlockedNumbers.COLUMN_ORIGINAL_NUMBER,
+                number
+            )
+        }
+        context.contentResolver.insert(
+            BlockedNumberContract.BlockedNumbers.CONTENT_URI,
+            values
+        ) != null
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false
+    }
+}
+
+/**
+ * Разблокировка контакта в системной базе
+ */
+private fun unblockContactNumber(context: Context, phoneNumber: String): Boolean {
+    val number = phoneNumber.trim()
+    if (number.isBlank()) return false
+    return try {
+        if (!BlockedNumberContract.canCurrentUserBlockNumbers(context)) {
+            return false
+        }
+        BlockedNumberContract.unblock(context, number) > 0
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false
+    }
+}
+
+
+
+

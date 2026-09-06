@@ -18,6 +18,7 @@ import android.telecom.CallEndpointException
 import android.telecom.InCallService
 import androidx.annotation.RequiresApi
 import com.asinosoft.dialer.data.model.CallState
+import com.asinosoft.dialer.data.repository.ContactRingtoneManager
 import com.asinosoft.dialer.ui.incall.FloatingCallOverlayManager
 import com.asinosoft.dialer.ui.incall.InCallActivity
 import com.asinosoft.dialer.ui.incall.IncomingCallPopupActivity
@@ -85,8 +86,10 @@ class CallService : InCallService() {
             startActivity(intent)
         }
 
+        val customRingtoneUri = ContactRingtoneManager.getCustomRingtoneForNumber(this, rawNumber)
+
         if (call.state == Call.STATE_RINGING) {
-            ringtonePlayer.start()
+            ringtonePlayer.start(customRingtoneUri)
             registerSilenceReceiver()
         }
 
@@ -97,7 +100,7 @@ class CallService : InCallService() {
                 CallManager.updateCallsState()
                 if (state == Call.STATE_RINGING) {
                     wasRinging = true
-                    ringtonePlayer.start()
+                    ringtonePlayer.start(customRingtoneUri)
                     registerSilenceReceiver()
                 } else if (state == Call.STATE_ACTIVE) {
                     wasAnswered = true

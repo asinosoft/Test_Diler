@@ -48,6 +48,7 @@ import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.CallMade
 import androidx.compose.material.icons.automirrored.filled.CallMissed
 import androidx.compose.material.icons.automirrored.filled.CallReceived
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Clear
@@ -106,6 +107,7 @@ import com.asinosoft.dialer.ui.recents.components.executeCustomSwipeAction
 import com.asinosoft.dialer.ui.recents.components.getCustomSwipeAction
 import com.asinosoft.dialer.ui.recents.components.getSwipeBackgroundVisuals
 import com.asinosoft.dialer.ui.components.SimIcon
+import com.asinosoft.dialer.ui.theme.BlockedRed
 import com.asinosoft.dialer.ui.theme.IncomingGreen
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
@@ -991,6 +993,7 @@ private fun CallTypeIcon(type: CallType) {
         CallType.OUTGOING -> Icons.AutoMirrored.Filled.CallMade to OutgoingBlue
         CallType.MISSED -> Icons.AutoMirrored.Filled.CallMissed to MissedRed
         CallType.REJECTED -> Icons.Default.CallEnd to MissedRed
+        CallType.BLOCKED -> Icons.Default.Block to BlockedRed
     }
     Icon(
         imageVector = icon,

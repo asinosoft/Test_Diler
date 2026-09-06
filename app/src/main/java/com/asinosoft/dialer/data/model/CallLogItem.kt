@@ -4,7 +4,8 @@ enum class CallType {
     INCOMING,
     OUTGOING,
     MISSED,
-    REJECTED
+    REJECTED,
+    BLOCKED
 }
 
 data class CallLogItem(

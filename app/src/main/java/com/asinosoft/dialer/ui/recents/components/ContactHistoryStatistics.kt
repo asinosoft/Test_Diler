@@ -245,12 +245,13 @@ fun ContactHistoryStatistics(
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            // Header Row: «Статистика» + Chevron + Period Selector dropdown
+            // Header Row: «Статистика» + Chevron + Period Selector dropdown / Centered call counts
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Left: «Статистика» + Chevron
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(12.dp))
@@ -275,7 +276,56 @@ fun ContactHistoryStatistics(
                     )
                 }
 
-                if (isExpanded) {
+                if (!isExpanded) {
+                    // Centered in the free space to the right of Chevron
+                    Row(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        // Incoming calls
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.CallReceived,
+                                contentDescription = "Входящие",
+                                tint = IncomingGreen,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text(
+                                text = "$incomingCount",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.width(18.dp))
+
+                        // Outgoing calls
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(3.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.CallMade,
+                                contentDescription = "Исходящие",
+                                tint = OutgoingBlue,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Text(
+                                text = "$outgoingCount",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                            )
+                        }
+                    }
+                } else {
                     Box {
                         Surface(
                             shape = RoundedCornerShape(12.dp),

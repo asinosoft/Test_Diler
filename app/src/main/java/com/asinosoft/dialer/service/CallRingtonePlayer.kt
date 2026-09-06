@@ -5,6 +5,7 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.Ringtone
 import android.media.RingtoneManager
+import androidx.core.net.toUri
 
 class CallRingtonePlayer(private val context: Context) {
     private val audioManager: AudioManager? = context.getSystemService(AudioManager::class.java)
@@ -14,11 +15,15 @@ class CallRingtonePlayer(private val context: Context) {
     val isPlaying: Boolean
         get() = ringtone?.isPlaying == true
 
-    fun start() {
+    fun start(customUriString: String? = null) {
         if (silenced || ringtone != null) return
 
         try {
-            val uri = RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_RINGTONE)
+            val uri = if (!customUriString.isNullOrBlank()) {
+                customUriString.toUri()
+            } else {
+                RingtoneManager.getActualDefaultRingtoneUri(context, RingtoneManager.TYPE_RINGTONE)
+            }
             val nextRingtone = RingtoneManager.getRingtone(context, uri)
             nextRingtone.audioAttributes = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)

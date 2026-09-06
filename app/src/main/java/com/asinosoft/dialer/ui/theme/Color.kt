@@ -6,6 +6,7 @@ val SamsungGreen = Color(0xFF08C359)
 val SamsungSmsBlue = Color(0xFF007AFF)
 
 val MissedRed = Color(0xFFE53935)
+val BlockedRed = Color(0xFFE05252)
 val IncomingGreen = Color(0xFF4CAF50)
 val OutgoingBlue = Color(0xFF1E88E5)
 

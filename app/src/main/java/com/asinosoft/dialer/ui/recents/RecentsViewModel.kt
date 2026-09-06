@@ -141,7 +141,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                 CallTypeFilter.ALL -> true
                 CallTypeFilter.INCOMING -> item.type == CallType.INCOMING
                 CallTypeFilter.OUTGOING -> item.type == CallType.OUTGOING
-                CallTypeFilter.MISSED -> item.type == CallType.MISSED || item.type == CallType.REJECTED
+                CallTypeFilter.MISSED -> item.type == CallType.MISSED || item.type == CallType.REJECTED || item.type == CallType.BLOCKED
             }
             val matchesSim = when (simFilter) {
                 SimFilter.ALL -> true

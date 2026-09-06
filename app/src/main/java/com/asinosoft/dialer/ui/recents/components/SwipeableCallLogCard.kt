@@ -69,6 +69,7 @@ import com.asinosoft.dialer.ui.components.OneUiPopupMenuDivider
 import com.asinosoft.dialer.ui.components.OneUiPopupMenuItem
 import com.asinosoft.dialer.ui.components.OneUiPopupMenuPainterItem
 import com.asinosoft.dialer.ui.components.SimIcon
+import com.asinosoft.dialer.ui.theme.BlockedRed
 import com.asinosoft.dialer.ui.theme.IncomingGreen
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
@@ -159,7 +160,7 @@ fun SwipeableCallLogCard(
     }
     val timeText = remember(item.timestamp) { formatTimeOnly(item.timestamp) }
     val avatarName = remember(item.name, formattedNumber) { item.name ?: formattedNumber }
-    val isMissed = item.type == CallType.MISSED || item.type == CallType.REJECTED
+    val isMissed = item.type == CallType.MISSED || item.type == CallType.REJECTED || item.type == CallType.BLOCKED
 
     Box(
         modifier = modifier
@@ -512,6 +513,7 @@ private fun CallTypeIcon(type: CallType) {
         CallType.OUTGOING -> Triple(Icons.AutoMirrored.Filled.CallMade, OutgoingBlue, "Исходящий")
         CallType.MISSED -> Triple(Icons.AutoMirrored.Filled.CallMissed, MissedRed, "Пропущенный")
         CallType.REJECTED -> Triple(Icons.Default.CallEnd, MissedRed, "Отклоненный")
+        CallType.BLOCKED -> Triple(Icons.Default.Block, BlockedRed, "Заблокированный")
     }
 
     Icon(

@@ -259,6 +259,7 @@ class CallLogRepository(private val context: Context) {
                         CallLog.Calls.OUTGOING_TYPE -> CallType.OUTGOING
                         CallLog.Calls.MISSED_TYPE -> CallType.MISSED
                         CallLog.Calls.REJECTED_TYPE -> CallType.REJECTED
+                        CallLog.Calls.BLOCKED_TYPE -> CallType.BLOCKED
                         else -> CallType.INCOMING
                     }
 
