@@ -11,8 +11,11 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.AudioAttributes
 import android.media.Ringtone
+import android.media.RingtoneManager
 import android.net.Uri
+import android.provider.BlockedNumberContract
 import android.provider.ContactsContract
+import android.provider.OpenableColumns
 import android.telephony.SubscriptionManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
@@ -32,7 +35,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -71,6 +73,7 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Cake
 import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
@@ -113,10 +116,6 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
-import android.media.RingtoneManager
-import android.provider.BlockedNumberContract
-import android.provider.OpenableColumns
-import androidx.compose.material.icons.filled.Check
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -126,7 +125,6 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -141,9 +139,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import com.asinosoft.dialer.ui.components.FloatingStickyDateHeader
-import com.asinosoft.dialer.ui.recents.CallTypeFilter
-import com.asinosoft.dialer.ui.recents.SimFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -154,7 +149,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import kotlin.math.roundToInt
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
@@ -177,12 +171,15 @@ import com.asinosoft.dialer.data.repository.CallLogRepository
 import com.asinosoft.dialer.data.repository.ContactRingtoneManager
 import com.asinosoft.dialer.data.repository.ContactsRepository
 import com.asinosoft.dialer.data.repository.ContactsWriteRepository
+import com.asinosoft.dialer.ui.components.FloatingStickyDateHeader
 import com.asinosoft.dialer.ui.components.Header
 import com.asinosoft.dialer.ui.components.LazyListVerticalScrollbar
 import com.asinosoft.dialer.ui.components.OneUiPopupMenu
 import com.asinosoft.dialer.ui.components.OneUiPopupMenuDivider
 import com.asinosoft.dialer.ui.components.OneUiPopupMenuItem
 import com.asinosoft.dialer.ui.components.SimIcon
+import com.asinosoft.dialer.ui.recents.CallTypeFilter
+import com.asinosoft.dialer.ui.recents.SimFilter
 import com.asinosoft.dialer.ui.theme.BlockedRed
 import com.asinosoft.dialer.ui.theme.IncomingGreen
 import com.asinosoft.dialer.ui.theme.MissedRed
@@ -194,7 +191,6 @@ import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -3242,10 +3238,8 @@ private fun MessengerBrandBadge(item: InstalledMessengerItem) {
         Image(
             bitmap = appIcon,
             contentDescription = item.messengerName,
-            modifier = Modifier
-                .size(24.dp)
-                .clip(CircleShape),
-            contentScale = ContentScale.Crop
+            modifier = Modifier.size(24.dp),
+            contentScale = ContentScale.Fit
         )
     } else {
         Box(
