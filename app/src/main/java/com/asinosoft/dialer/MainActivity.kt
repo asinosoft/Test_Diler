@@ -152,17 +152,35 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun handleContactOpenIntent(intent: Intent?) {
-        val number = intent?.getStringExtra(EXTRA_OPEN_CONTACT_NUMBER)
-        if (!number.isNullOrBlank()) {
+        if (intent == null) return
+
+        // 1. Explicit internal contact card open intent
+        val numberExtra = intent.getStringExtra(EXTRA_OPEN_CONTACT_NUMBER)
+        if (!numberExtra.isNullOrBlank()) {
             val name = intent.getStringExtra(EXTRA_OPEN_CONTACT_NAME)
             val id = intent.getStringExtra(EXTRA_OPEN_CONTACT_ID).orEmpty()
             val contact = FavoriteContact(
                 id = id,
-                name = name ?: number,
-                number = number,
+                name = name ?: numberExtra,
+                number = numberExtra,
                 photoUri = null
             )
             mainViewModel?.openContactDetail(contact, initialTab = 0)
+            return
+        }
+
+        // 2. External dial/call intents (ACTION_DIAL, ACTION_VIEW, ACTION_CALL with tel: URI)
+        val action = intent.action
+        val data = intent.data
+        if (data != null && (action == Intent.ACTION_DIAL || action == Intent.ACTION_VIEW || action == Intent.ACTION_CALL)) {
+            val scheme = data.scheme
+            if (scheme == "tel" || scheme == "sip") {
+                val rawNumber = data.schemeSpecificPart.orEmpty()
+                if (rawNumber.isNotBlank()) {
+                    mainViewModel?.openSearchDialer(rawNumber)
+                    return
+                }
+            }
         }
     }
 

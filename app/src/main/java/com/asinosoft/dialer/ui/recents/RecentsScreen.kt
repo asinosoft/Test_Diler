@@ -308,7 +308,7 @@ fun RecentsScreen(
     val dialerOpenMode by viewModel.dialerOpenMode.collectAsState()
 
     // Search & Dialpad Screen Overlay
-    var isSearchDialerOpen by remember { mutableStateOf(false) }
+    val isSearchDialerOpen by viewModel.isSearchDialerOpen.collectAsState()
 
     Box(
         modifier = Modifier
@@ -326,7 +326,7 @@ fun RecentsScreen(
                                     if (now - lastTapTimestamp < 380L &&
                                         (pos - lastTapPosition).getDistance() < 120f
                                     ) {
-                                        isSearchDialerOpen = true
+                                        viewModel.openSearchDialer()
                                         lastTapTimestamp = 0L
                                     } else {
                                         lastTapTimestamp = now
@@ -913,7 +913,7 @@ fun RecentsScreen(
         // Floating Dialpad Button (Only show on main screen when search dialer is closed)
         if (!isSearchDialerOpen && dialerOpenMode.showsFab) {
             FloatingActionButton(
-                onClick = { isSearchDialerOpen = true },
+                onClick = { viewModel.openSearchDialer() },
                 containerColor = SamsungGreen,
                 contentColor = Color.White,
                 shape = CircleShape,
@@ -936,7 +936,7 @@ fun RecentsScreen(
                 viewModel = viewModel,
                 onCall = onCall,
                 onSms = onSms,
-                onClose = { isSearchDialerOpen = false }
+                onClose = { viewModel.closeSearchDialer() }
             )
         }
     }

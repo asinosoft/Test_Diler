@@ -130,8 +130,15 @@ fun SearchDialerScreen(
     onClose: () -> Unit
 ) {
     val context = LocalContext.current
-    val searchQuery = rememberTextFieldState()
+    val currentSearchQueryText by viewModel.searchQuery.collectAsState()
+    val searchQuery = rememberTextFieldState(initialText = currentSearchQueryText)
     val results by viewModel.filteredDialerResults.collectAsState()
+
+    LaunchedEffect(currentSearchQueryText) {
+        if (searchQuery.text.toString() != currentSearchQueryText) {
+            searchQuery.setTextAndPlaceCursorAtEnd(currentSearchQueryText)
+        }
+    }
 
     val defaultSimSlot = remember(context) {
         try {

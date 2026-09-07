@@ -58,7 +58,10 @@ class CallService : InCallService() {
         when (intent?.action) {
             NotificationManager.ACTION_ANSWER -> {
                 CallManager.answer()
-                promoteToFullInCallUi()
+                // Don't force open InCallActivity if floating overlay is handling it
+                if (!FloatingCallOverlayManager.isShowing()) {
+                    promoteToFullInCallUi()
+                }
             }
             NotificationManager.ACTION_DISCONNECT -> CallManager.disconnect()
         }
@@ -88,7 +91,14 @@ class CallService : InCallService() {
 
         val showPopup = (call.state == Call.STATE_RINGING) && shouldShowFloatingPopup(this, call)
         if (showPopup) {
-            FloatingCallOverlayManager.show(this, onPromoteToFullScreen = { promoteToFullInCallUi() })
+            if (FloatingCallOverlayManager.canDrawOverlay(this)) {
+                FloatingCallOverlayManager.show(this, onPromoteToFullScreen = { promoteToFullInCallUi() })
+            } else {
+                val intent = Intent(this, IncomingCallPopupActivity::class.java).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+                }
+                startActivity(intent)
+            }
         } else {
             FloatingCallOverlayManager.hide()
             val intent = Intent(this, InCallActivity::class.java).apply {
@@ -117,9 +127,7 @@ class CallService : InCallService() {
                     wasAnswered = true
                     ringtonePlayer.stop()
                     unregisterSilenceReceiver()
-                    FloatingCallOverlayManager.hide()
-                    // BT headset / external answer while floating popup is showing
-                    promoteToFullInCallUi()
+                    // Stay in Floating window if it is already handling the call
                 } else {
                     unregisterSilenceReceiver()
                 }
@@ -128,7 +136,6 @@ class CallService : InCallService() {
                     if (CallManager.calls.value.none { it.state == Call.STATE_RINGING }) {
                         ringtonePlayer.stop()
                         unregisterSilenceReceiver()
-                        FloatingCallOverlayManager.hide()
                     }
                     val topCalls = CallManager.getDisplayableTopLevelCalls()
                     if (topCalls.isEmpty() && CallManager.calls.value.none { it.state != Call.STATE_DISCONNECTED }) {
@@ -368,7 +375,6 @@ class CallService : InCallService() {
         if (CallManager.calls.value.none { it.state == Call.STATE_RINGING }) {
             ringtonePlayer.stop()
             unregisterSilenceReceiver()
-            FloatingCallOverlayManager.hide()
         }
         if (CallManager.calls.value.isEmpty()) {
             stopForeground(true)

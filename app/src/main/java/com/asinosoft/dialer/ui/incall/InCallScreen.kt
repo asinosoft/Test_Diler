@@ -1556,7 +1556,7 @@ private fun getSimNumberFromCall(call: Call?, context: Context): Int {
     return 1
 }
 
-private fun formatDuration(seconds: Int): String {
+fun formatDuration(seconds: Int): String {
     val m = seconds / 60
     val s = seconds % 60
     return String.format(Locale.getDefault(), "%02d:%02d", m, s)
@@ -1687,7 +1687,7 @@ private fun InCallPostCallActionButton(
     }
 }
 
-private fun startCallFromInCallScreen(context: Context, number: String, simSlot: Int? = null) {
+fun startCallFromInCallScreen(context: Context, number: String, simSlot: Int? = null) {
     try {
         val telecomManager = context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
         val uri = Uri.fromParts("tel", number, null)

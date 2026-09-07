@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.ContactsContract
 import android.telecom.Call
+import android.telecom.CallAudioState
 import android.view.Gravity
 import android.view.KeyEvent
 import android.view.WindowManager
@@ -34,10 +35,16 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.CallMade
+import androidx.compose.material.icons.automirrored.filled.CallReceived
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -68,11 +75,17 @@ import androidx.core.net.toUri
 import com.asinosoft.dialer.data.model.CallState
 import com.asinosoft.dialer.service.CallManager
 import com.asinosoft.dialer.ui.components.SimIcon
+import com.asinosoft.dialer.ui.recents.components.executeCustomSwipeAction
+import com.asinosoft.dialer.ui.recents.components.getCustomSwipeAction
+import com.asinosoft.dialer.ui.recents.components.getSwipeBackgroundVisuals
 import com.asinosoft.dialer.ui.theme.DialerTheme
+import com.asinosoft.dialer.ui.theme.IncomingGreen
 import com.asinosoft.dialer.ui.theme.MissedRed
+import com.asinosoft.dialer.ui.theme.OutgoingBlue
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.util.PhoneNumberHelper
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 class IncomingCallPopupActivity : ComponentActivity() {
@@ -109,11 +122,7 @@ class IncomingCallPopupActivity : ComponentActivity() {
                 IncomingCallPopupScreen(
                     onAnswer = {
                         CallManager.answer()
-                        val intent = Intent(this, InCallActivity::class.java).apply {
-                            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-                        }
-                        startActivity(intent)
-                        finish()
+                        // Don't open InCallActivity, stay in floating popup
                     },
                     onDecline = {
                         CallManager.disconnect()
@@ -200,28 +209,54 @@ private fun IncomingCallPopupScreen(
         }
     }
 
+    var callState by remember { mutableStateOf(activeCall?.state ?: Call.STATE_DISCONNECTED) }
+    var durationSeconds by remember { mutableStateOf(0) }
+    var isDisconnected by remember { mutableStateOf(false) }
+
+    val isMuted by CallManager.isMuted.collectAsState()
+    val audioRoute by CallManager.audioRoute.collectAsState()
+    val isSpeakerOn = audioRoute == CallAudioState.ROUTE_SPEAKER
+
+    LaunchedEffect(callState) {
+        if (callState == Call.STATE_ACTIVE && !isDisconnected) {
+            while (true) {
+                delay(1000L)
+                durationSeconds++
+            }
+        }
+    }
+
     DisposableEffect(activeCall) {
         val current = activeCall
         if (current == null) {
-            onDismiss()
+            isDisconnected = true
             return@DisposableEffect onDispose {}
         }
 
         val callback = object : Call.Callback() {
             override fun onStateChanged(call: Call, state: Int) {
-                when (state) {
-                    // Answered from BT / notification / system — promote to full in-call UI
-                    Call.STATE_ACTIVE,
-                    Call.STATE_HOLDING -> onOpenFullScreen()
-                    Call.STATE_DISCONNECTED -> onDismiss()
+                callState = state
+                if (state == Call.STATE_DISCONNECTED) {
+                    isDisconnected = true
                 }
             }
         }
 
         current.registerCallback(callback)
+        callState = current.state
+        if (current.state == Call.STATE_DISCONNECTED) {
+            isDisconnected = true
+        }
 
         onDispose {
             current.unregisterCallback(callback)
+        }
+    }
+
+    LaunchedEffect(isDisconnected) {
+        if (isDisconnected) {
+            delay(3000L)
+            onDismiss()
         }
     }
 
@@ -301,12 +336,55 @@ private fun IncomingCallPopupScreen(
                         ) {
                             SimIcon(simNumber = call.simNumber, size = 14.dp)
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Входящие вызовы",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
-                            )
+
+                            if (isDisconnected) {
+                                Icon(
+                                    imageVector = Icons.Default.CallEnd,
+                                    contentDescription = null,
+                                    tint = MissedRed,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = formatDuration(durationSeconds),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MissedRed
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text(
+                                    text = "Вызов завершен",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MissedRed
+                                )
+                            } else if (callState == Call.STATE_ACTIVE) {
+                                val isIncomingCall = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                    activeCall?.details?.callDirection == Call.Details.DIRECTION_INCOMING
+                                } else {
+                                    true
+                                }
+                                Icon(
+                                    imageVector = if (isIncomingCall) Icons.AutoMirrored.Filled.CallReceived else Icons.AutoMirrored.Filled.CallMade,
+                                    contentDescription = null,
+                                    tint = if (isIncomingCall) IncomingGreen else OutgoingBlue,
+                                    modifier = Modifier.size(15.dp)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(
+                                    text = formatDuration(durationSeconds),
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            } else {
+                                Text(
+                                    text = "Входящий вызов",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(4.dp))
@@ -334,98 +412,213 @@ private fun IncomingCallPopupScreen(
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                // Bottom Action Bar: Green Answer | "Отправить сообщение" | Red Decline
+                // Bottom Action Bar: Answer/Decline OR In-Call (Speaker, Mic, End Call) OR Ended Call (Call Back)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Green Answer Button
-                    val isBluetoothConnected = CallManager.isBluetoothConnected()
-                    FloatingActionButton(
-                        onClick = onAnswer,
-                        containerColor = SamsungGreen,
-                        contentColor = Color.White,
-                        shape = CircleShape,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                    if (isDisconnected) {
+                        // After call disconnect: Only centered green "Вызов" button with configured right-swipe action
+                        val contactKey = remember(call.rawNumber) { call.rawNumber }
+                        val swipeRightAction = remember(contactKey, call.rawNumber, contactName) {
+                            getCustomSwipeAction(
+                                context,
+                                contactKey,
+                                isRight = true,
+                                fallbackNumber = call.rawNumber,
+                                contactName = contactName
+                            )
+                        }
+                        val rightVisuals = remember(swipeRightAction) {
+                            getSwipeBackgroundVisuals(
+                                swipeRightAction,
+                                defaultIsRight = true,
+                                context = context
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.weight(1f))
+                        FloatingActionButton(
+                            onClick = {
+                                onDismiss()
+                                if (swipeRightAction != null) {
+                                    executeCustomSwipeAction(
+                                        context = context,
+                                        action = swipeRightAction,
+                                        onCall = { num, sim ->
+                                            startCallFromInCallScreen(context, num, sim)
+                                        },
+                                        onSms = { num ->
+                                            try {
+                                                val intent = Intent(Intent.ACTION_SENDTO, "smsto:${Uri.encode(num)}".toUri()).apply {
+                                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                                }
+                                                context.startActivity(intent)
+                                            } catch (_: Exception) {}
+                                        }
+                                    )
+                                } else {
+                                    startCallFromInCallScreen(context, call.rawNumber, null)
+                                }
+                            },
+                            containerColor = rightVisuals.backgroundColor,
+                            contentColor = Color.White,
+                            shape = CircleShape,
+                            modifier = Modifier.size(48.dp)
+                        ) {
                             Icon(
-                                imageVector = Icons.Default.Call,
-                                contentDescription = "Ответить",
+                                imageVector = rightVisuals.icon,
+                                contentDescription = rightVisuals.label,
                                 modifier = Modifier.size(24.dp)
                             )
-                            if (isBluetoothConnected) {
+                        }
+                        Spacer(modifier = Modifier.weight(1f))
+                    } else if (callState == Call.STATE_ACTIVE) {
+                        // Active Call: Speaker button, Mic button, Red End Call button
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // 1. Speaker Button (size 48.dp)
+                            FloatingActionButton(
+                                onClick = { CallManager.toggleSpeaker() },
+                                containerColor = if (isSpeakerOn) SamsungGreen else MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (isSpeakerOn) Color.White else MaterialTheme.colorScheme.onSurface,
+                                shape = CircleShape,
+                                modifier = Modifier.size(48.dp)
+                            ) {
                                 Icon(
-                                    imageVector = Icons.Default.Bluetooth,
-                                    contentDescription = "Bluetooth",
-                                    tint = Color.White,
-                                    modifier = Modifier
-                                        .size(15.dp)
-                                        .align(Alignment.Center)
-                                        .offset(x = 8.dp, y = (-8).dp)
+                                    imageVector = if (isSpeakerOn) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
+                                    contentDescription = "Динамик",
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
+
+                            // 2. Mic Button (size 48.dp)
+                            FloatingActionButton(
+                                onClick = { CallManager.toggleMute() },
+                                containerColor = if (isMuted) MissedRed else MaterialTheme.colorScheme.surfaceVariant,
+                                contentColor = if (isMuted) Color.White else MaterialTheme.colorScheme.onSurface,
+                                shape = CircleShape,
+                                modifier = Modifier.size(48.dp)
+                            ) {
+                                Icon(
+                                    imageVector = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
+                                    contentDescription = "Микрофон",
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
                         }
-                    }
 
-                    // Send SMS Button
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.45f else 0.7f),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .clickable {
-                                try {
-                                    val smsIntent = Intent(
-                                        Intent.ACTION_SENDTO,
-                                        "smsto:${Uri.encode(call.rawNumber)}".toUri()
-                                    ).apply {
-                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                    }
-                                    context.startActivity(smsIntent)
-                                } catch (_: Exception) {
-                                    Toast.makeText(
-                                        context,
-                                        "Не удалось открыть отправку сообщений",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                            }
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        // Red End Call Button
+                        FloatingActionButton(
+                            onClick = {
+                                CallManager.disconnect()
+                                isDisconnected = true
+                            },
+                            containerColor = MissedRed,
+                            contentColor = Color.White,
+                            shape = CircleShape,
+                            modifier = Modifier.size(48.dp)
                         ) {
-                            Text(
-                                text = "Отправить сообщение",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.width(3.dp))
                             Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Быстрый ответ SMS",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(18.dp)
+                                imageVector = Icons.Default.CallEnd,
+                                contentDescription = "Завершить",
+                                modifier = Modifier.size(24.dp)
                             )
                         }
-                    }
+                    } else {
+                        // Ringing state: Green Answer Button
+                        val isBluetoothConnected = CallManager.isBluetoothConnected()
+                        FloatingActionButton(
+                            onClick = onAnswer,
+                            containerColor = SamsungGreen,
+                            contentColor = Color.White,
+                            shape = CircleShape,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    imageVector = Icons.Default.Call,
+                                    contentDescription = "Ответить",
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                if (isBluetoothConnected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Bluetooth,
+                                        contentDescription = "Bluetooth",
+                                        tint = Color.White,
+                                        modifier = Modifier
+                                            .size(15.dp)
+                                            .align(Alignment.Center)
+                                            .offset(x = 8.dp, y = (-8).dp)
+                                    )
+                                }
+                            }
+                        }
 
-                    // Red Decline Button
-                    FloatingActionButton(
-                        onClick = onDecline,
-                        containerColor = MissedRed,
-                        contentColor = Color.White,
-                        shape = CircleShape,
-                        modifier = Modifier.size(48.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.CallEnd,
-                            contentDescription = "Отклонить",
-                            modifier = Modifier.size(24.dp)
-                        )
+                        // Send SMS Button
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.45f else 0.7f),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .clickable {
+                                    try {
+                                        val smsIntent = Intent(
+                                            Intent.ACTION_SENDTO,
+                                            "smsto:${Uri.encode(call.rawNumber)}".toUri()
+                                        ).apply {
+                                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                        }
+                                        context.startActivity(smsIntent)
+                                    } catch (_: Exception) {
+                                        Toast.makeText(
+                                            context,
+                                            "Не удалось открыть отправку сообщений",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Отправить сообщение",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Быстрый ответ SMS",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+
+                        // Red Decline Button
+                        FloatingActionButton(
+                            onClick = {
+                                onDecline()
+                                isDisconnected = true
+                            },
+                            containerColor = MissedRed,
+                            contentColor = Color.White,
+                            shape = CircleShape,
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.CallEnd,
+                                contentDescription = "Отклонить",
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
                     }
                 }
             }

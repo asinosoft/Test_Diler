@@ -211,6 +211,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     val unsavedNumberFlow: StateFlow<UnsavedNumberFlowState?> = _unsavedNumberFlow.asStateFlow()
 
     private val _searchQuery = MutableStateFlow("")
+    val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
     private val _hasLoadedCallLogs = MutableStateFlow(false)
     val hasLoadedCallLogs: StateFlow<Boolean> = _hasLoadedCallLogs.asStateFlow()
@@ -281,6 +282,21 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     fun setSearchQuery(value: String) {
         _searchQuery.value = value
+    }
+
+    private val _isSearchDialerOpen = MutableStateFlow(false)
+    val isSearchDialerOpen: StateFlow<Boolean> = _isSearchDialerOpen.asStateFlow()
+
+    fun openSearchDialer(initialNumber: String? = null) {
+        if (!initialNumber.isNullOrBlank()) {
+            _searchQuery.value = initialNumber
+        }
+        _isSearchDialerOpen.value = true
+    }
+
+    fun closeSearchDialer() {
+        _isSearchDialerOpen.value = false
+        _searchQuery.value = ""
     }
 
     private lateinit var callLogObserver: ContentObserver
