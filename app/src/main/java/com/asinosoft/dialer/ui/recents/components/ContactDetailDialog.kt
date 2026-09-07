@@ -226,7 +226,7 @@ fun ContactDetailDialog(
         phones: List<ContactsWriteRepository.PhoneEntry>,
         emails: List<ContactsWriteRepository.EmailEntry>,
         birthdayDateString: String?,
-        photoBitmap: android.graphics.Bitmap?
+        photoBitmap: Bitmap?
     ) -> Unit = { _, updated, _, _, _, _ -> onUpdateContact(updated) },
     onDeleteContact: (FavoriteContact) -> Unit = {},
     onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", "Основные") }
@@ -3550,9 +3550,9 @@ private fun parseBirthdayString(rawDate: String): ContactBirthday {
     if (cleanDate.isBlank()) return ContactBirthday("", "", null)
 
     try {
-        val currentYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
-        val currentMonth = java.util.Calendar.getInstance().get(java.util.Calendar.MONTH) + 1
-        val currentDay = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_MONTH)
+        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+        val currentMonth = Calendar.getInstance().get(Calendar.MONTH) + 1
+        val currentDay = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
 
         val monthNames = arrayOf(
             "января",
@@ -5120,16 +5120,16 @@ private fun showCalendarDatePicker(
     initialDateString: String,
     onDateSelected: (formattedDate: String) -> Unit
 ) {
-    val cal = java.util.Calendar.getInstance()
+    val cal = Calendar.getInstance()
     val numbers =
         Regex("\\d+").findAll(initialDateString).mapNotNull { it.value.toIntOrNull() }.toList()
     if (numbers.size >= 3) {
-        val y = numbers.firstOrNull { it in 1900..2100 } ?: cal.get(java.util.Calendar.YEAR)
+        val y = numbers.firstOrNull { it in 1900..2100 } ?: cal.get(Calendar.YEAR)
         val nonYears = numbers.filter { it != y }
         val m =
-            if (nonYears.size >= 2 && nonYears[1] in 1..12) nonYears[1] - 1 else cal.get(java.util.Calendar.MONTH)
+            if (nonYears.size >= 2 && nonYears[1] in 1..12) nonYears[1] - 1 else cal.get(Calendar.MONTH)
         val d =
-            if (nonYears.isNotEmpty() && nonYears[0] in 1..31) nonYears[0] else cal.get(java.util.Calendar.DAY_OF_MONTH)
+            if (nonYears.isNotEmpty() && nonYears[0] in 1..31) nonYears[0] else cal.get(Calendar.DAY_OF_MONTH)
         cal.set(y, m, d)
     }
 
@@ -5154,9 +5154,9 @@ private fun showCalendarDatePicker(
             val formatted = "$dayOfMonth $mName $year г."
             onDateSelected(formatted)
         },
-        cal.get(java.util.Calendar.YEAR),
-        cal.get(java.util.Calendar.MONTH),
-        cal.get(java.util.Calendar.DAY_OF_MONTH)
+        cal.get(Calendar.YEAR),
+        cal.get(Calendar.MONTH),
+        cal.get(Calendar.DAY_OF_MONTH)
     )
     picker.show()
 }
@@ -5224,7 +5224,7 @@ fun CallLogAddContactDialog(
         phones: List<ContactsWriteRepository.PhoneEntry>,
         emails: List<ContactsWriteRepository.EmailEntry>,
         birthdayDateString: String?,
-        photoBitmap: android.graphics.Bitmap?
+        photoBitmap: Bitmap?
     ) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -5269,7 +5269,7 @@ fun CallLogAddToExistingContactDialog(
         phones: List<ContactsWriteRepository.PhoneEntry>,
         emails: List<ContactsWriteRepository.EmailEntry>,
         birthdayDateString: String?,
-        photoBitmap: android.graphics.Bitmap?
+        photoBitmap: Bitmap?
     ) -> Unit,
     onDismiss: () -> Unit
 ) {
