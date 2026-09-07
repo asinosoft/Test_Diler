@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.telecom.Call
 import android.telecom.CallAudioState
+import android.util.Log
 import com.asinosoft.dialer.MainActivity
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -176,10 +177,12 @@ object CallManager {
         val call2 = all[1]
         try {
             call1.conference(call2)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w("call", "Failed to create conference", e)
             try {
                 call2.conference(call1)
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.e("call", "Failed to create conference", e)
                 // ignore
             }
         }
@@ -225,7 +228,8 @@ object CallManager {
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
             }
             context.startActivity(intent)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("call", "Failed to open call screen", e)
             // ignore
         }
     }
