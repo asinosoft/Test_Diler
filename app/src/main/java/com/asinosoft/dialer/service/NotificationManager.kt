@@ -13,6 +13,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.ContactsContract
 import android.telecom.Call
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.content.ContextCompat
@@ -111,9 +112,12 @@ class NotificationManager(val service: Service) {
                 }
             }
 
-            val callerName = contactName ?: call.displayName.ifBlank { PhoneNumberHelper.format(call.rawNumber) }
+            Log.d("notification", "Person: ${call.displayName} / ${call.rawNumber}")
+
+            val callerName = (contactName ?: call.displayName).ifBlank { PhoneNumberHelper.format(call.rawNumber) }.ifBlank { "Anonymous" }
 
             val callerPerson = Person.Builder()
+                .setKey(call.rawNumber)
                 .setName(callerName)
                 .setImportant(true)
                 .build()
