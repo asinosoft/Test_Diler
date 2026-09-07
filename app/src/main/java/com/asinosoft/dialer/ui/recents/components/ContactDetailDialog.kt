@@ -17,6 +17,7 @@ import android.provider.BlockedNumberContract
 import android.provider.ContactsContract
 import android.provider.OpenableColumns
 import android.telephony.SubscriptionManager
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -129,6 +130,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -137,11 +139,15 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -434,15 +440,38 @@ fun ContactDetailDialog(
                     )
                 }
         ) {
+            // Expand contact photo up to half-screen
+            val minHeight = 280f
+            val maxHeight = LocalWindowInfo.current.containerDpSize.height.value / 2f
+            var heroHeight by remember { mutableFloatStateOf(minHeight) }
+            val scrollConnection = remember {
+                object : NestedScrollConnection {
+                    override fun onPreScroll(
+                        available: Offset,
+                        source: NestedScrollSource
+                    ): Offset {
+                        val previousHeight = heroHeight
+                        heroHeight = (heroHeight + available.y / 2).coerceIn(minHeight, maxHeight)
+                        val consumed = heroHeight - previousHeight
+
+                        Log.d("hero", "Available = $available, Consumed = $consumed")
+
+                        return Offset(0f, consumed)
+                    }
+                }
+            }
+
             LazyColumn(
                 state = listState,
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(scrollConnection)
             ) {
                 item(key = "hero") {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(280.dp)
+                            .height(heroHeight.dp)
                             .background(avatarBgColor)
                     ) {
                         val bitmap = avatarBitmap
@@ -541,11 +570,25 @@ fun ContactDetailDialog(
                                 targetState = selectedTab,
                                 transitionSpec = {
                                     if (targetState > initialState) {
-                                        (slideInHorizontally(animationSpec = tween(260)) { width -> width } + fadeIn(tween(260)))
-                                            .togetherWith(slideOutHorizontally(animationSpec = tween(260)) { width -> -width } + fadeOut(tween(260)))
+                                        (slideInHorizontally(animationSpec = tween(260)) { width -> width } + fadeIn(
+                                            tween(260)
+                                        ))
+                                            .togetherWith(
+                                                slideOutHorizontally(
+                                                    animationSpec = tween(
+                                                        260
+                                                    )
+                                                ) { width -> -width } + fadeOut(tween(260)))
                                     } else {
-                                        (slideInHorizontally(animationSpec = tween(260)) { width -> -width } + fadeIn(tween(260)))
-                                            .togetherWith(slideOutHorizontally(animationSpec = tween(260)) { width -> width } + fadeOut(tween(260)))
+                                        (slideInHorizontally(animationSpec = tween(260)) { width -> -width } + fadeIn(
+                                            tween(260)
+                                        ))
+                                            .togetherWith(
+                                                slideOutHorizontally(
+                                                    animationSpec = tween(
+                                                        260
+                                                    )
+                                                ) { width -> width } + fadeOut(tween(260)))
                                     }.using(SizeTransform(clip = false))
                                 },
                                 label = "tabTransition"
@@ -556,7 +599,9 @@ fun ContactDetailDialog(
                                             ContactTabContent(
                                                 phoneNumbersList = phoneNumbersList,
                                                 messengerAccountsList = messengerAccountsList,
-                                                onUpdateMessengerAccounts = { messengerAccountsList = it },
+                                                onUpdateMessengerAccounts = {
+                                                    messengerAccountsList = it
+                                                },
                                                 onUpdatePhoneNumbers = { phoneNumbersList = it },
                                                 onUpdateEmails = { emailsList = it },
                                                 emailsList = emailsList,
@@ -629,7 +674,9 @@ fun ContactDetailDialog(
                                                 isFavoriteInitial = isFavorite,
                                                 phoneNumbersList = phoneNumbersList,
                                                 messengerAccountsList = messengerAccountsList,
-                                                onUpdateMessengerAccounts = { messengerAccountsList = it },
+                                                onUpdateMessengerAccounts = {
+                                                    messengerAccountsList = it
+                                                },
                                                 emailsList = emailsList,
                                                 activeSimCount = activeSimCount,
                                                 context = context,
@@ -666,24 +713,37 @@ fun ContactDetailDialog(
                                 val headerOffsetPx by remember(listState) {
                                     derivedStateOf {
                                         val layoutInfo = listState.layoutInfo
-                                        val currentItem = layoutInfo.visibleItemsInfo.find { it.key == "history_header_$dateHeader" }
+                                        val currentItem =
+                                            layoutInfo.visibleItemsInfo.find { it.key == "history_header_$dateHeader" }
                                         if (currentItem == null) {
                                             0f
                                         } else {
                                             val nextHeader = layoutInfo.visibleItemsInfo.find {
-                                                it.key.toString().startsWith("history_header_") && it.index > currentItem.index
+                                                it.key.toString()
+                                                    .startsWith("history_header_") && it.index > currentItem.index
                                             }
-                                            val headerHeight = currentItem.size.toFloat().coerceAtLeast(1f)
+                                            val headerHeight =
+                                                currentItem.size.toFloat().coerceAtLeast(1f)
 
                                             if (currentItem.offset <= 0) {
                                                 if (nextHeader != null) {
-                                                    minOf(topBarrierPx, (nextHeader.offset - headerHeight).coerceAtLeast(0f))
+                                                    minOf(
+                                                        topBarrierPx,
+                                                        (nextHeader.offset - headerHeight).coerceAtLeast(
+                                                            0f
+                                                        )
+                                                    )
                                                 } else {
                                                     topBarrierPx
                                                 }
                                             } else if (currentItem.offset < topBarrierPx) {
                                                 if (nextHeader != null && nextHeader.offset < topBarrierPx + headerHeight) {
-                                                    minOf(topBarrierPx - currentItem.offset, (nextHeader.offset - headerHeight).coerceAtLeast(0f))
+                                                    minOf(
+                                                        topBarrierPx - currentItem.offset,
+                                                        (nextHeader.offset - headerHeight).coerceAtLeast(
+                                                            0f
+                                                        )
+                                                    )
                                                 } else {
                                                     topBarrierPx - currentItem.offset
                                                 }
@@ -1866,7 +1926,8 @@ private fun ContactTabContent(
                             context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         val clip = ClipData.newPlainText("Contact Data", contactFullText)
                         clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "Данные контакта скопированы", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(context, "Данные контакта скопированы", Toast.LENGTH_SHORT)
+                            .show()
                     }
                 )
             }
@@ -2576,7 +2637,11 @@ private fun SettingsTabContent(
                     icon = Icons.Default.AddHome,
                     label = "Добавить на главный экран",
                     onClick = {
-                        addContactShortcutToHomeScreen(context, contact, avatarBitmap?.asAndroidBitmap())
+                        addContactShortcutToHomeScreen(
+                            context,
+                            contact,
+                            avatarBitmap?.asAndroidBitmap()
+                        )
                     }
                 )
 
@@ -2600,17 +2665,27 @@ private fun SettingsTabContent(
                             val ok = blockContactNumber(context, contact.number)
                             if (ok) {
                                 isContactBlocked = true
-                                Toast.makeText(context, "Контакт заблокирован", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Контакт заблокирован", Toast.LENGTH_SHORT)
+                                    .show()
                             } else {
-                                Toast.makeText(context, "Не удалось заблокировать номер", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    "Не удалось заблокировать номер",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         } else {
                             val ok = unblockContactNumber(context, contact.number)
                             if (ok) {
                                 isContactBlocked = false
-                                Toast.makeText(context, "Контакт разблокирован", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, "Контакт разблокирован", Toast.LENGTH_SHORT)
+                                    .show()
                             } else {
-                                Toast.makeText(context, "Не удалось разблокировать номер", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(
+                                    context,
+                                    "Не удалось разблокировать номер",
+                                    Toast.LENGTH_SHORT
+                                ).show()
                             }
                         }
                     }
@@ -3921,7 +3996,10 @@ fun getCustomSwipeAction(
                     val obj = JSONObject(str)
                     val targetValue = obj.optString("targetValue")
                     val cleanTarget = digitsOnlyPhoneFast(targetValue, keepPlus = false)
-                    if (searchLast7.isNotBlank() && cleanTarget.length >= 7 && cleanTarget.takeLast(7) == searchLast7) {
+                    if (searchLast7.isNotBlank() && cleanTarget.length >= 7 && cleanTarget.takeLast(
+                            7
+                        ) == searchLast7
+                    ) {
                         jsonString = str
                         break
                     }
@@ -4045,7 +4123,10 @@ fun getSwipeBackgroundVisuals(
         "messenger_chat" -> {
             val messenger = customAction.messengerName ?: "Сообщение"
             val appIcon = if (context != null) {
-                val candidate = "${customAction.messengerName} ${customAction.targetValue} ${customAction.label}".lowercase(Locale.getDefault())
+                val candidate =
+                    "${customAction.messengerName} ${customAction.targetValue} ${customAction.label}".lowercase(
+                        Locale.getDefault()
+                    )
                 val pkg = when {
                     candidate.contains("telegram") || candidate.contains("tg") -> "org.telegram.messenger"
                     candidate.contains("whatsapp") || candidate.contains("wa") -> "com.whatsapp"
@@ -4346,7 +4427,11 @@ private fun SwipeActionPickerDialog(
                                                 CustomSwipeAction(
                                                     actionType = "sms",
                                                     targetValue = phoneItem.number,
-                                                    label = "SMS (${PhoneNumberHelper.format(phoneItem.number)})"
+                                                    label = "SMS (${
+                                                        PhoneNumberHelper.format(
+                                                            phoneItem.number
+                                                        )
+                                                    })"
                                                 )
                                             )
                                         },
@@ -6688,7 +6773,8 @@ private fun shareContactAsVCard(
         vcardBuilder.append("END:VCARD\n")
 
         val cacheDir = File(context.cacheDir, "vcards").apply { mkdirs() }
-        val safeName = contact.name.ifBlank { "contact" }.replace(Regex("[^a-zA-Z0-9а-яА-ЯёЁ_\\-]"), "_")
+        val safeName =
+            contact.name.ifBlank { "contact" }.replace(Regex("[^a-zA-Z0-9а-яА-ЯёЁ_\\-]"), "_")
         val vcardFile = File(cacheDir, "${safeName}.vcf")
         vcardFile.writeText(vcardBuilder.toString(), Charsets.UTF_8)
 
@@ -6857,11 +6943,12 @@ private fun OneUiRingtonePickerDialog(
                 var displayName = ""
                 try {
                     val projection = arrayOf(OpenableColumns.DISPLAY_NAME)
-                    context.contentResolver.query(pickedUri, projection, null, null, null)?.use { cursor ->
-                        if (cursor.moveToFirst()) {
-                            displayName = cursor.getString(0).orEmpty()
+                    context.contentResolver.query(pickedUri, projection, null, null, null)
+                        ?.use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                displayName = cursor.getString(0).orEmpty()
+                            }
                         }
-                    }
                 } catch (_: Exception) {
                     // ignore
                 }
@@ -6869,7 +6956,8 @@ private fun OneUiRingtonePickerDialog(
                 val title = if (displayName.isNotBlank()) {
                     displayName.substringBeforeLast(".")
                 } else {
-                    RingtoneManager.getRingtone(context, pickedUri)?.getTitle(context) ?: "Пользовательская мелодия"
+                    RingtoneManager.getRingtone(context, pickedUri)?.getTitle(context)
+                        ?: "Пользовательская мелодия"
                 }
 
                 val uriString = pickedUri.toString()
@@ -6878,7 +6966,8 @@ private fun OneUiRingtonePickerDialog(
                 // Refresh list and select new ringtone
                 val updated = loadAllRingtones()
                 ringtoneList = updated
-                val newEntry = updated.find { it.uri == uriString } ?: RingtoneEntry(uriString, title, true)
+                val newEntry =
+                    updated.find { it.uri == uriString } ?: RingtoneEntry(uriString, title, true)
                 selectedEntry = newEntry
                 playPreview(uriString)
             } catch (_: Exception) {
@@ -7118,7 +7207,11 @@ private fun addContactShortcutToHomeScreen(
 ) {
     try {
         if (!ShortcutManagerCompat.isRequestPinShortcutSupported(context)) {
-            Toast.makeText(context, "Создание ярлыков не поддерживается лаунчером", Toast.LENGTH_SHORT).show()
+            Toast.makeText(
+                context,
+                "Создание ярлыков не поддерживается лаунчером",
+                Toast.LENGTH_SHORT
+            ).show()
             return
         }
 
@@ -7143,7 +7236,14 @@ private fun addContactShortcutToHomeScreen(
 
         val shortcutInfo = ShortcutInfoCompat.Builder(
             context,
-            "contact_shortcut_${contact.id.ifBlank { contact.number.replace(Regex("[^0-9+]"), "") }}"
+            "contact_shortcut_${
+                contact.id.ifBlank {
+                    contact.number.replace(
+                        Regex("[^0-9+]"),
+                        ""
+                    )
+                }
+            }"
         )
             .setShortLabel(contact.name.ifBlank { contact.number })
             .setLongLabel(contact.name.ifBlank { contact.number })
@@ -7154,7 +7254,8 @@ private fun addContactShortcutToHomeScreen(
         ShortcutManagerCompat.requestPinShortcut(context, shortcutInfo, null)
         Toast.makeText(context, "Запрос на добавление ярлыка отправлен", Toast.LENGTH_SHORT).show()
     } catch (_: Exception) {
-        Toast.makeText(context, "Не удалось добавить ярлык на главный экран", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "Не удалось добавить ярлык на главный экран", Toast.LENGTH_SHORT)
+            .show()
     }
 }
 
