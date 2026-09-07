@@ -38,6 +38,12 @@ object CallManager {
     private val _currentBluetoothDeviceName = MutableStateFlow<String?>(null)
     val currentBluetoothDeviceName: StateFlow<String?> = _currentBluetoothDeviceName.asStateFlow()
 
+    fun isBluetoothConnected(): Boolean {
+        return _audioRoute.value == CallAudioState.ROUTE_BLUETOOTH ||
+                _bluetoothDevices.value.isNotEmpty() ||
+                !_currentBluetoothDeviceName.value.isNullOrBlank()
+    }
+
     private val _isHold = MutableStateFlow(false)
     val isHold: StateFlow<Boolean> = _isHold.asStateFlow()
 

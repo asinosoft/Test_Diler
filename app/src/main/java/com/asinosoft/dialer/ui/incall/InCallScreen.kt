@@ -1117,6 +1117,7 @@ private fun SamsungSwipeAnswerDeclineRow(
                 }
 
                 // Green Draggable Answer Button
+                val isBluetoothConnected = CallManager.isBluetoothConnected()
                 Surface(
                     shape = CircleShape,
                     color = SamsungGreen,
@@ -1169,6 +1170,17 @@ private fun SamsungSwipeAnswerDeclineRow(
                             tint = Color.White,
                             modifier = Modifier.size(34.dp)
                         )
+                        if (isBluetoothConnected) {
+                            Icon(
+                                imageVector = Icons.Default.Bluetooth,
+                                contentDescription = "Bluetooth",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .align(Alignment.Center)
+                                    .offset(x = 11.dp, y = (-11).dp)
+                            )
+                        }
                     }
                 }
             }

@@ -26,12 +26,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -408,6 +410,7 @@ private fun FloatingIncomingCallOverlayContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Green Answer Button
+                    val isBluetoothConnected = CallManager.isBluetoothConnected()
                     FloatingActionButton(
                         onClick = onAnswer,
                         containerColor = SamsungGreen,
@@ -415,11 +418,24 @@ private fun FloatingIncomingCallOverlayContent(
                         shape = CircleShape,
                         modifier = Modifier.size(48.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Call,
-                            contentDescription = "Ответить",
-                            modifier = Modifier.size(24.dp)
-                        )
+                        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Icon(
+                                imageVector = Icons.Default.Call,
+                                contentDescription = "Ответить",
+                                modifier = Modifier.size(24.dp)
+                            )
+                            if (isBluetoothConnected) {
+                                Icon(
+                                    imageVector = Icons.Default.Bluetooth,
+                                    contentDescription = "Bluetooth",
+                                    tint = Color.White,
+                                    modifier = Modifier
+                                        .size(15.dp)
+                                        .align(Alignment.Center)
+                                        .offset(x = 8.dp, y = (-8).dp)
+                                )
+                            }
+                        }
                     }
 
                     // Send SMS Button

@@ -69,6 +69,17 @@ class CallService : InCallService() {
         super.onCallAdded(call)
         CallManager.onCallAdded(call)
 
+        // Check and update bluetooth audio state immediately upon call added
+        try {
+            val audioState = callAudioState
+            if (audioState != null) {
+                CallManager.updateAudioRoute(audioState.route)
+                updateBluetoothDevicesFromAudioState(audioState)
+            }
+        } catch (_: Exception) {
+            // ignore
+        }
+
         var wasRinging = (call.state == Call.STATE_RINGING)
         var wasAnswered = (call.state == Call.STATE_ACTIVE)
 
@@ -205,6 +216,8 @@ class CallService : InCallService() {
     }
 
     private fun updateBluetoothDevicesFromAudioState(audioState: CallAudioState) {
+        val hasBtRoute = (audioState.supportedRouteMask and CallAudioState.ROUTE_BLUETOOTH) != 0
+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             val activeBt = audioState.activeBluetoothDevice
             val supportedBt = audioState.supportedBluetoothDevices?.toList().orEmpty()
@@ -226,7 +239,15 @@ class CallService : InCallService() {
             }
             if (devices.isNotEmpty()) {
                 CallManager.updateBluetoothDevices(devices)
+            } else if (hasBtRoute) {
+                CallManager.updateBluetoothDevices(
+                    listOf(BluetoothAudioDevice(id = "default_bt", name = "Bluetooth", isCurrent = true))
+                )
             }
+        } else if (hasBtRoute) {
+            CallManager.updateBluetoothDevices(
+                listOf(BluetoothAudioDevice(id = "default_bt", name = "Bluetooth", isCurrent = true))
+            )
         }
     }
 
