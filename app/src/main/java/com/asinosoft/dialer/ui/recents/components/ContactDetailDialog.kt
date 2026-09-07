@@ -3974,12 +3974,17 @@ fun executeCustomSwipeAction(
             "call_single" -> onCall(action.targetValue, null)
             "sms" -> onSms(action.targetValue)
             "email" -> {
-                val intent = Intent(Intent.ACTION_SENDTO, "mailto:${action.targetValue}".toUri())
+                val intent = Intent(Intent.ACTION_SENDTO, "mailto:${action.targetValue}".toUri()).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
                 context.startActivity(intent)
             }
 
             "messenger_chat", "messenger_audio", "messenger_video" -> {
-                val intent = Intent(Intent.ACTION_VIEW, action.targetValue.toUri())
+                val uri = action.targetValue.toUri()
+                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
                 context.startActivity(intent)
             }
 

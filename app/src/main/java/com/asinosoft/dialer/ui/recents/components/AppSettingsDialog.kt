@@ -2,6 +2,7 @@ package com.asinosoft.dialer.ui.recents.components
 
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -20,6 +22,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
@@ -67,10 +71,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.DialerOpenMode
 import com.asinosoft.dialer.data.model.FavoriteTab
+import com.asinosoft.dialer.data.repository.QuickRepliesManager
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import kotlin.math.roundToInt
 
@@ -364,6 +371,59 @@ private fun PhoneSettingsTab(
                 selected = dialerOpenMode == DialerOpenMode.DOUBLE_TAP,
                 onClick = { onDialerOpenModeSelected(DialerOpenMode.DOUBLE_TAP) }
             )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+            Spacer(modifier = Modifier.height(14.dp))
+
+            var showQuickRepliesEditor by remember { mutableStateOf(false) }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable { showQuickRepliesEditor = true }
+                    .padding(vertical = 10.dp, horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Message,
+                        contentDescription = null,
+                        tint = SamsungGreen,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "Редактировать ответы",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Быстрые сообщения при отклонении вызова",
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                        )
+                    }
+                }
+
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            if (showQuickRepliesEditor) {
+                QuickRepliesEditorDialog(
+                    onDismiss = { showQuickRepliesEditor = false }
+                )
+            }
         }
     }
 }
@@ -706,6 +766,313 @@ private fun AboutSettingsTab() {
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
             modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
+        )
+    }
+}
+
+/**
+ * Диалог редактирования быстрых текстовых ответов при отклонении вызова
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun QuickRepliesEditorDialog(
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+
+    var replies by remember {
+        mutableStateOf(QuickRepliesManager.getQuickReplies(context))
+    }
+
+    var draggingIndex by remember { mutableStateOf<Int?>(null) }
+    var dragOffsetY by remember { mutableFloatStateOf(0f) }
+
+    var editingReplyIndex by remember { mutableStateOf<Int?>(null) }
+    var editingText by remember { mutableStateOf("") }
+    var showEditDialog by remember { mutableStateOf(false) }
+
+    var showAddDialog by remember { mutableStateOf(false) }
+    var newReplyText by remember { mutableStateOf("") }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Top One UI Bar: Arrow back + Title + Add Button
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 8.dp, end = 16.dp, top = 42.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = onDismiss,
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "Назад",
+                                    tint = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = "Быстрые ответы",
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+
+                        IconButton(
+                            onClick = {
+                                newReplyText = ""
+                                showAddDialog = true
+                            },
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(SamsungGreen.copy(alpha = 0.12f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = "Добавить ответ",
+                                tint = SamsungGreen,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                // List of Replies
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    replies.forEachIndexed { index, reply ->
+                        val isDragging = draggingIndex == index
+
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer {
+                                    if (isDragging) {
+                                        translationY = dragOffsetY
+                                        shadowElevation = 12f
+                                        scaleX = 1.02f
+                                        scaleY = 1.02f
+                                    }
+                                }
+                                .zIndex(if (isDragging) 10f else 1f)
+                                .pointerInput(index, replies.size) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            draggingIndex = index
+                                            dragOffsetY = 0f
+                                        },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            dragOffsetY += dragAmount.y
+                                            val currentList = replies.toMutableList()
+                                            val currentIndex = draggingIndex ?: index
+                                            val rowHeightPx = with(density) { 60.dp.toPx() }
+                                            val shift = (dragOffsetY / rowHeightPx).roundToInt()
+                                            val targetIndex =
+                                                (currentIndex + shift).coerceIn(0, currentList.size - 1)
+
+                                            if (targetIndex != currentIndex) {
+                                                val item = currentList.removeAt(currentIndex)
+                                                currentList.add(targetIndex, item)
+                                                replies = currentList
+                                                QuickRepliesManager.saveQuickReplies(context, currentList)
+                                                dragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
+                                                draggingIndex = targetIndex
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            draggingIndex = null
+                                            dragOffsetY = 0f
+                                        },
+                                        onDragCancel = {
+                                            draggingIndex = null
+                                            dragOffsetY = 0f
+                                        }
+                                    )
+                                },
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isDragging) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+                            tonalElevation = if (isDragging) 4.dp else 1.dp
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DragHandle,
+                                        contentDescription = "Перетащить",
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = reply,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    IconButton(
+                                        onClick = {
+                                            editingReplyIndex = index
+                                            editingText = reply
+                                            showEditDialog = true
+                                        },
+                                        modifier = Modifier.size(36.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Edit,
+                                            contentDescription = "Редактировать",
+                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+
+                                    if (replies.size > 1) {
+                                        IconButton(
+                                            onClick = {
+                                                val updated = replies.toMutableList().apply { removeAt(index) }
+                                                replies = updated
+                                                QuickRepliesManager.saveQuickReplies(context, updated)
+                                            },
+                                            modifier = Modifier.size(36.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "Удалить",
+                                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+        }
+    }
+
+    // Edit Dialog
+    if (showEditDialog && editingReplyIndex != null) {
+        AlertDialog(
+            onDismissRequest = { showEditDialog = false },
+            title = { Text("Изменить ответ", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+            text = {
+                OutlinedTextField(
+                    value = editingText,
+                    onValueChange = { editingText = it },
+                    label = { Text("Текст ответа") },
+                    singleLine = false,
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val text = editingText.trim()
+                        if (text.isNotBlank()) {
+                            val idx = editingReplyIndex ?: return@TextButton
+                            val updated = replies.toMutableList().apply { set(idx, text) }
+                            replies = updated
+                            QuickRepliesManager.saveQuickReplies(context, updated)
+                        }
+                        showEditDialog = false
+                    }
+                ) {
+                    Text("Сохранить", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showEditDialog = false }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
+    // Add Dialog
+    if (showAddDialog) {
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            title = { Text("Новый ответ", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+            text = {
+                OutlinedTextField(
+                    value = newReplyText,
+                    onValueChange = { newReplyText = it },
+                    label = { Text("Текст ответа") },
+                    singleLine = false,
+                    maxLines = 3,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val text = newReplyText.trim()
+                        if (text.isNotBlank()) {
+                            val updated = replies + text
+                            replies = updated
+                            QuickRepliesManager.saveQuickReplies(context, updated)
+                        }
+                        showAddDialog = false
+                    }
+                ) {
+                    Text("Добавить", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDialog = false }) {
+                    Text("Отмена")
+                }
+            }
         )
     }
 }

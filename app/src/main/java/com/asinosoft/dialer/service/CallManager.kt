@@ -218,6 +218,16 @@ object CallManager {
         _currentCall.value?.answer(0)
     }
 
+    fun rejectWithMessage(message: String) {
+        val call = _currentCall.value
+        try {
+            @Suppress("DEPRECATION")
+            call?.reject(true, message)
+        } catch (_: Exception) {
+            call?.disconnect()
+        }
+    }
+
     fun disconnect() {
         val all = _calls.value.filter { it.state != Call.STATE_DISCONNECTED }
         if (all.size > 1) {

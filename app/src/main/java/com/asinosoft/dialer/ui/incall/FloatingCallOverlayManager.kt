@@ -13,6 +13,12 @@ import android.telecom.Call
 import android.view.Gravity
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
@@ -30,14 +36,20 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.rotate
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -75,10 +87,15 @@ import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.asinosoft.dialer.data.model.CallState
+import com.asinosoft.dialer.data.repository.QuickRepliesManager
 import com.asinosoft.dialer.service.CallManager
 import com.asinosoft.dialer.ui.components.SimIcon
+import com.asinosoft.dialer.ui.recents.components.executeCustomSwipeAction
+import com.asinosoft.dialer.ui.recents.components.getCustomSwipeAction
+import com.asinosoft.dialer.ui.recents.components.getSwipeBackgroundVisuals
 import com.asinosoft.dialer.ui.theme.DialerTheme
 import com.asinosoft.dialer.ui.theme.MissedRed
+import com.asinosoft.dialer.ui.theme.SamsungSmsBlue
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.util.PhoneNumberHelper
 import kotlinx.coroutines.Dispatchers
@@ -244,6 +261,7 @@ private fun FloatingIncomingCallOverlayContent(
         CallState.fromSystemCall(currentCall, context)
     }
 
+    var contactId by remember { mutableStateOf<String?>(null) }
     var contactName by remember { mutableStateOf<String?>(null) }
     var contactPhotoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
@@ -251,6 +269,7 @@ private fun FloatingIncomingCallOverlayContent(
         if (call.rawNumber.isNotBlank()) {
             withContext(Dispatchers.IO) {
                 val result = lookupOverlayContactInfo(context, call.rawNumber)
+                contactId = result.contactId
                 contactName = result.name
 
                 if (!result.photoUri.isNullOrEmpty()) {
@@ -297,6 +316,32 @@ private fun FloatingIncomingCallOverlayContent(
     val isDark = isSystemInDarkTheme()
     val finalName = contactName
         ?: if (call.displayName.isNotBlank() && call.displayName != call.rawNumber) call.displayName else "Неизвестный номер"
+
+    val quickReplies = remember {
+        QuickRepliesManager.getQuickReplies(context)
+    }
+    var showQuickRepliesDropdown by remember { mutableStateOf(false) }
+
+    // Resolve left swipe action for messenger
+    val contactKey = remember(contactId, call.rawNumber) {
+        contactId?.ifBlank { call.rawNumber } ?: call.rawNumber
+    }
+    val swipeLeftAction = remember(contactKey, call.rawNumber, contactId, contactName) {
+        getCustomSwipeAction(
+            context,
+            contactKey,
+            isRight = false,
+            fallbackNumber = call.rawNumber,
+            contactName = contactName
+        )
+    }
+    val leftVisuals = remember(swipeLeftAction) {
+        getSwipeBackgroundVisuals(
+            swipeLeftAction,
+            defaultIsRight = false,
+            context = context
+        )
+    }
 
     Box(
         modifier = Modifier
@@ -438,47 +483,37 @@ private fun FloatingIncomingCallOverlayContent(
                         }
                     }
 
-                    // Send SMS Button
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.45f else 0.7f),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .clickable {
-                                try {
-                                    val smsIntent = Intent(
-                                        Intent.ACTION_SENDTO,
-                                        "smsto:${Uri.encode(call.rawNumber)}".toUri()
-                                    ).apply {
-                                        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                    }
-                                    context.startActivity(smsIntent)
-                                } catch (_: Exception) {
-                                    Toast.makeText(
-                                        context,
-                                        "Не удалось открыть отправку сообщений",
-                                        Toast.LENGTH_SHORT
-                                    ).show()
-                                }
-                            }
+                    // Send SMS Button / Quick Replies Dropdown
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                        Surface(
+                            shape = RoundedCornerShape(20.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.45f else 0.7f),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .clickable { showQuickRepliesDropdown = !showQuickRepliesDropdown }
                         ) {
-                            Text(
-                                text = "Отправить сообщение",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.width(3.dp))
-                            Icon(
-                                imageVector = Icons.Default.KeyboardArrowDown,
-                                contentDescription = "Быстрый ответ SMS",
-                                tint = MaterialTheme.colorScheme.onSurface,
-                                modifier = Modifier.size(18.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "Отправить сообщение",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = "Быстрый ответ SMS",
+                                    tint = MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .rotate(if (showQuickRepliesDropdown) 180f else 0f)
+                                )
+                            }
                         }
                     }
 
@@ -497,6 +532,181 @@ private fun FloatingIncomingCallOverlayContent(
                         )
                     }
                 }
+
+                // Samsung One UI Animated Expanding Quick Replies Section
+                AnimatedVisibility(
+                    visible = showQuickRepliesDropdown,
+                    enter = expandVertically(animationSpec = tween(240)) +
+                            fadeIn(animationSpec = tween(240)),
+                    exit = shrinkVertically(animationSpec = tween(200)) +
+                            fadeOut(animationSpec = tween(200))
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 14.dp)
+                    ) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            modifier = Modifier.padding(bottom = 8.dp)
+                        )
+
+                        Surface(
+                            shape = RoundedCornerShape(18.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.35f else 0.55f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 4.dp)
+                            ) {
+                                // 1.1 - 1.3 Quick Replies
+                                quickReplies.forEachIndexed { index, replyText ->
+                                    if (index > 0) {
+                                        HorizontalDivider(
+                                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                            modifier = Modifier.padding(horizontal = 14.dp)
+                                        )
+                                    }
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                showQuickRepliesDropdown = false
+                                                CallManager.rejectWithMessage(replyText)
+                                                onDismiss()
+                                            }
+                                            .padding(horizontal = 14.dp, vertical = 11.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = replyText,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)
+                                )
+
+                                // 1.4 Create New SMS
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            showQuickRepliesDropdown = false
+                                            CallManager.disconnect()
+                                            onDismiss()
+                                            try {
+                                                val smsIntent = Intent(
+                                                    Intent.ACTION_SENDTO,
+                                                    "smsto:${Uri.encode(call.rawNumber)}".toUri()
+                                                ).apply {
+                                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                                }
+                                                context.startActivity(smsIntent)
+                                            } catch (_: Exception) {
+                                                // ignore
+                                            }
+                                        }
+                                        .padding(horizontal = 14.dp, vertical = 11.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Message,
+                                        contentDescription = null,
+                                        tint = SamsungSmsBlue,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = "Создание нового СМС",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f),
+                                    modifier = Modifier.padding(horizontal = 14.dp)
+                                )
+
+                                // 1.5 Write in Messenger
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .clickable {
+                                            showQuickRepliesDropdown = false
+                                            CallManager.disconnect()
+                                            onDismiss()
+                                            if (swipeLeftAction != null) {
+                                                executeCustomSwipeAction(
+                                                    context = context,
+                                                    action = swipeLeftAction,
+                                                    onCall = { num, _ ->
+                                                        val intent = Intent(Intent.ACTION_CALL, "tel:${Uri.encode(num)}".toUri()).apply {
+                                                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                                        }
+                                                        context.startActivity(intent)
+                                                    },
+                                                    onSms = { num ->
+                                                        val intent = Intent(Intent.ACTION_SENDTO, "smsto:${Uri.encode(num)}".toUri()).apply {
+                                                            flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                                        }
+                                                        context.startActivity(intent)
+                                                    }
+                                                )
+                                            } else {
+                                                val intent = Intent(Intent.ACTION_SENDTO, "smsto:${Uri.encode(call.rawNumber)}".toUri()).apply {
+                                                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                                                }
+                                                context.startActivity(intent)
+                                            }
+                                        }
+                                        .padding(horizontal = 14.dp, vertical = 11.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    if (leftVisuals.iconBitmap != null) {
+                                        Image(
+                                            bitmap = leftVisuals.iconBitmap,
+                                            contentDescription = leftVisuals.label,
+                                            modifier = Modifier
+                                                .size(22.dp)
+                                                .clip(CircleShape),
+                                            contentScale = ContentScale.Crop
+                                        )
+                                    } else {
+                                        Icon(
+                                            imageVector = leftVisuals.icon,
+                                            contentDescription = null,
+                                            tint = leftVisuals.backgroundColor,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(
+                                        text = "Написать сообщение",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -504,35 +714,40 @@ private fun FloatingIncomingCallOverlayContent(
 
 private data class OverlayContactLookupResult(
     val name: String?,
-    val photoUri: String?
+    val photoUri: String?,
+    val contactId: String? = null
 )
 
 private suspend fun lookupOverlayContactInfo(
     context: Context,
     phoneNumber: String
 ): OverlayContactLookupResult = withContext(Dispatchers.IO) {
-    if (phoneNumber.isBlank()) return@withContext OverlayContactLookupResult(null, null)
+    if (phoneNumber.isBlank()) return@withContext OverlayContactLookupResult(null, null, null)
     try {
         val uri = Uri.withAppendedPath(
             ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
             Uri.encode(phoneNumber)
         )
         val projection = arrayOf(
+            ContactsContract.PhoneLookup._ID,
             ContactsContract.PhoneLookup.DISPLAY_NAME,
             ContactsContract.PhoneLookup.PHOTO_URI,
             ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI
         )
         val cursor = context.contentResolver.query(uri, projection, null, null, null)
+        var contactId: String? = null
         var contactName: String? = null
         var contactPhotoUri: String? = null
 
         cursor?.use { c ->
             if (c.moveToFirst()) {
+                val idIndex = c.getColumnIndex(ContactsContract.PhoneLookup._ID)
                 val nameIndex = c.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
                 val fullPhotoIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
                 val thumbPhotoIndex =
                     c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI)
 
+                if (idIndex != -1) contactId = c.getString(idIndex)
                 if (nameIndex != -1) contactName = c.getString(nameIndex)
                 if (fullPhotoIndex != -1) contactPhotoUri = c.getString(fullPhotoIndex)
                 if (contactPhotoUri.isNullOrEmpty() && thumbPhotoIndex != -1) {
@@ -540,8 +755,8 @@ private suspend fun lookupOverlayContactInfo(
                 }
             }
         }
-        OverlayContactLookupResult(contactName, contactPhotoUri)
+        OverlayContactLookupResult(contactName, contactPhotoUri, contactId)
     } catch (_: Exception) {
-        OverlayContactLookupResult(null, null)
+        OverlayContactLookupResult(null, null, null)
     }
 }
