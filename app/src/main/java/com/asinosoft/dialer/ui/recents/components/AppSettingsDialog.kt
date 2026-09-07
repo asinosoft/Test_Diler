@@ -2,6 +2,7 @@ package com.asinosoft.dialer.ui.recents.components
 
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -77,6 +78,7 @@ import androidx.compose.ui.zIndex
 import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.DialerOpenMode
 import com.asinosoft.dialer.data.model.FavoriteTab
+import com.asinosoft.dialer.data.model.FavoritesViewMode
 import com.asinosoft.dialer.data.repository.QuickRepliesManager
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import kotlin.math.roundToInt
@@ -92,10 +94,12 @@ private enum class SettingsTab(val title: String) {
 @Composable
 fun AppSettingsDialog(
     selectedRowsCount: Int,
+    favoritesViewMode: FavoritesViewMode = FavoritesViewMode.GRID,
     maxPossibleRows: Int = 8,
     tabs: List<FavoriteTab> = emptyList(),
     dialerOpenMode: DialerOpenMode = DialerOpenMode.BUTTON_AND_DOUBLE_TAP,
     onRowsCountSelected: (Int) -> Unit,
+    onFavoritesViewModeSelected: (FavoritesViewMode) -> Unit = {},
     onDialerOpenModeSelected: (DialerOpenMode) -> Unit = {},
     onAddTab: (String) -> Unit = {},
     onRenameTab: (String, String) -> Unit = { _, _ -> },
@@ -183,9 +187,11 @@ fun AppSettingsDialog(
 
                     SettingsTab.FAVORITES -> FavoritesSettingsTab(
                         selectedRowsCount = selectedRowsCount,
+                        favoritesViewMode = favoritesViewMode,
                         maxPossibleRows = maxPossibleRows,
                         tabs = tabs,
                         onRowsCountSelected = onRowsCountSelected,
+                        onFavoritesViewModeSelected = onFavoritesViewModeSelected,
                         onAddTabClick = {
                             newTabNameInput = ""
                             showAddTabDialog = true
@@ -461,9 +467,11 @@ private fun DialerOpenModeOption(
 @Composable
 private fun FavoritesSettingsTab(
     selectedRowsCount: Int,
+    favoritesViewMode: FavoritesViewMode,
     maxPossibleRows: Int,
     tabs: List<FavoriteTab>,
     onRowsCountSelected: (Int) -> Unit,
+    onFavoritesViewModeSelected: (FavoritesViewMode) -> Unit,
     onAddTabClick: () -> Unit,
     onRenameTabClick: (FavoriteTab) -> Unit,
     onDeleteTab: (String) -> Unit,
@@ -507,8 +515,127 @@ private fun FavoritesSettingsTab(
 
             Spacer(modifier = Modifier.height(14.dp))
 
+            // View Mode Selector (Grid vs List)
             Text(
-                text = "Строк избранного при старте ($selectedRowsCount)",
+                text = "Вид отображения",
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                text = "Формат карточек контактов на главном экране",
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                // Option 1: Grid (квадратики 3x3)
+                val isGrid = favoritesViewMode == FavoritesViewMode.GRID
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onFavoritesViewModeSelected(FavoritesViewMode.GRID) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isGrid) SamsungGreen.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    border = BorderStroke(
+                        width = if (isGrid) 2.dp else 1.dp,
+                        color = if (isGrid) SamsungGreen else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        ) {
+                            repeat(3) {
+                                Surface(
+                                    modifier = Modifier.size(14.dp),
+                                    shape = RoundedCornerShape(3.dp),
+                                    color = if (isGrid) SamsungGreen else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                ) {}
+                            }
+                        }
+                        Text(
+                            text = "Сетка",
+                            fontSize = 14.sp,
+                            fontWeight = if (isGrid) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isGrid) SamsungGreen else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "3 столбца",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+
+                // Option 2: List (строки как в журнале со свайпами)
+                val isList = favoritesViewMode == FavoritesViewMode.LIST
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onFavoritesViewModeSelected(FavoritesViewMode.LIST) },
+                    shape = RoundedCornerShape(16.dp),
+                    color = if (isList) SamsungGreen.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+                    border = androidx.compose.foundation.BorderStroke(
+                        width = if (isList) 2.dp else 1.dp,
+                        color = if (isList) SamsungGreen else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Column(
+                            verticalArrangement = Arrangement.spacedBy(3.dp),
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        ) {
+                            repeat(2) {
+                                Surface(
+                                    modifier = Modifier.size(width = 46.dp, height = 6.dp),
+                                    shape = RoundedCornerShape(2.dp),
+                                    color = if (isList) SamsungGreen else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                                ) {}
+                            }
+                        }
+                        Text(
+                            text = "Список",
+                            fontSize = 14.sp,
+                            fontWeight = if (isList) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isList) SamsungGreen else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Со свайпами",
+                            fontSize = 11.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
+
+            val rowsLabel = if (favoritesViewMode == FavoritesViewMode.LIST) {
+                "Строк избранного списка при старте ($selectedRowsCount)"
+            } else {
+                "Строк избранной сетки при старте ($selectedRowsCount)"
+            }
+
+            Text(
+                text = rowsLabel,
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
@@ -545,6 +672,7 @@ private fun FavoritesSettingsTab(
             }
 
             Spacer(modifier = Modifier.height(20.dp))
+
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
             Spacer(modifier = Modifier.height(16.dp))
 

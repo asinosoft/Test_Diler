@@ -33,6 +33,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.core.content.edit
+import com.asinosoft.dialer.data.model.FavoritesViewMode
 import com.asinosoft.dialer.data.repository.ContactsRepository
 import kotlin.time.Duration.Companion.milliseconds
 
@@ -190,8 +191,22 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     private val prefs = application.getSharedPreferences("dialer_settings", Context.MODE_PRIVATE)
 
-    private val _favoriteRowsCount = MutableStateFlow(prefs.getInt("favorite_rows_count", 3))
-    val favoriteRowsCount: StateFlow<Int> = _favoriteRowsCount.asStateFlow()
+    private val _gridRowsCount = MutableStateFlow(prefs.getInt("favorite_rows_count_grid", prefs.getInt("favorite_rows_count", 3)))
+    val gridRowsCount: StateFlow<Int> = _gridRowsCount.asStateFlow()
+
+    private val _listRowsCount = MutableStateFlow(prefs.getInt("favorite_rows_count_list", 5))
+    val listRowsCount: StateFlow<Int> = _listRowsCount.asStateFlow()
+
+    private val _favoritesViewMode = MutableStateFlow(
+        FavoritesViewMode.fromStorageKey(prefs.getString("favorites_view_mode", null))
+    )
+    val favoritesViewMode: StateFlow<FavoritesViewMode> = _favoritesViewMode.asStateFlow()
+
+    val currentFavoriteRowsCount: StateFlow<Int> = combine(_favoritesViewMode, _gridRowsCount, _listRowsCount) { mode, grid, list ->
+        if (mode == FavoritesViewMode.LIST) list else grid
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 3)
+
+    val favoriteRowsCount: StateFlow<Int> = currentFavoriteRowsCount
 
     private val _dialerOpenMode = MutableStateFlow(
         DialerOpenMode.fromStorageKey(prefs.getString("dialer_open_mode", null))
@@ -729,8 +744,18 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     fun setFavoriteRowsCount(count: Int) {
         val validCount = count.coerceIn(1, 8)
-        _favoriteRowsCount.value = validCount
-        prefs.edit { putInt("favorite_rows_count", validCount) }
+        if (_favoritesViewMode.value == FavoritesViewMode.LIST) {
+            _listRowsCount.value = validCount
+            prefs.edit { putInt("favorite_rows_count_list", validCount) }
+        } else {
+            _gridRowsCount.value = validCount
+            prefs.edit { putInt("favorite_rows_count_grid", validCount) }
+        }
+    }
+
+    fun setFavoritesViewMode(mode: FavoritesViewMode) {
+        _favoritesViewMode.value = mode
+        prefs.edit { putString("favorites_view_mode", mode.storageKey) }
     }
 
     fun setDialerOpenMode(mode: DialerOpenMode) {

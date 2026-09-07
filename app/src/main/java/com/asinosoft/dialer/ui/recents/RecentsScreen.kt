@@ -77,6 +77,7 @@ import android.content.Context
 import android.telephony.SubscriptionManager
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.asinosoft.dialer.data.model.FavoriteTab
+import com.asinosoft.dialer.data.model.FavoritesViewMode
 import com.asinosoft.dialer.ui.components.FloatingStickyDateHeader
 import com.asinosoft.dialer.ui.components.LazyListVerticalScrollbar
 import com.asinosoft.dialer.ui.dialer.SearchDialerScreen
@@ -90,6 +91,7 @@ import com.asinosoft.dialer.ui.recents.components.ContactDetailDialog
 import com.asinosoft.dialer.ui.recents.components.FavoriteContactCard
 import com.asinosoft.dialer.ui.recents.components.FavoritesTopBar
 import com.asinosoft.dialer.ui.recents.components.SwipeableCallLogCard
+import com.asinosoft.dialer.ui.recents.components.SwipeableFavoriteContactCard
 import com.asinosoft.dialer.ui.recents.components.UnsavedNumberChoiceDialog
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -121,6 +123,7 @@ fun RecentsScreen(
     val isAddFavoriteOpen by viewModel.isAddFavoriteOpen.collectAsState()
     val isAppSettingsOpen by viewModel.isAppSettingsOpen.collectAsState()
     val favoriteRowsCount by viewModel.favoriteRowsCount.collectAsState()
+    val favoritesViewMode by viewModel.favoritesViewMode.collectAsState()
     val contactDetailToShow by viewModel.contactDetailToShow.collectAsState()
     val unsavedNumberFlow by viewModel.unsavedNumberFlow.collectAsState()
 
@@ -180,13 +183,21 @@ fun RecentsScreen(
         }
     }
 
-    val maxRowsAcrossAllTabs = remember(allFavorites, tabs, favoriteRowsCount) {
-        val tabGroupRows = tabs.map { tab ->
-            val count = allFavorites.count { it.tabId == tab.id }
-            if (count == 0) 0 else (count + 2) / 3
+    val maxRowsAcrossAllTabs = remember(allFavorites, tabs, favoriteRowsCount, favoritesViewMode) {
+        if (favoritesViewMode == FavoritesViewMode.LIST) {
+            val tabGroupCounts = tabs.map { tab ->
+                allFavorites.count { it.tabId == tab.id }
+            }
+            val maxFromTabs = tabGroupCounts.maxOrNull() ?: 0
+            maxOf(maxFromTabs, favoriteRowsCount)
+        } else {
+            val tabGroupRows = tabs.map { tab ->
+                val count = allFavorites.count { it.tabId == tab.id }
+                if (count == 0) 0 else (count + 2) / 3
+            }
+            val maxFromTabs = tabGroupRows.maxOrNull() ?: 0
+            maxOf(maxFromTabs, favoriteRowsCount)
         }
-        val maxFromTabs = tabGroupRows.maxOrNull() ?: 0
-        maxOf(maxFromTabs, favoriteRowsCount)
     }
 
     val targetGridRowIndex = remember(maxRowsAcrossAllTabs, favoriteRowsCount) {
@@ -458,142 +469,182 @@ fun RecentsScreen(
                         }
                     }
 
-                    // Favorites Grid Rows (Each row is a separate item)
-                    if (favoriteRows.size < maxRowsAcrossAllTabs) {
-                        val extraSpacers = maxRowsAcrossAllTabs - favoriteRows.size
-                        items(extraSpacers) {
-                            Spacer(
+                    if (favoritesViewMode == FavoritesViewMode.LIST) {
+                        // Favorites List Mode (Vertical Swipeable Cards with Star icon)
+                        val extraListSpacers = (maxRowsAcrossAllTabs - favorites.size).coerceAtLeast(0)
+                        if (extraListSpacers > 0) {
+                            items(extraListSpacers) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .size(width = 0.dp, height = 76.dp)
+                                )
+                            }
+                        }
+
+                        items(
+                            count = favorites.size,
+                            key = { idx -> "fav_list_${favorites[idx].id}" }
+                        ) { idx ->
+                            val contact = favorites[idx]
+                            Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .aspectRatio(3f)
-                            )
-                        }
-                    }
-
-                    itemsIndexed(items = favoriteRows) { _, rowItems ->
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .zIndex(6f)
-                                .onGloballyPositioned { coordinates ->
-                                    if (!isTopBarVisible) return@onGloballyPositioned
-                                    val rect = coordinates.boundsInWindow()
-                                    val current = favoritesBoundsRef.value
-                                    favoritesBoundsRef.value = if (current == Rect.Zero) {
-                                        rect
-                                    } else {
-                                        Rect(
-                                            left = minOf(current.left, rect.left),
-                                            top = minOf(current.top, rect.top),
-                                            right = maxOf(current.right, rect.right),
-                                            bottom = maxOf(current.bottom, rect.bottom)
-                                        )
+                                    .padding(bottom = 6.dp)
+                            ) {
+                                SwipeableFavoriteContactCard(
+                                    contact = contact,
+                                    isSelected = selectedFavorite?.id == contact.id,
+                                    onCall = { num, sim -> onCall(num, sim) },
+                                    onSms = onSms,
+                                    onClick = { clickedContact ->
+                                        if (isTopBarVisible) {
+                                            viewModel.clearFavoriteSelection()
+                                        } else {
+                                            viewModel.openContactDetail(clickedContact)
+                                        }
                                     }
-                                },
-                            horizontalArrangement = Arrangement.spacedBy(4.dp)
-                        ) {
-                            for (i in 0 until 3) {
-                                if (i < rowItems.size) {
-                                    val contact = rowItems[i]
-                                    val contactIndex =
-                                        favorites.indexOfFirst { it.id == contact.id }
-                                    val isTargetSlot =
-                                        draggingContactId != null && dragToIndex == contactIndex && draggingContactId != contact.id
+                                )
+                            }
+                        }
+                    } else {
+                        // Favorites Grid Rows (Each row is a separate item)
+                        if (favoriteRows.size < maxRowsAcrossAllTabs) {
+                            val extraSpacers = maxRowsAcrossAllTabs - favoriteRows.size
+                            items(extraSpacers) {
+                                Spacer(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .aspectRatio(3f)
+                                )
+                            }
+                        }
 
-                                    FavoriteContactCard(
-                                        contact = contact,
-                                        isSelected = selectedFavorite?.id == contact.id || isTargetSlot,
-                                        isDragging = draggingContactId == contact.id,
-                                        dragVisualOffset = if (draggingContactId == contact.id) dragOffset else Offset.Zero,
-                                        onCall = { num, sim -> onCall(num, sim) },
-                                        onSms = onSms,
-                                        onSelect = { viewModel.selectFavorite(it) },
-                                        onContactClick = { clickedContact ->
-                                            if (isTopBarVisible) {
-                                                viewModel.clearFavoriteSelection()
-                                            } else {
-                                                viewModel.openContactDetail(clickedContact)
-                                            }
-                                        },
-                                        onDragStart = {
-                                            val idx = favorites.indexOfFirst { it.id == contact.id }
-                                            if (idx != -1) {
-                                                draggingContactId = contact.id
-                                                dragFromIndex = idx
-                                                dragToIndex = idx
-                                                dragOffset = Offset.Zero
-                                            }
-                                        },
-                                        onDrag = { delta ->
-                                            dragOffset += delta
-                                            if (dragFromIndex != -1 && favorites.size > 1) {
-                                                val cellWidthPx = with(density) { 110.dp.toPx() }
-                                                val cellHeightPx = with(density) { 110.dp.toPx() }
+                        itemsIndexed(items = favoriteRows) { _, rowItems ->
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .zIndex(6f)
+                                    .onGloballyPositioned { coordinates ->
+                                        if (!isTopBarVisible) return@onGloballyPositioned
+                                        val rect = coordinates.boundsInWindow()
+                                        val current = favoritesBoundsRef.value
+                                        favoritesBoundsRef.value = if (current == Rect.Zero) {
+                                            rect
+                                        } else {
+                                            Rect(
+                                                left = minOf(current.left, rect.left),
+                                                top = minOf(current.top, rect.top),
+                                                right = maxOf(current.right, rect.right),
+                                                bottom = maxOf(current.bottom, rect.bottom)
+                                            )
+                                        }
+                                    },
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                for (i in 0 until 3) {
+                                    if (i < rowItems.size) {
+                                        val contact = rowItems[i]
+                                        val contactIndex =
+                                            favorites.indexOfFirst { it.id == contact.id }
+                                        val isTargetSlot =
+                                            draggingContactId != null && dragToIndex == contactIndex && draggingContactId != contact.id
 
-                                                val remainder = favorites.size % 3
-
-                                                val startRow: Int
-                                                val startCol: Int
-                                                if (remainder == 0) {
-                                                    startRow = dragFromIndex / 3
-                                                    startCol = dragFromIndex % 3
+                                        FavoriteContactCard(
+                                            contact = contact,
+                                            isSelected = selectedFavorite?.id == contact.id || isTargetSlot,
+                                            isDragging = draggingContactId == contact.id,
+                                            dragVisualOffset = if (draggingContactId == contact.id) dragOffset else Offset.Zero,
+                                            onCall = { num, sim -> onCall(num, sim) },
+                                            onSms = onSms,
+                                            onSelect = { viewModel.selectFavorite(it) },
+                                            onContactClick = { clickedContact ->
+                                                if (isTopBarVisible) {
+                                                    viewModel.clearFavoriteSelection()
                                                 } else {
-                                                    if (dragFromIndex < remainder) {
-                                                        startRow = 0
-                                                        startCol = dragFromIndex
-                                                    } else {
-                                                        startRow =
-                                                            1 + (dragFromIndex - remainder) / 3
-                                                        startCol = (dragFromIndex - remainder) % 3
-                                                    }
+                                                    viewModel.openContactDetail(clickedContact)
                                                 }
+                                            },
+                                            onDragStart = {
+                                                val idx = favorites.indexOfFirst { it.id == contact.id }
+                                                if (idx != -1) {
+                                                    draggingContactId = contact.id
+                                                    dragFromIndex = idx
+                                                    dragToIndex = idx
+                                                    dragOffset = Offset.Zero
+                                                }
+                                            },
+                                            onDrag = { delta ->
+                                                dragOffset += delta
+                                                if (dragFromIndex != -1 && favorites.size > 1) {
+                                                    val cellWidthPx = with(density) { 110.dp.toPx() }
+                                                    val cellHeightPx = with(density) { 110.dp.toPx() }
 
-                                                val colShift =
-                                                    (dragOffset.x / cellWidthPx).roundToInt()
-                                                val rowShift =
-                                                    (dragOffset.y / cellHeightPx).roundToInt()
+                                                    val remainder = favorites.size % 3
 
-                                                val totalRows = favoriteRows.size
-                                                val targetRow =
-                                                    (startRow + rowShift).coerceIn(0, totalRows - 1)
-                                                val targetCol = (startCol + colShift).coerceIn(0, 2)
-                                                val newTargetIndex: Int = if (remainder == 0) {
-                                                    (targetRow * 3 + targetCol).coerceIn(
-                                                        0,
-                                                        favorites.size - 1
-                                                    )
-                                                } else {
-                                                    if (targetRow == 0) {
-                                                        targetCol.coerceIn(0, remainder - 1)
+                                                    val startRow: Int
+                                                    val startCol: Int
+                                                    if (remainder == 0) {
+                                                        startRow = dragFromIndex / 3
+                                                        startCol = dragFromIndex % 3
                                                     } else {
-                                                        (remainder + (targetRow - 1) * 3 + targetCol).coerceIn(
+                                                        if (dragFromIndex < remainder) {
+                                                            startRow = 0
+                                                            startCol = dragFromIndex
+                                                        } else {
+                                                            startRow =
+                                                                1 + (dragFromIndex - remainder) / 3
+                                                            startCol = (dragFromIndex - remainder) % 3
+                                                        }
+                                                    }
+
+                                                    val colShift =
+                                                        (dragOffset.x / cellWidthPx).roundToInt()
+                                                    val rowShift =
+                                                        (dragOffset.y / cellHeightPx).roundToInt()
+
+                                                    val totalRows = favoriteRows.size
+                                                    val targetRow =
+                                                        (startRow + rowShift).coerceIn(0, totalRows - 1)
+                                                    val targetCol = (startCol + colShift).coerceIn(0, 2)
+                                                    val newTargetIndex: Int = if (remainder == 0) {
+                                                        (targetRow * 3 + targetCol).coerceIn(
                                                             0,
                                                             favorites.size - 1
                                                         )
+                                                    } else {
+                                                        if (targetRow == 0) {
+                                                            targetCol.coerceIn(0, remainder - 1)
+                                                        } else {
+                                                            (remainder + (targetRow - 1) * 3 + targetCol).coerceIn(
+                                                                0,
+                                                                favorites.size - 1
+                                                            )
+                                                        }
+                                                    }
+
+                                                    if (newTargetIndex != dragToIndex) {
+                                                        dragToIndex = newTargetIndex
                                                     }
                                                 }
-
-                                                if (newTargetIndex != dragToIndex) {
-                                                    dragToIndex = newTargetIndex
+                                            },
+                                            onDragEnd = {
+                                                if (dragFromIndex in favorites.indices && dragToIndex in favorites.indices && dragFromIndex != dragToIndex) {
+                                                    viewModel.reorderFavorites(
+                                                        dragFromIndex,
+                                                        dragToIndex
+                                                    )
                                                 }
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            if (dragFromIndex in favorites.indices && dragToIndex in favorites.indices && dragFromIndex != dragToIndex) {
-                                                viewModel.reorderFavorites(
-                                                    dragFromIndex,
-                                                    dragToIndex
-                                                )
-                                            }
-                                            draggingContactId = null
-                                            dragFromIndex = -1
-                                            dragToIndex = -1
-                                            dragOffset = Offset.Zero
-                                        },
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                } else {
-                                    Spacer(modifier = Modifier.weight(1f))
+                                                draggingContactId = null
+                                                dragFromIndex = -1
+                                                dragToIndex = -1
+                                                dragOffset = Offset.Zero
+                                            },
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                    } else {
+                                        Spacer(modifier = Modifier.weight(1f))
+                                    }
                                 }
                             }
                         }
@@ -777,13 +828,18 @@ fun RecentsScreen(
 
         // App Settings Bottom Sheet Dialog
         if (isAppSettingsOpen) {
+            val favoritesViewMode by viewModel.favoritesViewMode.collectAsState()
             AppSettingsDialog(
                 selectedRowsCount = favoriteRowsCount,
+                favoritesViewMode = favoritesViewMode,
                 maxPossibleRows = 8,
                 tabs = tabs,
                 dialerOpenMode = dialerOpenMode,
                 onRowsCountSelected = { count ->
                     viewModel.setFavoriteRowsCount(count)
+                },
+                onFavoritesViewModeSelected = { mode ->
+                    viewModel.setFavoritesViewMode(mode)
                 },
                 onDialerOpenModeSelected = { mode ->
                     viewModel.setDialerOpenMode(mode)
