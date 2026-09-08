@@ -24,16 +24,22 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.Dialpad
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -56,12 +62,14 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
@@ -81,10 +89,11 @@ import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.data.model.FavoritesViewMode
 import com.asinosoft.dialer.data.repository.QuickRepliesManager
 import com.asinosoft.dialer.ui.theme.SamsungGreen
+import com.asinosoft.dialer.util.AboutSupportHelper
+import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 private enum class SettingsTab(val title: String) {
-    MAIN("Основное"),
     PHONE("Телефон"),
     FAVORITES("Избранное"),
     ABOUT("О приложении")
@@ -178,8 +187,6 @@ fun AppSettingsDialog(
                     .heightIn(min = 280.dp, max = 480.dp)
             ) {
                 when (SettingsTab.entries[selectedTabIndex]) {
-                    SettingsTab.MAIN -> MainSettingsTab()
-
                     SettingsTab.PHONE -> PhoneSettingsTab(
                         dialerOpenMode = dialerOpenMode,
                         onDialerOpenModeSelected = onDialerOpenModeSelected
@@ -282,30 +289,6 @@ fun AppSettingsDialog(
 }
 
 @Composable
-private fun MainSettingsTab() {
-    Surface(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(20.dp),
-        color = MaterialTheme.colorScheme.surface,
-        tonalElevation = 1.dp
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(
-                text = "Пока нет настроек",
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f)
-            )
-        }
-    }
-}
-
-@Composable
 private fun PhoneSettingsTab(
     dialerOpenMode: DialerOpenMode,
     onDialerOpenModeSelected: (DialerOpenMode) -> Unit
@@ -317,26 +300,6 @@ private fun PhoneSettingsTab(
         tonalElevation = 1.dp
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Phone,
-                    contentDescription = null,
-                    tint = SamsungGreen,
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Телефон",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-            Spacer(modifier = Modifier.height(14.dp))
-
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Outlined.Dialpad,
@@ -497,24 +460,6 @@ private fun FavoritesSettingsTab(
         tonalElevation = 1.dp
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(
-                    imageVector = Icons.Default.Star,
-                    contentDescription = "Избранное",
-                    tint = Color(0xFFFFB300),
-                    modifier = Modifier.size(22.dp)
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = "Избранное",
-                    fontSize = 17.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
             // View Mode Selector (Grid vs List)
             Text(
                 text = "Вид отображения",
@@ -827,6 +772,10 @@ private fun FavoritesSettingsTab(
 @Composable
 private fun AboutSettingsTab() {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var showLicenses by remember { mutableStateOf(false) }
+    var isPreparingSupport by remember { mutableStateOf(false) }
+
     val versionName = remember {
         try {
             val info = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
@@ -849,54 +798,295 @@ private fun AboutSettingsTab() {
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 280.dp)
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 4.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        Text(
+            text = "Версия $versionName",
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+            modifier = Modifier.padding(top = 8.dp, bottom = 12.dp)
+        )
+
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(20.dp),
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 1.dp
         ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Info,
-                    contentDescription = null,
-                    tint = SamsungGreen,
-                    modifier = Modifier.size(40.dp)
+            Column(modifier = Modifier.fillMaxWidth()) {
+                AboutActionRow(
+                    icon = Icons.Default.ThumbUp,
+                    title = "Сказать спасибо",
+                    subtitle = "Понравилось приложение, оставьте отзыв в Google Play!",
+                    onClick = { AboutSupportHelper.openPlayStoreListing(context) }
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = appName,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 18.dp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
                 )
-                Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = "Телефонный номеронабиратель",
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                AboutActionRow(
+                    icon = Icons.Default.Share,
+                    title = "Посоветовать друзьям",
+                    subtitle = "Посоветуйте приложение своим друзьям",
+                    onClick = { AboutSupportHelper.shareApp(context, appName) }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 18.dp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                )
+                AboutActionRow(
+                    icon = Icons.Default.Email,
+                    title = "Написать в поддержку",
+                    subtitle = if (isPreparingSupport) {
+                        "Подготовка отчёта…"
+                    } else {
+                        "Открыть письмо на cdm.asinosoft@gmail.com"
+                    },
+                    enabled = !isPreparingSupport,
+                    onClick = {
+                        scope.launch {
+                            isPreparingSupport = true
+                            try {
+                                AboutSupportHelper.openSupportEmail(context, appName)
+                            } finally {
+                                isPreparingSupport = false
+                            }
+                        }
+                    }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 18.dp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                )
+                AboutActionRow(
+                    icon = Icons.Default.Description,
+                    title = "Лицензии третьих сторон",
+                    subtitle = "Открытые компоненты, используемые в приложении",
+                    onClick = { showLicenses = true }
+                )
+                HorizontalDivider(
+                    modifier = Modifier.padding(horizontal = 18.dp),
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                )
+                AboutActionRow(
+                    icon = Icons.Default.Policy,
+                    title = "Политика конфиденциальности",
+                    subtitle = "asinosoft.ru",
+                    onClick = { AboutSupportHelper.openPrivacyPolicy(context) }
                 )
             }
         }
 
-        Spacer(modifier = Modifier.weight(1f))
+        Spacer(modifier = Modifier.height(16.dp))
+    }
 
-        Text(
-            text = "Версия $versionName",
-            fontSize = 13.sp,
-            fontWeight = FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-            modifier = Modifier.padding(top = 24.dp, bottom = 8.dp)
+    if (showLicenses) {
+        ThirdPartyLicensesDialog(onDismiss = { showLicenses = false })
+    }
+}
+
+@Composable
+private fun AboutActionRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (enabled) SamsungGreen else SamsungGreen.copy(alpha = 0.4f),
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.45f)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = subtitle,
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Icon(
+            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f),
+            modifier = Modifier.size(18.dp)
         )
     }
 }
+
+@Composable
+private fun ThirdPartyLicensesDialog(onDismiss: () -> Unit) {
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp, end = 16.dp, top = 36.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Назад",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                    Text(
+                        text = "Лицензии третьих сторон",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "Это приложение использует сторонние библиотеки с открытым исходным кодом. " +
+                            "Ниже приведены сведения о них и тексты соответствующих лицензий.",
+                        fontSize = 14.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                    )
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    LicenseSection(
+                        title = "AndroidX / Jetpack",
+                        components = "Core KTX, Activity, Lifecycle, AppCompat components, " +
+                            "Jetpack Compose UI, Compose Foundation, Compose Material3, " +
+                            "Compose Material Icons",
+                        licenseName = "Apache License 2.0"
+                    )
+                    LicenseSection(
+                        title = "CameraX",
+                        components = "camera-camera2, camera-lifecycle, camera-view",
+                        licenseName = "Apache License 2.0"
+                    )
+                    LicenseSection(
+                        title = "Google ML Kit",
+                        components = "Barcode Scanning",
+                        licenseName = "Apache License 2.0 / условия Google ML Kit"
+                    )
+                    LicenseSection(
+                        title = "libphonenumber",
+                        components = "Google libphonenumber — форматирование и разбор номеров телефонов",
+                        licenseName = "Apache License 2.0"
+                    )
+                    LicenseSection(
+                        title = "Kotlin",
+                        components = "Kotlin Standard Library, Kotlin Coroutines",
+                        licenseName = "Apache License 2.0"
+                    )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = "Apache License 2.0",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = APACHE_LICENSE_2_NOTICE,
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
+                        lineHeight = 17.sp
+                    )
+                    Spacer(modifier = Modifier.height(32.dp))
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LicenseSection(
+    title: String,
+    components: String,
+    licenseName: String
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 12.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text(
+                text = title,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = components,
+                fontSize = 13.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = licenseName,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = SamsungGreen
+            )
+        }
+    }
+}
+
+private val APACHE_LICENSE_2_NOTICE = """
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+Полный текст лицензии: https://www.apache.org/licenses/LICENSE-2.0
+""".trimIndent()
 
 /**
  * Диалог редактирования быстрых текстовых ответов при отклонении вызова

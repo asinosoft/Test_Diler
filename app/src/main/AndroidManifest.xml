@@ -44,6 +44,26 @@
         </intent>
         <intent>
             <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="market" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="mailto" />
+        </intent>
+        <package android:name="com.google.android.gm" />
+        <package android:name="com.samsung.android.email.provider" />
+        <package android:name="com.microsoft.office.outlook" />
+        <package android:name="ru.yandex.mail" />
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
             <data android:scheme="viber" />
         </intent>
         <intent>
