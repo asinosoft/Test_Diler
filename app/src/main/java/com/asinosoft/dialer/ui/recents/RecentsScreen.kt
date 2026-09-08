@@ -60,6 +60,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToDown
 import androidx.compose.ui.input.pointer.pointerInput
@@ -67,6 +68,7 @@ import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -111,6 +113,7 @@ fun RecentsScreen(
     onSms: (String) -> Unit
 ) {
     val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val callLogs by viewModel.recentCalls.collectAsState(initial = emptyList())
@@ -482,19 +485,27 @@ fun RecentsScreen(
                             }
                         }
 
-                        items(
-                            count = favorites.size,
-                            key = { idx -> "fav_list_${favorites[idx].id}" }
-                        ) { idx ->
-                            val contact = favorites[idx]
+                        itemsIndexed(
+                            items = favorites,
+                            key = { _, item -> "fav_list_${item.id}" }
+                        ) { idx, contact ->
+                            val contactIndex = idx
+                            val isBeingDragged = draggingContactId == contact.id
+                            val isTargetSlot = draggingContactId != null &&
+                                    dragToIndex == contactIndex &&
+                                    draggingContactId != contact.id
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(bottom = 6.dp)
+                                    .zIndex(if (isBeingDragged) 100f else 0f)
                             ) {
                                 SwipeableFavoriteContactCard(
                                     contact = contact,
-                                    isSelected = selectedFavorite?.id == contact.id,
+                                    isSelected = selectedFavorite?.id == contact.id || isTargetSlot,
+                                    isDragging = isBeingDragged,
+                                    dragVisualOffsetY = if (isBeingDragged) dragOffset.y else 0f,
                                     onCall = { num, sim -> onCall(num, sim) },
                                     onSms = onSms,
                                     onClick = { clickedContact ->
@@ -503,6 +514,44 @@ fun RecentsScreen(
                                         } else {
                                             viewModel.openContactDetail(clickedContact)
                                         }
+                                    },
+                                    onDragStart = {
+                                        val currentIdx = favorites.indexOfFirst { it.id == contact.id }
+                                        if (currentIdx != -1) {
+                                            draggingContactId = contact.id
+                                            dragFromIndex = currentIdx
+                                            dragToIndex = currentIdx
+                                            dragOffset = Offset.Zero
+                                        }
+                                    },
+                                    onDrag = { deltaY ->
+                                        dragOffset += Offset(0f, deltaY)
+                                        val draggedId = draggingContactId
+                                        if (draggedId != null && favorites.size > 1) {
+                                            val currentIdx = favorites.indexOfFirst { it.id == draggedId }
+                                            if (currentIdx != -1) {
+                                                val rowHeightPx = with(density) { 76.dp.toPx() }
+                                                val shift = (dragOffset.y / rowHeightPx).roundToInt()
+                                                val targetIdx = (currentIdx + shift)
+                                                    .coerceIn(0, favorites.size - 1)
+                                                if (targetIdx != currentIdx) {
+                                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                                    viewModel.reorderFavorites(currentIdx, targetIdx)
+                                                    dragOffset = Offset(
+                                                        0f,
+                                                        dragOffset.y - (targetIdx - currentIdx) * rowHeightPx
+                                                    )
+                                                    dragFromIndex = targetIdx
+                                                    dragToIndex = targetIdx
+                                                }
+                                            }
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        draggingContactId = null
+                                        dragFromIndex = -1
+                                        dragToIndex = -1
+                                        dragOffset = Offset.Zero
                                     }
                                 )
                             }

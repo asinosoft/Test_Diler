@@ -194,7 +194,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     private val _gridRowsCount = MutableStateFlow(prefs.getInt("favorite_rows_count_grid", prefs.getInt("favorite_rows_count", 3)))
     val gridRowsCount: StateFlow<Int> = _gridRowsCount.asStateFlow()
 
-    private val _listRowsCount = MutableStateFlow(prefs.getInt("favorite_rows_count_list", 5))
+    private val _listRowsCount = MutableStateFlow(prefs.getInt("favorite_rows_count_list", 4))
     val listRowsCount: StateFlow<Int> = _listRowsCount.asStateFlow()
 
     private val _favoritesViewMode = MutableStateFlow(

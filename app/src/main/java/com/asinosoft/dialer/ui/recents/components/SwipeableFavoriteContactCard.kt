@@ -9,6 +9,7 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -39,15 +40,18 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
@@ -69,9 +73,14 @@ import kotlin.math.roundToInt
 fun SwipeableFavoriteContactCard(
     contact: FavoriteContact,
     isSelected: Boolean = false,
+    isDragging: Boolean = false,
+    dragVisualOffsetY: Float = 0f,
     onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
     onClick: (FavoriteContact) -> Unit,
+    onDragStart: (() -> Unit)? = null,
+    onDrag: ((Float) -> Unit)? = null,
+    onDragEnd: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -120,10 +129,28 @@ fun SwipeableFavoriteContactCard(
         PhoneNumberHelper.format(contact.number)
     }
 
+    val currentOnDragStart by rememberUpdatedState(onDragStart)
+    val currentOnDrag by rememberUpdatedState(onDrag)
+    val currentOnDragEnd by rememberUpdatedState(onDragEnd)
+    val currentOnClick by rememberUpdatedState(onClick)
+    val currentOnCall by rememberUpdatedState(onCall)
+    val currentOnSms by rememberUpdatedState(onSms)
+    val currentCustomRightAction by rememberUpdatedState(customRightAction)
+    val currentCustomLeftAction by rememberUpdatedState(customLeftAction)
+
     Box(
         modifier = modifier
             .fillMaxWidth()
             .height(70.dp)
+            .zIndex(if (isDragging) 100f else 0f)
+            .graphicsLayer {
+                if (isDragging) {
+                    translationY = dragVisualOffsetY
+                    scaleX = 1.03f
+                    scaleY = 1.03f
+                    shadowElevation = 16f
+                }
+            }
             .clip(RoundedCornerShape(20.dp))
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
@@ -221,74 +248,99 @@ fun SwipeableFavoriteContactCard(
                     .offset { IntOffset(drawnOffset.roundToInt(), 0) }
                     .fillMaxSize()
                     .pointerInput(contact.id) {
-                        detectHorizontalDragGestures(
-                            onDragEnd = {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 coroutineScope.launch {
-                                    val current = offsetX.value
-                                    if (current >= thresholdPx) {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        offsetX.snapTo(0f)
-                                        drawnOffset = 0f
-                                        executeSwipe(
-                                            context = context,
-                                            isRight = true,
-                                            action = customRightAction,
-                                            fallbackNumber = contact.number,
-                                            onCall = { num, sim -> onCall(num, sim) },
-                                            onSms = onSms
-                                        )
-                                    } else if (current <= -thresholdPx) {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        offsetX.snapTo(0f)
-                                        drawnOffset = 0f
-                                        executeSwipe(
-                                            context = context,
-                                            isRight = false,
-                                            action = customLeftAction,
-                                            fallbackNumber = contact.number,
-                                            onCall = { num, sim -> onCall(num, sim) },
-                                            onSms = onSms
-                                        )
-                                    } else {
-                                        offsetX.animateTo(0f, spring())
-                                        drawnOffset = 0f
-                                    }
-                                    hasVibratedThreshold = false
+                                    offsetX.snapTo(0f)
+                                    drawnOffset = 0f
                                 }
+                                currentOnDragStart?.invoke()
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                currentOnDrag?.invoke(dragAmount.y)
+                            },
+                            onDragEnd = {
+                                currentOnDragEnd?.invoke()
                             },
                             onDragCancel = {
-                                coroutineScope.launch {
-                                    offsetX.animateTo(0f, spring())
-                                    drawnOffset = 0f
-                                    hasVibratedThreshold = false
-                                }
-                            },
-                            onHorizontalDrag = { change, dragAmount ->
-                                change.consume()
-                                val target = (offsetX.value + dragAmount)
-                                    .coerceIn(-maxDragPx, maxDragPx)
-
-                                val crossedThreshold =
-                                    abs(target) >= thresholdPx && abs(offsetX.value) < thresholdPx
-                                if (crossedThreshold && !hasVibratedThreshold) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    hasVibratedThreshold = true
-                                } else if (abs(target) < thresholdPx) {
-                                    hasVibratedThreshold = false
-                                }
-
-                                coroutineScope.launch {
-                                    offsetX.snapTo(target)
-                                    drawnOffset = target
-                                }
+                                currentOnDragEnd?.invoke()
                             }
                         )
+                    }
+                    .pointerInput(contact.id, isDragging) {
+                        // Restart only when reorder drag begins/ends — keeps long-press detector alive.
+                        if (!isDragging) {
+                            detectHorizontalDragGestures(
+                                onDragEnd = {
+                                    coroutineScope.launch {
+                                        val current = offsetX.value
+                                        if (current >= thresholdPx) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            offsetX.snapTo(0f)
+                                            drawnOffset = 0f
+                                            executeSwipe(
+                                                context = context,
+                                                isRight = true,
+                                                action = currentCustomRightAction,
+                                                fallbackNumber = contact.number,
+                                                onCall = { num, sim -> currentOnCall(num, sim) },
+                                                onSms = currentOnSms
+                                            )
+                                        } else if (current <= -thresholdPx) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            offsetX.snapTo(0f)
+                                            drawnOffset = 0f
+                                            executeSwipe(
+                                                context = context,
+                                                isRight = false,
+                                                action = currentCustomLeftAction,
+                                                fallbackNumber = contact.number,
+                                                onCall = { num, sim -> currentOnCall(num, sim) },
+                                                onSms = currentOnSms
+                                            )
+                                        } else {
+                                            offsetX.animateTo(0f, spring())
+                                            drawnOffset = 0f
+                                        }
+                                        hasVibratedThreshold = false
+                                    }
+                                },
+                                onDragCancel = {
+                                    coroutineScope.launch {
+                                        offsetX.animateTo(0f, spring())
+                                        drawnOffset = 0f
+                                        hasVibratedThreshold = false
+                                    }
+                                },
+                                onHorizontalDrag = { change, dragAmount ->
+                                    change.consume()
+                                    val target = (offsetX.value + dragAmount)
+                                        .coerceIn(-maxDragPx, maxDragPx)
+
+                                    val crossedThreshold =
+                                        abs(target) >= thresholdPx && abs(offsetX.value) < thresholdPx
+                                    if (crossedThreshold && !hasVibratedThreshold) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        hasVibratedThreshold = true
+                                    } else if (abs(target) < thresholdPx) {
+                                        hasVibratedThreshold = false
+                                    }
+
+                                    coroutineScope.launch {
+                                        offsetX.snapTo(target)
+                                        drawnOffset = target
+                                    }
+                                }
+                            )
+                        }
                     }
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null
                     ) {
-                        onClick(contact)
+                        currentOnClick(contact)
                     },
                 color = if (isSelected) {
                     SamsungGreen.copy(alpha = 0.18f)
@@ -338,7 +390,7 @@ fun SwipeableFavoriteContactCard(
 
                     Spacer(modifier = Modifier.width(12.dp))
 
-                    // Gold Star Icon instead of time
+                    // Gold Star Icon
                     Icon(
                         imageVector = Icons.Default.Star,
                         contentDescription = "Избранное",
