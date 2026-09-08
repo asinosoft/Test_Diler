@@ -76,7 +76,10 @@ import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import android.content.Context
+import android.content.Intent
+import android.provider.Settings
 import android.telephony.SubscriptionManager
+import androidx.compose.material.icons.filled.LockOpen
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.data.model.FavoritesViewMode
@@ -732,6 +735,40 @@ fun RecentsScreen(
                                                 horizontal = 10.dp,
                                                 vertical = 3.dp
                                             )
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (!Settings.canDrawOverlays(context)) {
+                        item("request_overlay_permission") {
+                            Surface(
+                                shape = RoundedCornerShape(16.dp),
+                                color = SamsungGreen.copy(alpha = 0.12f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp, bottom = 4.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(
+                                        horizontal = 14.dp,
+                                        vertical = 10.dp
+                                    ),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    Text(
+                                        text = "Разрешите показывать уведомления поверх других приложений",
+                                        fontSize = 13.sp,
+                                        modifier = Modifier.weight(1f)
+                                    )
+
+                                    IconButton(onClick = { context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)) }) {
+                                        Icon(
+                                            imageVector = Icons.Default.LockOpen,
+                                            contentDescription = "Разрешить",
+                                            modifier = Modifier.size(20.dp)
                                         )
                                     }
                                 }
