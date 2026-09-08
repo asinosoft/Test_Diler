@@ -2149,7 +2149,7 @@ private fun SettingsTabContent(
                         Icon(
                             imageVector = Icons.Default.Star,
                             contentDescription = "Избранное",
-                            tint = SamsungGreen,
+                            tint = Color(0xFFFFB300),
                             modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(14.dp))

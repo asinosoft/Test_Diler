@@ -416,7 +416,7 @@ fun RecentsScreen(
                                 Icon(
                                     imageVector = Icons.Default.Star,
                                     contentDescription = "Избранное",
-                                    tint = SamsungGreen,
+                                    tint = Color(0xFFFFB300),
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Text(

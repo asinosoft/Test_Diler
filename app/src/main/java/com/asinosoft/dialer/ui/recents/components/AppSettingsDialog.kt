@@ -501,7 +501,7 @@ private fun FavoritesSettingsTab(
                 Icon(
                     imageVector = Icons.Default.Star,
                     contentDescription = "Избранное",
-                    tint = SamsungGreen,
+                    tint = Color(0xFFFFB300),
                     modifier = Modifier.size(22.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
