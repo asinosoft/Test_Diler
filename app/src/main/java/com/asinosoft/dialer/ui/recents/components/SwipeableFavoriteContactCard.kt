@@ -36,7 +36,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -87,7 +86,6 @@ fun SwipeableFavoriteContactCard(
     val coroutineScope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
     val offsetX = remember { Animatable(0f) }
-    var drawnOffset by remember { mutableFloatStateOf(0f) }
     val density = LocalDensity.current
     val thresholdPx = with(density) { 90.dp.toPx() }
     val maxDragPx = with(density) { 160.dp.toPx() }
@@ -154,7 +152,7 @@ fun SwipeableFavoriteContactCard(
             .clip(RoundedCornerShape(20.dp))
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
-            if (drawnOffset > 0f) {
+            if (offsetX.value > 0f) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -201,7 +199,7 @@ fun SwipeableFavoriteContactCard(
                         )
                     }
                 }
-            } else if (drawnOffset < 0f) {
+            } else if (offsetX.value < 0f) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -245,7 +243,7 @@ fun SwipeableFavoriteContactCard(
 
             Surface(
                 modifier = Modifier
-                    .offset { IntOffset(drawnOffset.roundToInt(), 0) }
+                    .offset { IntOffset(offsetX.value.roundToInt(), 0) }
                     .fillMaxSize()
                     .pointerInput(contact.id) {
                         detectDragGesturesAfterLongPress(
@@ -253,7 +251,6 @@ fun SwipeableFavoriteContactCard(
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 coroutineScope.launch {
                                     offsetX.snapTo(0f)
-                                    drawnOffset = 0f
                                 }
                                 currentOnDragStart?.invoke()
                             },
@@ -279,7 +276,6 @@ fun SwipeableFavoriteContactCard(
                                         if (current >= thresholdPx) {
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             offsetX.snapTo(0f)
-                                            drawnOffset = 0f
                                             executeSwipe(
                                                 context = context,
                                                 isRight = true,
@@ -291,7 +287,6 @@ fun SwipeableFavoriteContactCard(
                                         } else if (current <= -thresholdPx) {
                                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                             offsetX.snapTo(0f)
-                                            drawnOffset = 0f
                                             executeSwipe(
                                                 context = context,
                                                 isRight = false,
@@ -300,17 +295,15 @@ fun SwipeableFavoriteContactCard(
                                                 onCall = { num, sim -> currentOnCall(num, sim) },
                                                 onSms = currentOnSms
                                             )
-                                        } else {
-                                            offsetX.animateTo(0f, spring())
-                                            drawnOffset = 0f
                                         }
+
+                                        offsetX.animateTo(0f, spring())
                                         hasVibratedThreshold = false
                                     }
                                 },
                                 onDragCancel = {
                                     coroutineScope.launch {
                                         offsetX.animateTo(0f, spring())
-                                        drawnOffset = 0f
                                         hasVibratedThreshold = false
                                     }
                                 },
@@ -330,7 +323,6 @@ fun SwipeableFavoriteContactCard(
 
                                     coroutineScope.launch {
                                         offsetX.snapTo(target)
-                                        drawnOffset = target
                                     }
                                 }
                             )
