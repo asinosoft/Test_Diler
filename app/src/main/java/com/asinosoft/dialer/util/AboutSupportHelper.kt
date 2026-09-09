@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -27,7 +28,7 @@ object AboutSupportHelper {
             context.startActivity(
                 Intent(
                     Intent.ACTION_VIEW,
-                    Uri.parse("market://details?id=$PLAY_STORE_PACKAGE")
+                    "market://details?id=$PLAY_STORE_PACKAGE".toUri()
                 ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
         } catch (_: Exception) {
@@ -35,7 +36,7 @@ object AboutSupportHelper {
                 context.startActivity(
                     Intent(
                         Intent.ACTION_VIEW,
-                        Uri.parse("https://play.google.com/store/apps/details?id=$PLAY_STORE_PACKAGE")
+                        "https://play.google.com/store/apps/details?id=$PLAY_STORE_PACKAGE".toUri()
                     ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 )
             } catch (_: Exception) {
@@ -66,7 +67,7 @@ object AboutSupportHelper {
     fun openPrivacyPolicy(context: Context) {
         try {
             context.startActivity(
-                Intent(Intent.ACTION_VIEW, Uri.parse(PRIVACY_POLICY_URL))
+                Intent(Intent.ACTION_VIEW, PRIVACY_POLICY_URL.toUri())
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
         } catch (_: Exception) {
@@ -118,22 +119,18 @@ object AboutSupportHelper {
         body: String,
         attachmentUri: Uri?
     ): Boolean {
-        if (attachmentUri == null) return false
         return try {
-            val intent = Intent(Intent.ACTION_SEND).apply {
-                type = "text/plain"
+            val intent = Intent(Intent.ACTION_SEND, "mailto:$SUPPORT_EMAIL".toUri()).apply {
                 putExtra(Intent.EXTRA_EMAIL, arrayOf(SUPPORT_EMAIL))
                 putExtra(Intent.EXTRA_SUBJECT, subject)
                 putExtra(Intent.EXTRA_TEXT, body)
-                putExtra(Intent.EXTRA_STREAM, attachmentUri)
-                clipData = android.content.ClipData.newRawUri("", attachmentUri)
-                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            }
-            context.startActivity(
-                Intent.createChooser(intent, "Написать в поддержку").apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                attachmentUri?.let {
+                    putExtra(Intent.EXTRA_STREAM, attachmentUri)
+                    clipData = android.content.ClipData.newRawUri("", attachmentUri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
-            )
+            }
+            context.startActivity(intent)
             true
         } catch (_: Exception) {
             false
@@ -145,21 +142,16 @@ object AboutSupportHelper {
         subject: String,
         body: String
     ): Boolean {
-        val mailtoUri = Uri.parse(
+        val mailtoUri = (
             "mailto:$SUPPORT_EMAIL" +
                 "?subject=${Uri.encode(subject)}" +
                 "&body=${Uri.encode(body)}"
-        )
+        ).toUri()
 
         // 1) SENDTO + mailto
         try {
-            val sendTo = Intent(Intent.ACTION_SENDTO).apply {
-                data = mailtoUri
-            }
             context.startActivity(
-                Intent.createChooser(sendTo, "Написать в поддержку").apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
+            Intent(Intent.ACTION_SENDTO, mailtoUri).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
             return true
         } catch (_: Exception) {
@@ -189,8 +181,7 @@ object AboutSupportHelper {
         )
         for (pkg in emailPackages) {
             try {
-                val intent = Intent(Intent.ACTION_SENDTO).apply {
-                    data = mailtoUri
+                val intent = Intent(Intent.ACTION_SENDTO, mailtoUri).apply {
                     setPackage(pkg)
                     addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 }
@@ -206,7 +197,7 @@ object AboutSupportHelper {
     }
 
     private fun buildSupportReportFile(context: Context, appName: String): File {
-        val dir = File(context.cacheDir, "support").apply { mkdirs() }
+        val dir = File(context.cacheDir, "support/report.txt").apply { mkdirs() }
         val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val file = File(dir, "support_report_$stamp.txt")
         file.writeText(buildSupportReport(context, appName), Charsets.UTF_8)

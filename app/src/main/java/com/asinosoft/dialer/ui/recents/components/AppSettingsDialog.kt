@@ -33,12 +33,9 @@ import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Policy
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.Dialpad
 import androidx.compose.material3.AlertDialog
@@ -535,7 +532,7 @@ private fun FavoritesSettingsTab(
                         .clickable { onFavoritesViewModeSelected(FavoritesViewMode.LIST) },
                     shape = RoundedCornerShape(16.dp),
                     color = if (isList) SamsungGreen.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-                    border = androidx.compose.foundation.BorderStroke(
+                    border = BorderStroke(
                         width = if (isList) 2.dp else 1.dp,
                         color = if (isList) SamsungGreen else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                     )
