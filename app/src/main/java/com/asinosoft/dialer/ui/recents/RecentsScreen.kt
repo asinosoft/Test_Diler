@@ -135,7 +135,6 @@ fun RecentsScreen(
 
     val hasLoadedCallLogs by viewModel.hasLoadedCallLogs.collectAsState()
     val showHint by viewModel.showSwipeHint.collectAsState()
-    var initialScrollDone by remember { mutableStateOf(false) }
     var listReady by remember { mutableStateOf(hasLoadedCallLogs || callLogs.isNotEmpty()) }
 
     LaunchedEffect(hasLoadedCallLogs, callLogs) {
@@ -206,13 +205,8 @@ fun RecentsScreen(
         }
     }
 
-    val targetGridRowIndex = remember(maxRowsAcrossAllTabs, favoriteRowsCount) {
-        (maxRowsAcrossAllTabs - favoriteRowsCount).coerceAtLeast(0)
-    }
-
-    // LazyColumn item index corresponding to target favorite row
-    val initialItemIndex = remember(targetGridRowIndex) {
-        1 + targetGridRowIndex
+    val initialItemIndex = remember(maxRowsAcrossAllTabs, favoriteRowsCount) {
+        1 + (maxRowsAcrossAllTabs - favoriteRowsCount).coerceAtLeast(0)
     }
 
     val initialItemIndexState = rememberUpdatedState(initialItemIndex)
@@ -238,9 +232,7 @@ fun RecentsScreen(
     }
 
     // Position list once; prefetch avatars first so first frames don't decode mid-scroll
-    LaunchedEffect(hasLoadedCallLogs, initialItemIndex, favoriteRows.size) {
-        if (!hasLoadedCallLogs || initialScrollDone) return@LaunchedEffect
-
+    LaunchedEffect(initialItemIndex, favoriteRowsCount) {
         val callLogAvatarPx = with(density) { 48.dp.roundToPx() }.coerceAtLeast(1)
         val favoriteAvatarPx = with(density) { 72.dp.roundToPx() }.coerceAtLeast(1)
 
@@ -255,9 +247,7 @@ fun RecentsScreen(
             targetPx = callLogAvatarPx
         )
 
-        val target = if (favoriteRows.isNotEmpty()) initialItemIndex else 0
-        listState.scrollToItem(target.coerceAtLeast(0), 0)
-        initialScrollDone = true
+        listState.scrollToItem(initialItemIndex, 0)
         listReady = true
     }
 
