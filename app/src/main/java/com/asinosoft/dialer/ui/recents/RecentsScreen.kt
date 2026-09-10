@@ -51,7 +51,6 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -80,6 +79,7 @@ import android.content.Intent
 import android.provider.Settings
 import android.telephony.SubscriptionManager
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.runtime.key
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.data.model.FavoritesViewMode
@@ -137,12 +137,6 @@ fun RecentsScreen(
     val showHint by viewModel.showSwipeHint.collectAsState()
     var listReady by remember { mutableStateOf(hasLoadedCallLogs || callLogs.isNotEmpty()) }
 
-    LaunchedEffect(hasLoadedCallLogs, callLogs) {
-        if (hasLoadedCallLogs || callLogs.isNotEmpty()) {
-            listReady = true
-        }
-    }
-
     val activeSimCount = remember(context) {
         try {
             val sm = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
@@ -158,8 +152,6 @@ fun RecentsScreen(
     val simFilter by viewModel.simFilter.collectAsState()
     val isFilterActive by viewModel.isFilterActive.collectAsState()
     var showCallFilterDialog by remember { mutableStateOf(false) }
-
-    val listState = rememberLazyListState()
 
     var draggingContactId by remember { mutableStateOf<String?>(null) }
     var dragFromIndex by remember { mutableIntStateOf(-1) }
@@ -209,8 +201,7 @@ fun RecentsScreen(
         1 + (maxRowsAcrossAllTabs - favoriteRowsCount).coerceAtLeast(0)
     }
 
-    val initialItemIndexState = rememberUpdatedState(initialItemIndex)
-    val listStateRef = rememberUpdatedState(listState)
+    val listState = key(initialItemIndex) { rememberLazyListState(initialItemIndex) }
 
     // After a call, MainActivity resumes — pull newest CallLog entries immediately; on stop reset scroll
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -223,7 +214,7 @@ fun RecentsScreen(
             }
             if (event == Lifecycle.Event.ON_STOP) {
                 coroutineScope.launch {
-                    listStateRef.value.scrollToItem(initialItemIndexState.value, 0)
+                    listState.scrollToItem(initialItemIndex, 0)
                 }
             }
         }
@@ -231,28 +222,8 @@ fun RecentsScreen(
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
 
-    // Position list once; prefetch avatars first so first frames don't decode mid-scroll
-    LaunchedEffect(initialItemIndex, favoriteRowsCount) {
-        val callLogAvatarPx = with(density) { 48.dp.roundToPx() }.coerceAtLeast(1)
-        val favoriteAvatarPx = with(density) { 72.dp.roundToPx() }.coerceAtLeast(1)
-
-        AvatarBitmapCache.prefetch(
-            context = context,
-            uris = favorites.map { it.photoUri },
-            targetPx = favoriteAvatarPx
-        )
-        AvatarBitmapCache.prefetch(
-            context = context,
-            uris = callLogs.take(24).map { it.photoUri },
-            targetPx = callLogAvatarPx
-        )
-
-        listState.scrollToItem(initialItemIndex, 0)
-        listReady = true
-    }
-
     // Warm nearby avatars only — full journal can be huge; rest via scroll-window prefetch
-    LaunchedEffect(listReady, callLogs, favorites) {
+    LaunchedEffect(callLogs, favorites) {
         if (!listReady) return@LaunchedEffect
         val callLogAvatarPx = with(density) { 48.dp.roundToPx() }.coerceAtLeast(1)
         val favoriteAvatarPx = with(density) { 72.dp.roundToPx() }.coerceAtLeast(1)
@@ -316,6 +287,17 @@ fun RecentsScreen(
 
     // Search & Dialpad Screen Overlay
     val isSearchDialerOpen by viewModel.isSearchDialerOpen.collectAsState()
+
+    if (!listReady) {
+        Box(Modifier.fillMaxSize()) {
+            CircularProgressIndicator(
+                modifier = Modifier.align(Alignment.Center),
+                color = SamsungGreen
+            )
+        }
+
+        return
+    }
 
     Box(
         modifier = Modifier
