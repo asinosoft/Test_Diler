@@ -65,7 +65,6 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
@@ -138,7 +137,6 @@ fun InCallScreen(
     val isMuted by CallManager.isMuted.collectAsState()
     val audioRoute by CallManager.audioRoute.collectAsState()
     val isHold by CallManager.isHold.collectAsState()
-    val isRecording by CallManager.isRecording.collectAsState()
     val bluetoothDevices by CallManager.bluetoothDevices.collectAsState()
     val currentBtName by CallManager.currentBluetoothDeviceName.collectAsState()
 
@@ -1630,7 +1628,7 @@ private fun performSwipeActionVibration(context: Context) {
 }
 
 @Composable
-private fun InCallPostCallActionButton(
+fun InCallPostCallActionButton(
     icon: ImageVector? = null,
     iconBitmap: ImageBitmap? = null,
     label: String,
@@ -1647,29 +1645,38 @@ private fun InCallPostCallActionButton(
                 onClick = onClick
             )
     ) {
-        Surface(
-            modifier = Modifier.size(60.dp),
-            shape = CircleShape,
-            color = containerColor,
-            shadowElevation = 4.dp
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                if (iconBitmap != null) {
+        if (iconBitmap != null) {
+            Surface(
+                modifier = Modifier.size(60.dp),
+                color = Color.Transparent,
+                shadowElevation = 4.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
                     Image(
                         bitmap = iconBitmap,
                         contentDescription = label,
                         modifier = Modifier
-                            .fillMaxSize()
-                            .clip(CircleShape),
+                            .fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
-                } else if (icon != null) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = label,
-                        tint = contentColor,
-                        modifier = Modifier.size(26.dp)
-                    )
+                }
+            }
+        } else {
+            Surface(
+                modifier = Modifier.size(60.dp),
+                shape = CircleShape,
+                color = containerColor,
+                shadowElevation = 4.dp
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    if (icon != null) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = label,
+                            tint = contentColor,
+                            modifier = Modifier.size(26.dp)
+                        )
+                    }
                 }
             }
         }
