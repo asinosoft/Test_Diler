@@ -453,21 +453,22 @@ fun InCallScreen(
                     Spacer(modifier = Modifier.height(14.dp))
 
                     // Call Status & Timer Badge
-                    val statusText = when {
-                        isCallDisconnected -> "Вызов завершен"
-                        isHold -> "На удержании"
-                        callState == Call.STATE_RINGING -> "Входящий вызов"
-                        callState == Call.STATE_DIALING -> "Вызов..."
-                        callState == Call.STATE_CONNECTING -> "Соединение..."
-                        isCallActive -> formatDuration(durationSeconds)
-                        else -> "Вызов завершен"
+                    val statusText = when(callState) {
+                        Call.STATE_DISCONNECTED -> "Вызов завершен"
+                        Call.STATE_HOLDING -> "На удержании"
+                        Call.STATE_RINGING -> "Входящий вызов"
+                        Call.STATE_DIALING -> "Вызов..."
+                        Call.STATE_CONNECTING -> "Соединение..."
+                        Call.STATE_DISCONNECTING -> "Завершение..."
+                        Call.STATE_ACTIVE -> formatDuration(durationSeconds)
+                        else -> "..."
                     }
 
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = when {
                             isCallDisconnected -> Color.White.copy(alpha = 0.12f)
-                            isHold -> Color(0xFFFFB300).copy(alpha = 0.22f)
+                                isHold -> Color(0xFFFFB300).copy(alpha = 0.22f)
                             isCallActive -> Color.White.copy(alpha = 0.12f)
                             else -> SamsungGreen.copy(alpha = 0.18f)
                         }
