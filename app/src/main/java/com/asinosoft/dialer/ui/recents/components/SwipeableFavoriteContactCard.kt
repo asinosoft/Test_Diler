@@ -274,7 +274,9 @@ fun SwipeableFavoriteContactCard(
                                     coroutineScope.launch {
                                         val current = offsetX.value
                                         if (current >= thresholdPx) {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            if (!hasVibratedThreshold) {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            }
                                             offsetX.snapTo(0f)
                                             executeSwipe(
                                                 context = context,
@@ -285,7 +287,9 @@ fun SwipeableFavoriteContactCard(
                                                 onSms = currentOnSms
                                             )
                                         } else if (current <= -thresholdPx) {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            if (!hasVibratedThreshold) {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            }
                                             offsetX.snapTo(0f)
                                             executeSwipe(
                                                 context = context,
