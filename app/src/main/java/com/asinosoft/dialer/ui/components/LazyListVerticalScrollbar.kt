@@ -58,7 +58,7 @@ fun LazyListVerticalScrollbar(
     // Stabilize item-size estimate across frames (short date headers must not double the thumb)
     val stableItemSize = remember { mutableFloatStateOf(0f) }
 
-    val scrollMetrics by remember {
+    val scrollMetrics by remember(listState) {
         derivedStateOf {
             val layoutInfo = listState.layoutInfo
             val totalItems = layoutInfo.totalItemsCount
