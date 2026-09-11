@@ -21,7 +21,9 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.DisposableEffect
@@ -31,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -48,6 +51,7 @@ import com.asinosoft.dialer.ui.onboarding.OnboardingPermissionsScreen
 import com.asinosoft.dialer.ui.recents.RecentsScreen
 import com.asinosoft.dialer.ui.recents.RecentsViewModel
 import com.asinosoft.dialer.ui.theme.DialerTheme
+import com.asinosoft.dialer.ui.theme.SamsungGreen
 
 class MainActivity : ComponentActivity() {
 
@@ -81,6 +85,9 @@ class MainActivity : ComponentActivity() {
                 var isOnboardingComplete by remember {
                     mutableStateOf(resolveOnboardingComplete(onboardingPrefs))
                 }
+
+                var isCheckingPermissions by remember { mutableStateOf(true) }
+
                 var isPermissionsStepDone by remember { mutableStateOf(false) }
                 var dialerRequestedAfterRuntime by remember { mutableStateOf(false) }
 
@@ -111,6 +118,7 @@ class MainActivity : ComponentActivity() {
                     contract = ActivityResultContracts.RequestMultiplePermissions()
                 ) {
                     isRuntimeGranted = areRuntimePermissionsGranted()
+                    isPermissionsStepDone = isRuntimeGranted && isOverlayGranted
                     highlightedStep = if (isRuntimeGranted) {
                         if (!Settings.canDrawOverlays(this)) {
                             OnboardingPermissionStep.OVERLAY
@@ -121,6 +129,7 @@ class MainActivity : ComponentActivity() {
                         OnboardingPermissionStep.RUNTIME
                     }
                     if (isRuntimeGranted) {
+                        isCheckingPermissions = false
                         viewModel.loadCallLogs()
                         requestDialerAfterRuntimeIfNeeded()
                     }
@@ -130,6 +139,7 @@ class MainActivity : ComponentActivity() {
                     contract = ActivityResultContracts.StartActivityForResult()
                 ) {
                     isOverlayGranted = Settings.canDrawOverlays(this)
+                    isPermissionsStepDone = isRuntimeGranted && isOverlayGranted
                     highlightedStep = if (isOverlayGranted) null else OnboardingPermissionStep.OVERLAY
                 }
 
@@ -138,6 +148,8 @@ class MainActivity : ComponentActivity() {
                         if (event == Lifecycle.Event.ON_RESUME) {
                             isRuntimeGranted = areRuntimePermissionsGranted()
                             isOverlayGranted = Settings.canDrawOverlays(this@MainActivity)
+                            isCheckingPermissions = false
+                            isPermissionsStepDone = isRuntimeGranted && isOverlayGranted
                         }
                     }
                     lifecycleOwner.lifecycle.addObserver(observer)
@@ -164,7 +176,7 @@ class MainActivity : ComponentActivity() {
                     ).show()
                     val intent = Intent(
                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:$packageName")
+                        Uri.fromParts("package", packageName, null)
                     )
                     try {
                         overlayLauncher.launch(intent)
@@ -191,7 +203,16 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     when {
-                        !isOnboardingComplete && !isPermissionsStepDone -> {
+                        isCheckingPermissions -> {
+                            Box(Modifier.fillMaxSize()) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.align(Alignment.Center),
+                                    color = SamsungGreen
+                                )
+                            }
+                        }
+
+                        !isPermissionsStepDone -> {
                             OnboardingPermissionsScreen(
                                 isRuntimeGranted = isRuntimeGranted,
                                 isOverlayGranted = isOverlayGranted,

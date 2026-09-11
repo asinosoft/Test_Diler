@@ -64,6 +64,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -215,6 +217,11 @@ fun AppSettingsDialog(
     }
 
     if (showAddTabDialog) {
+        val focusRequester = remember { FocusRequester() }
+        LaunchedEffect(Unit) {
+            focusRequester.requestFocus()
+        }
+
         AlertDialog(
             onDismissRequest = { showAddTabDialog = false },
             title = {
@@ -226,7 +233,7 @@ fun AppSettingsDialog(
                     onValueChange = { newTabNameInput = it },
                     label = { Text("Название вкладки") },
                     singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth().focusRequester(focusRequester)
                 )
             },
             confirmButton = {

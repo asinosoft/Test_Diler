@@ -58,7 +58,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.changedToDown
@@ -76,9 +75,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import android.telephony.SubscriptionManager
 import androidx.compose.material.icons.filled.LockOpen
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.key
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.asinosoft.dialer.data.model.FavoriteTab
@@ -135,7 +136,7 @@ fun RecentsScreen(
 
     val hasLoadedCallLogs by viewModel.hasLoadedCallLogs.collectAsState()
     val showHint by viewModel.showSwipeHint.collectAsState()
-    var listReady by remember { mutableStateOf(hasLoadedCallLogs || callLogs.isNotEmpty()) }
+    val listReady by remember { derivedStateOf { hasLoadedCallLogs || callLogs.isNotEmpty() } }
 
     val activeSimCount = remember(context) {
         try {
@@ -201,7 +202,9 @@ fun RecentsScreen(
         1 + (maxRowsAcrossAllTabs - favoriteRowsCount).coerceAtLeast(0)
     }
 
-    val listState = key(initialItemIndex) { rememberLazyListState(initialItemIndex) }
+    val listState = key(initialItemIndex, callLogs.isNotEmpty()) {
+        rememberLazyListState(initialItemIndex)
+    }
 
     // After a call, MainActivity resumes — pull newest CallLog entries immediately; on stop reset scroll
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -367,10 +370,9 @@ fun RecentsScreen(
             ) {
                 LazyColumn(
                     state = listState,
-                    userScrollEnabled = draggingContactId == null && listReady,
+                    userScrollEnabled = draggingContactId == null,
                     modifier = Modifier
-                        .fillMaxSize()
-                        .graphicsLayer { alpha = if (listReady) 1f else 0f },
+                        .fillMaxSize(),
                     contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
@@ -736,7 +738,10 @@ fun RecentsScreen(
                                         modifier = Modifier.weight(1f)
                                     )
 
-                                    IconButton(onClick = { context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)) }) {
+                                    IconButton(onClick = {
+                                        val pkg = Uri.fromParts("package", context.packageName, null) // only before API 30
+                                        context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, pkg))
+                                    }) {
                                         Icon(
                                             imageVector = Icons.Default.LockOpen,
                                             contentDescription = "Разрешить",
@@ -860,15 +865,7 @@ fun RecentsScreen(
                         .align(Alignment.CenterEnd)
                         .fillMaxHeight()
                         .zIndex(5f)
-                        .graphicsLayer { alpha = if (listReady) 1f else 0f }
                 )
-
-                if (!listReady) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.align(Alignment.Center),
-                        color = SamsungGreen
-                    )
-                }
             }
         }
 
