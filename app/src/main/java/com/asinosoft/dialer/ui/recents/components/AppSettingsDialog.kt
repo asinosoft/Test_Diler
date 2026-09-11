@@ -75,6 +75,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.annotation.StringRes
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -92,10 +93,10 @@ import com.asinosoft.dialer.util.AboutSupportHelper
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-private enum class SettingsTab(val title: String) {
-    PHONE("Телефон"),
-    FAVORITES("Избранное"),
-    ABOUT("О приложении")
+private enum class SettingsTab(@androidx.annotation.StringRes val titleRes: Int) {
+    PHONE(R.string.settings_tab_phone),
+    FAVORITES(R.string.settings_tab_favorites),
+    ABOUT(R.string.settings_tab_about)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -137,7 +138,7 @@ fun AppSettingsDialog(
                 .padding(bottom = 24.dp)
         ) {
             Text(
-                text = "Настройки",
+                text = stringResource(R.string.settings_title),
                 fontSize = 22.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -161,7 +162,7 @@ fun AppSettingsDialog(
                         onClick = { selectedTabIndex = index },
                         text = {
                             Text(
-                                text = tab.title,
+                                text = stringResource(tab.titleRes),
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
                                 fontSize = 13.sp,
@@ -225,13 +226,13 @@ fun AppSettingsDialog(
         AlertDialog(
             onDismissRequest = { showAddTabDialog = false },
             title = {
-                Text(text = "Новая вкладка", fontWeight = FontWeight.Bold)
+                Text(text = stringResource(R.string.onboarding_new_tab_title), fontWeight = FontWeight.Bold)
             },
             text = {
                 OutlinedTextField(
                     value = newTabNameInput,
                     onValueChange = { newTabNameInput = it },
-                    label = { Text("Название вкладки") },
+                    label = { Text(stringResource(R.string.onboarding_tab_name_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth().focusRequester(focusRequester)
                 )
@@ -245,12 +246,12 @@ fun AppSettingsDialog(
                         }
                     }
                 ) {
-                    Text("Создать", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.action_create), color = SamsungGreen, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAddTabDialog = false }) {
-                    Text("Отмена")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -260,13 +261,13 @@ fun AppSettingsDialog(
         AlertDialog(
             onDismissRequest = { tabToRename = null },
             title = {
-                Text(text = "Переименовать вкладку", fontWeight = FontWeight.Bold)
+                Text(text = stringResource(R.string.onboarding_rename_tab_title), fontWeight = FontWeight.Bold)
             },
             text = {
                 OutlinedTextField(
                     value = renameTabInput,
                     onValueChange = { renameTabInput = it },
-                    label = { Text("Название вкладки") },
+                    label = { Text(stringResource(R.string.onboarding_tab_name_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -280,12 +281,12 @@ fun AppSettingsDialog(
                         }
                     }
                 ) {
-                    Text("Сохранить", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.action_save), color = SamsungGreen, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { tabToRename = null }) {
-                    Text("Отмена")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -313,7 +314,7 @@ private fun PhoneSettingsTab(
                 )
                 Spacer(modifier = Modifier.width(10.dp))
                 Text(
-                    text = "Открывать номеронабиратель",
+                    text = stringResource(R.string.settings_open_dialer_title),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -322,7 +323,7 @@ private fun PhoneSettingsTab(
 
             Spacer(modifier = Modifier.height(6.dp))
             Text(
-                text = "Как открывать набор номера с главного экрана",
+                text = stringResource(R.string.settings_open_dialer_subtitle),
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
             )
@@ -330,17 +331,17 @@ private fun PhoneSettingsTab(
             Spacer(modifier = Modifier.height(14.dp))
 
             DialerOpenModeOption(
-                label = "Кнопка",
+                label = stringResource(R.string.settings_dialer_mode_button),
                 selected = dialerOpenMode == DialerOpenMode.BUTTON,
                 onClick = { onDialerOpenModeSelected(DialerOpenMode.BUTTON) }
             )
             DialerOpenModeOption(
-                label = "Кнопка / двойное нажатие на экране",
+                label = stringResource(R.string.settings_dialer_mode_button_double_tap),
                 selected = dialerOpenMode == DialerOpenMode.BUTTON_AND_DOUBLE_TAP,
                 onClick = { onDialerOpenModeSelected(DialerOpenMode.BUTTON_AND_DOUBLE_TAP) }
             )
             DialerOpenModeOption(
-                label = "Двойное нажатие на экране",
+                label = stringResource(R.string.settings_dialer_mode_double_tap),
                 selected = dialerOpenMode == DialerOpenMode.DOUBLE_TAP,
                 onClick = { onDialerOpenModeSelected(DialerOpenMode.DOUBLE_TAP) }
             )
@@ -370,14 +371,14 @@ private fun PhoneSettingsTab(
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
                         Text(
-                            text = "Редактировать ответы",
+                            text = stringResource(R.string.settings_quick_replies_title),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Быстрые сообщения при отклонении вызова",
+                            text = stringResource(R.string.settings_quick_replies_subtitle),
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
                         )
@@ -466,7 +467,7 @@ internal fun FavoritesSettingsTab(
         Column(modifier = Modifier.padding(18.dp)) {
             // View Mode Selector (Grid vs List)
             Text(
-                text = "Вид отображения",
+                text = stringResource(R.string.settings_favorites_view_title),
                 fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -475,7 +476,7 @@ internal fun FavoritesSettingsTab(
             Spacer(modifier = Modifier.height(4.dp))
 
             Text(
-                text = "Формат карточек контактов на главном экране",
+                text = stringResource(R.string.settings_favorites_view_subtitle),
                 fontSize = 13.sp,
                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
             )
@@ -517,13 +518,13 @@ internal fun FavoritesSettingsTab(
                             }
                         }
                         Text(
-                            text = "Сетка",
+                            text = stringResource(R.string.settings_view_grid),
                             fontSize = 14.sp,
                             fontWeight = if (isGrid) FontWeight.Bold else FontWeight.Medium,
                             color = if (isGrid) SamsungGreen else MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "3 столбца",
+                            text = stringResource(R.string.settings_view_grid_columns),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
@@ -561,13 +562,13 @@ internal fun FavoritesSettingsTab(
                             }
                         }
                         Text(
-                            text = "Список",
+                            text = stringResource(R.string.settings_view_list),
                             fontSize = 14.sp,
                             fontWeight = if (isList) FontWeight.Bold else FontWeight.Medium,
                             color = if (isList) SamsungGreen else MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = "Со свайпами",
+                            text = stringResource(R.string.settings_view_list_swipes),
                             fontSize = 11.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
@@ -578,9 +579,9 @@ internal fun FavoritesSettingsTab(
             Spacer(modifier = Modifier.height(18.dp))
 
             val rowsLabel = if (favoritesViewMode == FavoritesViewMode.LIST) {
-                "Строк избранного списка при старте ($selectedRowsCount)"
+                stringResource(R.string.settings_favorites_list_rows, selectedRowsCount)
             } else {
-                "Строк избранной сетки при старте ($selectedRowsCount)"
+                stringResource(R.string.settings_favorites_grid_rows, selectedRowsCount)
             }
 
             Text(
@@ -631,7 +632,7 @@ internal fun FavoritesSettingsTab(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Вкладки (${editableTabs.size})",
+                    text = stringResource(R.string.settings_tabs_header, editableTabs.size),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -640,13 +641,13 @@ internal fun FavoritesSettingsTab(
                 TextButton(onClick = onAddTabClick) {
                     Icon(
                         imageVector = Icons.Default.Add,
-                        contentDescription = "Добавить",
+                        contentDescription = stringResource(R.string.action_add),
                         modifier = Modifier.size(18.dp),
                         tint = SamsungGreen
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "Добавить",
+                        text = stringResource(R.string.action_add),
                         color = SamsungGreen,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
@@ -724,7 +725,7 @@ internal fun FavoritesSettingsTab(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.DragHandle,
-                                contentDescription = "Перетащить",
+                                contentDescription = stringResource(R.string.cd_drag),
                                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
                                 modifier = Modifier.size(20.dp)
                             )
@@ -746,7 +747,7 @@ internal fun FavoritesSettingsTab(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Edit,
-                                    contentDescription = "Переименовать",
+                                    contentDescription = stringResource(R.string.action_rename),
                                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -759,7 +760,7 @@ internal fun FavoritesSettingsTab(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Delete,
-                                        contentDescription = "Удалить",
+                                        contentDescription = stringResource(R.string.action_delete),
                                         tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -807,7 +808,7 @@ private fun AboutSettingsTab() {
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
-            text = "Версия $versionName",
+            text = stringResource(R.string.settings_version, versionName),
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
@@ -823,8 +824,8 @@ private fun AboutSettingsTab() {
             Column(modifier = Modifier.fillMaxWidth()) {
                 AboutActionRow(
                     icon = Icons.Default.ThumbUp,
-                    title = "Сказать спасибо",
-                    subtitle = "Понравилось приложение, оставьте отзыв в Google Play!",
+                    title = stringResource(R.string.about_rate_title),
+                    subtitle = stringResource(R.string.about_rate_subtitle),
                     onClick = { AboutSupportHelper.openPlayStoreListing(context) }
                 )
                 HorizontalDivider(
@@ -833,8 +834,8 @@ private fun AboutSettingsTab() {
                 )
                 AboutActionRow(
                     icon = Icons.Default.Share,
-                    title = "Посоветовать друзьям",
-                    subtitle = "Посоветуйте приложение своим друзьям",
+                    title = stringResource(R.string.about_share_title),
+                    subtitle = stringResource(R.string.about_share_subtitle),
                     onClick = { AboutSupportHelper.shareApp(context, appName) }
                 )
                 HorizontalDivider(
@@ -843,11 +844,11 @@ private fun AboutSettingsTab() {
                 )
                 AboutActionRow(
                     icon = Icons.Default.Email,
-                    title = "Написать в поддержку",
+                    title = stringResource(R.string.about_support_title),
                     subtitle = if (isPreparingSupport) {
-                        "Подготовка отчёта…"
+                        stringResource(R.string.about_support_preparing)
                     } else {
-                        "Открыть письмо на cdm.asinosoft@gmail.com"
+                        stringResource(R.string.about_support_open_email)
                     },
                     enabled = !isPreparingSupport,
                     onClick = {
@@ -867,8 +868,8 @@ private fun AboutSettingsTab() {
                 )
                 AboutActionRow(
                     icon = Icons.Default.Description,
-                    title = "Лицензии третьих сторон",
-                    subtitle = "Открытые компоненты, используемые в приложении",
+                    title = stringResource(R.string.about_licenses_title),
+                    subtitle = stringResource(R.string.about_licenses_subtitle),
                     onClick = { showLicenses = true }
                 )
                 HorizontalDivider(
@@ -877,7 +878,7 @@ private fun AboutSettingsTab() {
                 )
                 AboutActionRow(
                     icon = Icons.Default.Policy,
-                    title = "Политика конфиденциальности",
+                    title = stringResource(R.string.about_privacy_title),
                     subtitle = "asinosoft.ru",
                     onClick = { AboutSupportHelper.openPrivacyPolicy(context) }
                 )
@@ -963,12 +964,12 @@ private fun ThirdPartyLicensesDialog(onDismiss: () -> Unit) {
                     IconButton(onClick = onDismiss) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Назад",
+                            contentDescription = stringResource(R.string.cd_back),
                             tint = MaterialTheme.colorScheme.onBackground
                         )
                     }
                     Text(
-                        text = "Лицензии третьих сторон",
+                        text = stringResource(R.string.about_licenses_title),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
@@ -982,8 +983,7 @@ private fun ThirdPartyLicensesDialog(onDismiss: () -> Unit) {
                         .padding(horizontal = 20.dp, vertical = 8.dp)
                 ) {
                     Text(
-                        text = "Это приложение использует сторонние библиотеки с открытым исходным кодом. " +
-                            "Ниже приведены сведения о них и тексты соответствующих лицензий.",
+                        text = stringResource(R.string.about_licenses_intro),
                         fontSize = 14.sp,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
                     )
@@ -1004,11 +1004,11 @@ private fun ThirdPartyLicensesDialog(onDismiss: () -> Unit) {
                     LicenseSection(
                         title = "Google ML Kit",
                         components = "Barcode Scanning",
-                        licenseName = "Apache License 2.0 / условия Google ML Kit"
+                        licenseName = stringResource(R.string.about_license_mlkit)
                     )
                     LicenseSection(
                         title = "libphonenumber",
-                        components = "Google libphonenumber — форматирование и разбор номеров телефонов",
+                        components = stringResource(R.string.about_license_libphonenumber),
                         licenseName = "Apache License 2.0"
                     )
                     LicenseSection(
@@ -1026,7 +1026,7 @@ private fun ThirdPartyLicensesDialog(onDismiss: () -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = APACHE_LICENSE_2_NOTICE,
+                        text = stringResource(R.string.about_apache_license_notice),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
                         lineHeight = 17.sp
@@ -1075,22 +1075,6 @@ private fun LicenseSection(
         }
     }
 }
-
-private val APACHE_LICENSE_2_NOTICE = """
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-Полный текст лицензии: https://www.apache.org/licenses/LICENSE-2.0
-""".trimIndent()
 
 /**
  * Диалог редактирования быстрых текстовых ответов при отклонении вызова
@@ -1150,13 +1134,13 @@ private fun QuickRepliesEditorDialog(
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Назад",
+                                    contentDescription = stringResource(R.string.cd_back),
                                     tint = MaterialTheme.colorScheme.onBackground
                                 )
                             }
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Быстрые ответы",
+                                text = stringResource(R.string.quick_replies_screen_title),
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onBackground
@@ -1175,7 +1159,7 @@ private fun QuickRepliesEditorDialog(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
-                                contentDescription = "Добавить ответ",
+                                contentDescription = stringResource(R.string.quick_replies_add_cd),
                                 tint = SamsungGreen,
                                 modifier = Modifier.size(22.dp)
                             )
@@ -1261,7 +1245,7 @@ private fun QuickRepliesEditorDialog(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.DragHandle,
-                                        contentDescription = "Перетащить",
+                                        contentDescription = stringResource(R.string.cd_drag),
                                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -1287,7 +1271,7 @@ private fun QuickRepliesEditorDialog(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Edit,
-                                            contentDescription = "Редактировать",
+                                            contentDescription = stringResource(R.string.action_edit),
                                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                             modifier = Modifier.size(18.dp)
                                         )
@@ -1304,7 +1288,7 @@ private fun QuickRepliesEditorDialog(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Delete,
-                                                contentDescription = "Удалить",
+                                                contentDescription = stringResource(R.string.action_delete),
                                                 tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -1325,12 +1309,12 @@ private fun QuickRepliesEditorDialog(
     if (showEditDialog && editingReplyIndex != null) {
         AlertDialog(
             onDismissRequest = { showEditDialog = false },
-            title = { Text("Изменить ответ", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+            title = { Text(stringResource(R.string.quick_replies_edit_title), fontWeight = FontWeight.Bold, fontSize = 18.sp) },
             text = {
                 OutlinedTextField(
                     value = editingText,
                     onValueChange = { editingText = it },
-                    label = { Text("Текст ответа") },
+                    label = { Text(stringResource(R.string.quick_replies_text_label)) },
                     singleLine = false,
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
@@ -1349,12 +1333,12 @@ private fun QuickRepliesEditorDialog(
                         showEditDialog = false
                     }
                 ) {
-                    Text("Сохранить", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.action_save), color = SamsungGreen, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showEditDialog = false }) {
-                    Text("Отмена")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -1364,12 +1348,12 @@ private fun QuickRepliesEditorDialog(
     if (showAddDialog) {
         AlertDialog(
             onDismissRequest = { showAddDialog = false },
-            title = { Text("Новый ответ", fontWeight = FontWeight.Bold, fontSize = 18.sp) },
+            title = { Text(stringResource(R.string.quick_replies_new_title), fontWeight = FontWeight.Bold, fontSize = 18.sp) },
             text = {
                 OutlinedTextField(
                     value = newReplyText,
                     onValueChange = { newReplyText = it },
-                    label = { Text("Текст ответа") },
+                    label = { Text(stringResource(R.string.quick_replies_text_label)) },
                     singleLine = false,
                     maxLines = 3,
                     modifier = Modifier.fillMaxWidth()
@@ -1387,12 +1371,12 @@ private fun QuickRepliesEditorDialog(
                         showAddDialog = false
                     }
                 ) {
-                    Text("Добавить", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.action_add), color = SamsungGreen, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAddDialog = false }) {
-                    Text("Отмена")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )

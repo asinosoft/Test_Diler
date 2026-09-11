@@ -98,6 +98,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -107,6 +108,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.asinosoft.dialer.MainActivity
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.service.CallManager
 import com.asinosoft.dialer.ui.components.OneUiPopupMenu
 import com.asinosoft.dialer.ui.components.OneUiPopupMenuItem
@@ -187,7 +189,7 @@ fun InCallScreen(
     LaunchedEffect(rawNumber, isConference) {
         if (isConference) {
             contactId = null
-            contactName = "Конференция"
+            contactName = context.getString(R.string.incall_conference)
             contactPhotoBitmap = null
         } else if (rawNumber.isNotBlank()) {
             withContext(Dispatchers.IO) {
@@ -299,7 +301,7 @@ fun InCallScreen(
     }
 
     val formattedName = contactName ?: if (displayName.isBlank()) {
-        "Неизвестный номер"
+        stringResource(R.string.incall_unknown_number)
     } else if (displayName == rawNumber) {
         PhoneNumberHelper.format(displayName)
     } else {
@@ -361,7 +363,7 @@ fun InCallScreen(
                             if (contactPhotoBitmap != null) {
                                 Image(
                                     bitmap = contactPhotoBitmap!!,
-                                    contentDescription = "Фото контакта",
+                                    contentDescription = stringResource(R.string.incall_contact_photo_cd),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -379,7 +381,7 @@ fun InCallScreen(
                                     @Suppress("DEPRECATION")
                                     Icon(
                                         imageVector = Icons.Default.CallMerge,
-                                        contentDescription = "Конференция",
+                                        contentDescription = stringResource(R.string.incall_conference),
                                         tint = Color.White,
                                         modifier = Modifier.size(72.dp)
                                     )
@@ -454,12 +456,12 @@ fun InCallScreen(
 
                     // Call Status & Timer Badge
                     val statusText = when(callState) {
-                        Call.STATE_DISCONNECTED -> "Вызов завершен"
-                        Call.STATE_HOLDING -> "На удержании"
-                        Call.STATE_RINGING -> "Входящий вызов"
-                        Call.STATE_DIALING -> "Вызов..."
-                        Call.STATE_CONNECTING -> "Соединение..."
-                        Call.STATE_DISCONNECTING -> "Завершение..."
+                        Call.STATE_DISCONNECTED -> stringResource(R.string.incall_state_disconnected)
+                        Call.STATE_HOLDING -> stringResource(R.string.incall_state_holding)
+                        Call.STATE_RINGING -> stringResource(R.string.incall_state_ringing)
+                        Call.STATE_DIALING -> stringResource(R.string.incall_state_dialing)
+                        Call.STATE_CONNECTING -> stringResource(R.string.incall_state_connecting)
+                        Call.STATE_DISCONNECTING -> stringResource(R.string.incall_state_disconnecting)
                         Call.STATE_ACTIVE -> formatDuration(durationSeconds)
                         else -> "..."
                     }
@@ -534,7 +536,7 @@ fun InCallScreen(
                             InCallPostCallActionButton(
                                 icon = leftVisuals.icon,
                                 iconBitmap = leftVisuals.iconBitmap,
-                                label = "Сообщение",
+                                label = stringResource(R.string.incall_action_message),
                                 containerColor = leftVisuals.backgroundColor,
                                 onClick = {
                                     onFinish()
@@ -554,7 +556,7 @@ fun InCallScreen(
                             // Button 3: Info -> opens ContactDetailDialog on Contact Tab (tab 0)
                             InCallPostCallActionButton(
                                 icon = Icons.Default.Person,
-                                label = "Инфо",
+                                label = stringResource(R.string.incall_action_info),
                                 containerColor = Color.White.copy(alpha = 0.15f),
                                 onClick = {
                                     onFinish()
@@ -581,7 +583,7 @@ fun InCallScreen(
                         InCallActionButton(
                             icon = leftVisuals.icon,
                             iconBitmap = leftVisuals.iconBitmap,
-                            label = "Сообщение",
+                            label = stringResource(R.string.incall_action_message),
                             isActive = false,
                             onClick = {
                                 if (swipeLeftAction != null) {
@@ -600,7 +602,7 @@ fun InCallScreen(
                         // 2. Add Call Button (replaces Hold button)
                         InCallActionButton(
                             icon = Icons.Default.Add,
-                            label = "Добавить",
+                            label = stringResource(R.string.incall_action_add),
                             isActive = false,
                             onClick = { CallManager.openNewCallScreen(context) }
                         )
@@ -673,7 +675,7 @@ fun InCallScreen(
                         val isSpeakerActive = audioRoute == CallAudioState.ROUTE_SPEAKER
                         InCallActionButton(
                             icon = if (isSpeakerActive) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
-                            label = "Динамик",
+                            label = stringResource(R.string.incall_action_speaker),
                             isActive = isSpeakerActive,
                             activeColor = SamsungGreen,
                             onClick = { CallManager.toggleSpeaker() }
@@ -682,7 +684,11 @@ fun InCallScreen(
                         // 5. Mute Microphone
                         InCallActionButton(
                             icon = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
-                            label = if (isMuted) "Выкл. микр." else "Микрофон",
+                            label = if (isMuted) {
+                                stringResource(R.string.incall_action_mic_off)
+                            } else {
+                                stringResource(R.string.incall_action_mic)
+                            },
                             isActive = isMuted,
                             activeColor = MissedRed,
                             onClick = { CallManager.toggleMute() }
@@ -691,7 +697,7 @@ fun InCallScreen(
                         // 6. DTMF Keypad
                         InCallActionButton(
                             icon = Icons.Default.Dialpad,
-                            label = "Клавиатура",
+                            label = stringResource(R.string.incall_action_keypad),
                             isActive = showKeypadSheet,
                             activeColor = SamsungGreen,
                             onClick = { showKeypadSheet = true }
@@ -735,7 +741,7 @@ fun InCallScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CallEnd,
-                                contentDescription = "Завершить вызов",
+                                contentDescription = stringResource(R.string.incall_end_call_cd),
                                 modifier = Modifier.size(38.dp)
                             )
                         }
@@ -807,9 +813,13 @@ private fun MultiCallCardsView(
 
             val isConf = CallManager.isConferenceCall(call)
             val title = if (isConf) {
-                "Конференция"
+                stringResource(R.string.incall_conference)
             } else {
-                cName ?: if (rawNum.isNotBlank()) PhoneNumberHelper.format(rawNum) else "Неизвестный"
+                cName ?: if (rawNum.isNotBlank()) {
+                    PhoneNumberHelper.format(rawNum)
+                } else {
+                    stringResource(R.string.incall_unknown_short)
+                }
             }
 
             Surface(
@@ -860,10 +870,10 @@ private fun MultiCallCardsView(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = when {
-                                    isHeld -> "На удержании"
+                                    isHeld -> stringResource(R.string.incall_state_holding)
                                     isCurrent -> formatDuration(durationSeconds)
-                                    call.state == Call.STATE_DIALING -> "Вызов..."
-                                    else -> "Соединение..."
+                                    call.state == Call.STATE_DIALING -> stringResource(R.string.incall_state_dialing)
+                                    else -> stringResource(R.string.incall_state_connecting)
                                 },
                                 fontSize = 13.sp,
                                 color = if (isHeld) Color(0xFFFFC107) else if (isCurrent) SamsungGreen else Color.White.copy(alpha = 0.5f)
@@ -878,7 +888,7 @@ private fun MultiCallCardsView(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Close,
-                            contentDescription = "Завершить",
+                            contentDescription = stringResource(R.string.incall_end_cd),
                             tint = MissedRed.copy(alpha = 0.8f),
                             modifier = Modifier.size(20.dp)
                         )
@@ -909,12 +919,12 @@ private fun MultiCallCardsView(
                         @Suppress("DEPRECATION")
                         Icon(
                             imageVector = Icons.Default.CallMerge,
-                            contentDescription = "Объединить",
+                            contentDescription = stringResource(R.string.incall_merge),
                             tint = Color.White,
                             modifier = Modifier.size(18.dp)
                         )
                         Text(
-                            text = "Объединить",
+                            text = stringResource(R.string.incall_merge),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White
@@ -952,7 +962,7 @@ private fun CallWaitingAnswerBottomSheet(
                 .padding(bottom = 36.dp)
         ) {
             Text(
-                text = "Ответить на вызов и:",
+                text = stringResource(R.string.incall_answer_prompt),
                 fontSize = 19.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color.White,
@@ -993,7 +1003,7 @@ private fun CallWaitingAnswerBottomSheet(
                     }
 
                     Text(
-                        text = "Поместить «$activeContactName» на удержание",
+                        text = stringResource(R.string.incall_hold_active, activeContactName),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.White,
@@ -1038,7 +1048,7 @@ private fun CallWaitingAnswerBottomSheet(
                     }
 
                     Text(
-                        text = "Завершить вызов с «$activeContactName»",
+                        text = stringResource(R.string.incall_end_active, activeContactName),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color.White,
@@ -1165,7 +1175,7 @@ private fun SamsungSwipeAnswerDeclineRow(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Call,
-                            contentDescription = "Ответить",
+                            contentDescription = stringResource(R.string.incall_answer),
                             tint = Color.White,
                             modifier = Modifier.size(34.dp)
                         )
@@ -1186,7 +1196,7 @@ private fun SamsungSwipeAnswerDeclineRow(
 
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Ответить",
+                text = stringResource(R.string.incall_answer),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color.White.copy(alpha = 0.8f)
@@ -1269,7 +1279,7 @@ private fun SamsungSwipeAnswerDeclineRow(
                     ) {
                         Icon(
                             imageVector = Icons.Default.CallEnd,
-                            contentDescription = "Отклонить",
+                            contentDescription = stringResource(R.string.incall_decline),
                             tint = Color.White,
                             modifier = Modifier.size(34.dp)
                         )
@@ -1279,7 +1289,7 @@ private fun SamsungSwipeAnswerDeclineRow(
 
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "Отклонить",
+                text = stringResource(R.string.incall_decline),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Medium,
                 color = Color.White.copy(alpha = 0.8f)
@@ -1382,7 +1392,7 @@ private fun InCallKeypadSheet(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = dialedDigits.ifEmpty { "Клавиатура" },
+                        text = dialedDigits.ifEmpty { stringResource(R.string.incall_action_keypad) },
                         fontSize = if (dialedDigits.isNotEmpty()) 24.sp else 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
@@ -1394,7 +1404,7 @@ private fun InCallKeypadSheet(
                         IconButton(onClick = { dialedDigits = dialedDigits.dropLast(1) }) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Backspace,
-                                contentDescription = "Удалить",
+                                contentDescription = stringResource(R.string.action_delete),
                                 tint = Color.White.copy(alpha = 0.6f),
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1405,7 +1415,7 @@ private fun InCallKeypadSheet(
                 IconButton(onClick = onDismiss) {
                     Icon(
                         imageVector = Icons.Default.Close,
-                        contentDescription = "Закрыть",
+                        contentDescription = stringResource(R.string.cd_close),
                         tint = Color.White.copy(alpha = 0.7f)
                     )
                 }
@@ -1752,7 +1762,7 @@ private fun openSystemContactFromInCallScreen(context: Context, contactNumber: S
             }
             context.startActivity(intent)
         } catch (_: Exception) {
-            Toast.makeText(context, "Не удалось открыть информацию о контакте", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.error_open_contact_info), Toast.LENGTH_SHORT).show()
         }
     }
 }

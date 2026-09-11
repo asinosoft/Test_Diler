@@ -8,6 +8,7 @@ import android.os.Build
 import android.widget.Toast
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
+import com.asinosoft.dialer.R
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.BufferedReader
@@ -40,14 +41,14 @@ object AboutSupportHelper {
                     ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                 )
             } catch (_: Exception) {
-                Toast.makeText(context, "Не удалось открыть Google Play", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.error_open_play), Toast.LENGTH_SHORT).show()
             }
         }
     }
 
     fun shareApp(context: Context, appName: String) {
         val playUrl = "https://play.google.com/store/apps/details?id=$PLAY_STORE_PACKAGE"
-        val text = "Попробуйте приложение «$appName»:\n$playUrl"
+        val text = context.getString(R.string.about_share_message, appName, playUrl)
         try {
             context.startActivity(
                 Intent.createChooser(
@@ -56,11 +57,11 @@ object AboutSupportHelper {
                         putExtra(Intent.EXTRA_SUBJECT, appName)
                         putExtra(Intent.EXTRA_TEXT, text)
                     },
-                    "Посоветовать друзьям"
+                    context.getString(R.string.about_share_chooser)
                 )
             )
         } catch (_: Exception) {
-            Toast.makeText(context, "Не удалось поделиться", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.error_share), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -71,16 +72,15 @@ object AboutSupportHelper {
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             )
         } catch (_: Exception) {
-            Toast.makeText(context, "Не удалось открыть ссылку", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.error_open_link), Toast.LENGTH_SHORT).show()
         }
     }
 
     suspend fun openSupportEmail(context: Context, appName: String) = withContext(Dispatchers.IO) {
         val reportFile = buildSupportReportFile(context, appName)
         withContext(Dispatchers.Main) {
-            val subject = "Поддержка: $appName"
-            val body = "Опишите проблему или вопрос:\n\n\n" +
-                "—\nК письму приложен файл с информацией об устройстве и приложении."
+            val subject = context.getString(R.string.about_email_subject, appName)
+            val body = context.getString(R.string.about_email_body)
 
             val attachmentUri = try {
                 FileProvider.getUriForFile(
@@ -106,7 +106,7 @@ object AboutSupportHelper {
             if (!opened) {
                 Toast.makeText(
                     context,
-                    "Установите почтовое приложение (например, Gmail)",
+                    context.getString(R.string.error_no_email_app),
                     Toast.LENGTH_LONG
                 ).show()
             }
@@ -208,16 +208,21 @@ object AboutSupportHelper {
         val versionName = readVersionName(context)
         val versionCode = readVersionCode(context)
         val sb = StringBuilder()
-        sb.appendLine("=== Отчёт для поддержки ===")
-        sb.appendLine("Дата: ${SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.getDefault()).format(Date())}")
+        sb.appendLine(context.getString(R.string.about_report_title))
+        sb.appendLine(
+            context.getString(
+                R.string.about_report_date,
+                SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.getDefault()).format(Date())
+            )
+        )
         sb.appendLine()
-        sb.appendLine("--- Приложение ---")
-        sb.appendLine("Название: $appName")
+        sb.appendLine(context.getString(R.string.about_report_app_section))
+        sb.appendLine(context.getString(R.string.about_report_app_name, appName))
         sb.appendLine("Package: ${context.packageName}")
         sb.appendLine("Version name: $versionName")
         sb.appendLine("Version code: $versionCode")
         sb.appendLine()
-        sb.appendLine("--- Устройство ---")
+        sb.appendLine(context.getString(R.string.about_report_device_section))
         sb.appendLine("Manufacturer: ${Build.MANUFACTURER}")
         sb.appendLine("Brand: ${Build.BRAND}")
         sb.appendLine("Model: ${Build.MODEL}")
@@ -229,8 +234,8 @@ object AboutSupportHelper {
         sb.appendLine("Display: ${Build.DISPLAY}")
         sb.appendLine("Supported ABIs: ${Build.SUPPORTED_ABIS.joinToString()}")
         sb.appendLine()
-        sb.appendLine("--- Логи (logcat, последние строки) ---")
-        sb.appendLine(collectRecentLogs())
+        sb.appendLine(context.getString(R.string.about_report_logs_section))
+        sb.appendLine(collectRecentLogs(context))
         return sb.toString()
     }
 
@@ -273,7 +278,7 @@ object AboutSupportHelper {
         }
     }
 
-    private fun collectRecentLogs(): String {
+    private fun collectRecentLogs(context: Context): String {
         return try {
             val process = Runtime.getRuntime().exec(
                 arrayOf("logcat", "-d", "-t", "400", "*:W")
@@ -283,12 +288,12 @@ object AboutSupportHelper {
             }
             process.waitFor()
             if (output.isBlank()) {
-                "(логи недоступны или пусты)"
+                context.getString(R.string.about_report_logs_empty)
             } else {
                 output.takeLast(50_000)
             }
         } catch (e: Exception) {
-            "(не удалось получить логи: ${e.message})"
+            context.getString(R.string.about_report_logs_error, e.message ?: "")
         }
     }
 }

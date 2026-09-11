@@ -1,7 +1,6 @@
 package com.asinosoft.dialer.ui.recents
 
 import android.annotation.SuppressLint
-import android.text.format.DateUtils
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
@@ -67,6 +66,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,7 +82,9 @@ import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.key
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.FavoriteTab
+import com.asinosoft.dialer.util.DateHeaderFormatter
 import com.asinosoft.dialer.data.model.FavoritesViewMode
 import com.asinosoft.dialer.ui.components.FloatingStickyDateHeader
 import com.asinosoft.dialer.ui.components.LazyListVerticalScrollbar
@@ -102,10 +104,6 @@ import com.asinosoft.dialer.ui.recents.components.UnsavedNumberChoiceDialog
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
 import kotlin.math.roundToInt
 
 @SuppressLint("FrequentlyChangingValue")
@@ -280,8 +278,8 @@ fun RecentsScreen(
         }
     }
 
-    val groupedCallLogs = remember(callLogs) {
-        callLogs.groupBy { formatDateHeader(it.timestamp) }
+    val groupedCallLogs = remember(callLogs, context) {
+        callLogs.groupBy { DateHeaderFormatter.formatDateHeader(context, it.timestamp) }
     }
 
     var lastTapTimestamp by remember { mutableLongStateOf(0L) }
@@ -392,12 +390,12 @@ fun RecentsScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Star,
-                                    contentDescription = "Избранное",
+                                    contentDescription = stringResource(R.string.recents_favorites_header),
                                     tint = Color(0xFFFFB300),
                                     modifier = Modifier.size(20.dp)
                                 )
                                 Text(
-                                    text = "Избранное",
+                                    text = stringResource(R.string.recents_favorites_header),
                                     fontSize = 18.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onBackground
@@ -426,7 +424,7 @@ fun RecentsScreen(
                                             modifier = Modifier.size(16.dp)
                                         )
                                         Text(
-                                            text = "Добавить",
+                                            text = stringResource(R.string.action_add),
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = SamsungGreen
@@ -440,7 +438,7 @@ fun RecentsScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Settings,
-                                        contentDescription = "Настройки",
+                                        contentDescription = stringResource(R.string.cd_settings),
                                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -733,7 +731,7 @@ fun RecentsScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                 ) {
                                     Text(
-                                        text = "Разрешите показывать уведомления поверх других приложений",
+                                        text = stringResource(R.string.recents_overlay_permission_banner),
                                         fontSize = 13.sp,
                                         modifier = Modifier.weight(1f)
                                     )
@@ -744,7 +742,7 @@ fun RecentsScreen(
                                     }) {
                                         Icon(
                                             imageVector = Icons.Default.LockOpen,
-                                            contentDescription = "Разрешить",
+                                            contentDescription = stringResource(R.string.recents_allow_cd),
                                             modifier = Modifier.size(20.dp)
                                         )
                                     }
@@ -762,7 +760,7 @@ fun RecentsScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Вызовы не найдены",
+                                text = stringResource(R.string.recents_no_calls),
                                 fontSize = 16.sp,
                                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                             )
@@ -792,13 +790,13 @@ fun RecentsScreen(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Info,
-                                            contentDescription = "Подсказка",
+                                            contentDescription = stringResource(R.string.recents_gesture_hint_cd),
                                             tint = SamsungGreen,
                                             modifier = Modifier.size(20.dp)
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = "👉 Свайп вправо — звонок | 👈 влево — SMS",
+                                            text = stringResource(R.string.recents_gesture_hint),
                                             fontSize = 13.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = MaterialTheme.colorScheme.onBackground
@@ -807,7 +805,7 @@ fun RecentsScreen(
 
                                     Icon(
                                         imageVector = Icons.Default.Clear,
-                                        contentDescription = "Закрыть",
+                                        contentDescription = stringResource(R.string.cd_close),
                                         tint = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
                                         modifier = Modifier
                                             .size(18.dp)
@@ -948,7 +946,7 @@ fun RecentsScreen(
 
                 UnsavedNumberFlowStep.PickExisting -> {
                     AddFavoriteDialog(
-                        title = "Поиск контакта",
+                        title = stringResource(R.string.favorites_search_title),
                         dismissOnSelect = false,
                         onDismiss = { viewModel.unsavedNumberBackToChoose() },
                         onContactSelect = { viewModel.unsavedNumberSelectExistingContact(it) }
@@ -1035,7 +1033,7 @@ fun RecentsScreen(
             ) {
                 Icon(
                     imageVector = Icons.Default.Dialpad,
-                    contentDescription = "Номеронабиратель",
+                    contentDescription = stringResource(R.string.recents_dialer_fab_cd),
                     modifier = Modifier.size(28.dp)
                 )
             }
@@ -1051,33 +1049,4 @@ fun RecentsScreen(
             )
         }
     }
-}
-
-private val dateHeaderDayFormatter = ThreadLocal.withInitial {
-    SimpleDateFormat("d MMMM", Locale.forLanguageTag("ru"))
-}
-
-private fun formatShortWeekday(timestamp: Long): String {
-    val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
-    return when (cal.get(Calendar.DAY_OF_WEEK)) {
-        Calendar.MONDAY -> "пн"
-        Calendar.TUESDAY -> "вт"
-        Calendar.WEDNESDAY -> "ср"
-        Calendar.THURSDAY -> "чт"
-        Calendar.FRIDAY -> "пт"
-        Calendar.SATURDAY -> "сб"
-        Calendar.SUNDAY -> "вс"
-        else -> ""
-    }
-}
-
-private fun formatDateHeader(timestamp: Long): String {
-    if (timestamp == 0L) return ""
-    if (DateUtils.isToday(timestamp)) return "Сегодня"
-    if (DateUtils.isToday(timestamp + 24 * 3600 * 1000L)) return "Вчера"
-
-    val dateStr = dateHeaderDayFormatter.get()!!.format(Date(timestamp))
-    val shortWeekday = formatShortWeekday(timestamp)
-
-    return if (shortWeekday.isNotEmpty()) "$dateStr, $shortWeekday" else dateStr
 }

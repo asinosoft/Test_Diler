@@ -54,6 +54,7 @@ import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -389,7 +390,7 @@ fun SwipeableFavoriteContactCard(
                     // Gold Star Icon
                     Icon(
                         imageVector = Icons.Default.Star,
-                        contentDescription = "Избранное",
+                        contentDescription = stringResource(R.string.recents_favorites_header),
                         tint = Color(0xFFFFB300),
                         modifier = Modifier.size(20.dp)
                     )
@@ -424,7 +425,7 @@ private fun executeSwipe(
                 }
                 context.startActivity(smsIntent)
             } catch (_: Exception) {
-                Toast.makeText(context, "Не удалось открыть SMS", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.error_open_sms), Toast.LENGTH_SHORT).show()
             }
         }
     }

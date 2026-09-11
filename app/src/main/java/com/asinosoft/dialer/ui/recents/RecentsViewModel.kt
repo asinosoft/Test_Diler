@@ -36,6 +36,9 @@ import androidx.core.content.edit
 import com.asinosoft.dialer.data.model.FavoritesViewMode
 import com.asinosoft.dialer.data.repository.ContactsRepository
 import kotlin.time.Duration.Companion.milliseconds
+import androidx.annotation.StringRes
+import com.asinosoft.dialer.R
+import com.asinosoft.dialer.util.ContactLabelHelper
 
 data class ContactDetailState(
     val contact: FavoriteContact,
@@ -43,17 +46,17 @@ data class ContactDetailState(
     val isFavorite: Boolean = false
 )
 
-enum class CallTypeFilter(val title: String) {
-    ALL("Все"),
-    INCOMING("Входящие"),
-    OUTGOING("Исходящие"),
-    MISSED("Пропущенные")
+enum class CallTypeFilter(@StringRes val titleRes: Int) {
+    ALL(R.string.call_type_filter_all),
+    INCOMING(R.string.call_type_filter_incoming),
+    OUTGOING(R.string.call_type_filter_outgoing),
+    MISSED(R.string.call_type_filter_missed)
 }
 
-enum class SimFilter(val title: String) {
-    ALL("Все SIM"),
-    SIM_1("SIM 1"),
-    SIM_2("SIM 2")
+enum class SimFilter(@StringRes val titleRes: Int) {
+    ALL(R.string.sim_filter_all),
+    SIM_1(R.string.sim_filter_sim1),
+    SIM_2(R.string.sim_filter_sim2)
 }
 
 data class UnsavedNumberFlowState(
@@ -864,7 +867,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     Manifest.permission.WRITE_CONTACTS
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
-                showToast("Нет разрешения на запись контактов")
+                showToast(R.string.error_contacts_permission)
                 return@launch
             }
 
@@ -880,7 +883,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             }
 
             if (!deleted) {
-                showToast("Не удалось удалить контакт")
+                showToast(R.string.error_delete_contact)
                 return@launch
             }
 
@@ -894,7 +897,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             }
             loadCallLogs(showLoading = false)
             closeContactDetail()
-            showToast("Контакт удалён")
+            showToast(R.string.toast_contact_deleted)
         }
     }
 
@@ -984,7 +987,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     Manifest.permission.WRITE_CONTACTS
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
-                showToast("Нет разрешения на запись контактов")
+                showToast(R.string.error_contacts_permission)
                 return@launch
             }
 
@@ -1003,7 +1006,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             }
 
             if (!saved) {
-                showToast("Не удалось сохранить контакт")
+                showToast(R.string.error_save_contact)
                 return@launch
             }
 
@@ -1018,7 +1021,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             }
             loadCallLogs(showLoading = false)
             _unsavedNumberFlow.value = null
-            showToast("Контакт сохранён")
+            showToast(R.string.toast_contact_saved)
         }
     }
 
@@ -1033,7 +1036,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             val trimmedName = displayName.trim()
             if (trimmedName.isEmpty()) {
-                showToast("Введите имя контакта")
+                showToast(R.string.error_contact_name_required)
                 return@launch
             }
 
@@ -1042,7 +1045,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     Manifest.permission.WRITE_CONTACTS
                 ) != PackageManager.PERMISSION_GRANTED
             ) {
-                showToast("Нет разрешения на запись контактов")
+                showToast(R.string.error_contacts_permission)
                 return@launch
             }
 
@@ -1050,7 +1053,12 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             suppressCallLogObserverUntilElapsed = SystemClock.elapsedRealtime() + 2_500L
 
             val phoneEntries = phones.filter { it.number.isNotBlank() }.ifEmpty {
-                listOf(ContactsWriteRepository.PhoneEntry(phoneNumber, "Мобильный"))
+                listOf(
+                    ContactsWriteRepository.PhoneEntry(
+                        phoneNumber,
+                        ContactLabelHelper.defaultMobileLabel(getApplication())
+                    )
+                )
             }
 
             val contactId = withContext(Dispatchers.IO) {
@@ -1064,7 +1072,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             }
 
             if (contactId == null) {
-                showToast("Не удалось сохранить контакт")
+                showToast(R.string.error_save_contact)
                 return@launch
             }
 
@@ -1075,12 +1083,13 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             patchCallLogNames(phoneEntries.map { it.number }, trimmedName)
             loadCallLogs(showLoading = false)
             _unsavedNumberFlow.value = null
-            showToast("Контакт сохранён")
+            showToast(R.string.toast_contact_saved)
         }
     }
 
-    private fun showToast(message: String) {
-        Toast.makeText(getApplication(), message, Toast.LENGTH_SHORT).show()
+    private fun showToast(messageResId: Int) {
+        val app = getApplication<Application>()
+        Toast.makeText(app, app.getString(messageResId), Toast.LENGTH_SHORT).show()
     }
 
     private fun contactFromCallLogItem(item: CallLogItem): FavoriteContact {

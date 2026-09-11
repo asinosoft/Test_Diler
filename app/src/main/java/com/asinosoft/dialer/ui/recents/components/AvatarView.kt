@@ -22,6 +22,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
+import com.asinosoft.dialer.R
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -56,7 +58,7 @@ fun AvatarView(
         ) {
             Icon(
                 imageVector = Icons.Default.PersonAdd,
-                contentDescription = "Контакт не сохранён",
+                contentDescription = stringResource(R.string.avatar_unsaved_cd),
                 tint = Color.White,
                 modifier = Modifier.size(26.dp)
             )
@@ -102,7 +104,7 @@ fun AvatarView(
     if (bitmap != null) {
         Image(
             bitmap = bitmap,
-            contentDescription = "Фото контакта",
+            contentDescription = stringResource(R.string.contact_photo_cd),
             modifier = Modifier
                 .size(48.dp)
                 .clip(CircleShape),

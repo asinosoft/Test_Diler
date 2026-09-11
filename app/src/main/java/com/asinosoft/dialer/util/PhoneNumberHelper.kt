@@ -4,6 +4,15 @@ import com.google.i18n.phonenumbers.PhoneNumberUtil
 import java.util.Locale
 
 object PhoneNumberHelper {
+    /** Keeps digits and dialer/USSD symbols needed to place a call. */
+    fun sanitizeForDial(raw: String): String =
+        raw.filter { ch ->
+            ch.isDigit() || ch == '+' || ch == '*' || ch == '#' || ch == ',' || ch == ';'
+        }
+
+    fun telUri(rawNumber: String): android.net.Uri =
+        android.net.Uri.fromParts("tel", sanitizeForDial(rawNumber), null)
+
     fun parse(text: String): String? {
         return try {
             val clearNumber = text.filter { it.isDigit() }

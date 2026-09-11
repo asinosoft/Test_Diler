@@ -1,0 +1,30 @@
+﻿CallLogRepository.kt | Сегодня
+ContactsWriteRepository.kt | моб
+ContactsWriteRepository.kt | дом
+ContactsWriteRepository.kt | раб
+ContactsWriteRepository.kt | раб
+ContactsWriteRepository.kt | моб
+ContactsWriteRepository.kt | лич
+FavoritesRepository.kt | Основные
+FavoritesRepository.kt | Мои
+MissedCallNotificationListener.kt | пропущ
+MissedCallNotificationListener.kt | вызов пропущ
+MissedCallNotificationListener.kt | неотвечен
+FloatingCallOverlayManager.kt | Вызов
+InCallScreen.kt | Вызов завершен
+InCallScreen.kt | Вызов завершен
+InCallScreen.kt | Завершить
+IncomingCallPopupActivity.kt | Вызов
+RecentsScreen.kt | Избранное
+RecentsScreen.kt | + Добавить
+RecentsScreen.kt | Сегодня
+ContactDetailDialog.kt | вконтакте
+ContactDetailDialog.kt | домашний
+ContactDetailDialog.kt | рабочий
+ContactDetailDialog.kt | домашний
+ContactDetailDialog.kt | рабочий
+ContactDetailDialog.kt | [^a-zA-Z0-9а-яА-ЯёЁ_\\-]
+ContactHistoryStatistics.kt | 12ч 15м
+ContactHistoryStatistics.kt | 12м
+ContactHistoryStatistics.kt | 1ч 07м
+ContactHistoryStatistics.kt | 0м

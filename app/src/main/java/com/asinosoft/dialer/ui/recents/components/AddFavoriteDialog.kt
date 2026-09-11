@@ -40,10 +40,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.FavoriteContact
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -53,10 +55,11 @@ import kotlinx.coroutines.withContext
 fun AddFavoriteDialog(
     onDismiss: () -> Unit,
     onContactSelect: (FavoriteContact) -> Unit,
-    title: String = "Добавить в избранное",
+    title: String? = null,
     dismissOnSelect: Boolean = true
 ) {
     val context = LocalContext.current
+    val dialogTitle = title ?: stringResource(R.string.favorites_add_dialog_title)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     var searchQuery by remember { mutableStateOf("") }
@@ -92,7 +95,7 @@ fun AddFavoriteDialog(
                 .padding(horizontal = 16.dp)
         ) {
             Text(
-                text = title,
+                text = dialogTitle,
                 fontSize = 20.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground,
@@ -111,14 +114,14 @@ fun AddFavoriteDialog(
                     onValueChange = { searchQuery = it },
                     placeholder = {
                         Text(
-                            text = "Поиск контакта...",
+                            text = stringResource(R.string.favorites_search_hint),
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
                     },
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Search,
-                            contentDescription = "Поиск",
+                            contentDescription = stringResource(R.string.cd_search),
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                         )
                     },
@@ -127,7 +130,7 @@ fun AddFavoriteDialog(
                             IconButton(onClick = { searchQuery = "" }) {
                                 Icon(
                                     imageVector = Icons.Default.Clear,
-                                    contentDescription = "Очистить"
+                                    contentDescription = stringResource(R.string.cd_clear)
                                 )
                             }
                         }
@@ -155,7 +158,7 @@ fun AddFavoriteDialog(
                         .weight(1f)
                 ) {
                     Text(
-                        text = "Контакты не найдены",
+                        text = stringResource(R.string.favorites_no_contacts),
                         color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                     )
                 }
@@ -243,7 +246,11 @@ private fun loadDeviceContacts(context: Context): List<FavoriteContact> {
 
             while (c.moveToNext()) {
                 val id = if (idIndex != -1) c.getString(idIndex) else ""
-                val name = if (nameIndex != -1) c.getString(nameIndex) else "Без имени"
+                val name = if (nameIndex != -1) {
+                    c.getString(nameIndex)
+                } else {
+                    context.getString(R.string.contact_no_name)
+                }
                 val number = if (numberIndex != -1) c.getString(numberIndex) else ""
                 val photoUri = if (photoIndex != -1) c.getString(photoIndex) else null
 

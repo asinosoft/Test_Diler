@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Dialer" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/one_ui_bg_dark</item>
+        <item name="android:colorBackground">@color/one_ui_bg_dark</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@color/one_ui_bg_dark</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>
