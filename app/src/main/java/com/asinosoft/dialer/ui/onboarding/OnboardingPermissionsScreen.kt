@@ -108,7 +108,7 @@ fun OnboardingPermissionsScreen(
 
             PermissionBlock(
                 title = "Разрешения",
-                subtitle = "Список вызовов, контакты и управление звонками",
+                subtitle = "Для управления контактами и звонками",
                 details = listOf(
                     "Список вызовов",
                     "К контактам и аккаунтам",

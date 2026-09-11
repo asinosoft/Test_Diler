@@ -82,6 +82,7 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(resolveOnboardingComplete(onboardingPrefs))
                 }
                 var isPermissionsStepDone by remember { mutableStateOf(false) }
+                var dialerRequestedAfterRuntime by remember { mutableStateOf(false) }
 
                 var isRuntimeGranted by remember {
                     mutableStateOf(areRuntimePermissionsGranted())
@@ -99,17 +100,29 @@ class MainActivity : ComponentActivity() {
                     viewModel.loadCallLogs()
                 }
 
+                fun requestDialerAfterRuntimeIfNeeded() {
+                    if (isOnboardingComplete || dialerRequestedAfterRuntime) return
+                    if (!areRuntimePermissionsGranted()) return
+                    dialerRequestedAfterRuntime = true
+                    requestDefaultDialerRole(roleLauncher)
+                }
+
                 val permissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestMultiplePermissions()
                 ) {
                     isRuntimeGranted = areRuntimePermissionsGranted()
                     highlightedStep = if (isRuntimeGranted) {
-                        if (!Settings.canDrawOverlays(this)) OnboardingPermissionStep.OVERLAY else null
+                        if (!Settings.canDrawOverlays(this)) {
+                            OnboardingPermissionStep.OVERLAY
+                        } else {
+                            null
+                        }
                     } else {
                         OnboardingPermissionStep.RUNTIME
                     }
                     if (isRuntimeGranted) {
                         viewModel.loadCallLogs()
+                        requestDialerAfterRuntimeIfNeeded()
                     }
                 }
 
@@ -149,7 +162,6 @@ class MainActivity : ComponentActivity() {
                         "Включите Contacts Dialer Messages на этом экране",
                         Toast.LENGTH_LONG
                     ).show()
-                    // Open the system "Appear on top" list focused on this app when possible.
                     val intent = Intent(
                         Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
                         Uri.parse("package:$packageName")
@@ -216,7 +228,6 @@ class MainActivity : ComponentActivity() {
                                         putBoolean(KEY_ONBOARDING_COMPLETE, true)
                                     }
                                     isOnboardingComplete = true
-                                    requestDefaultDialerRole(roleLauncher)
                                     viewModel.loadCallLogs()
                                 }
                             )
@@ -346,16 +357,19 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun requestDefaultDialerRole(launcher: androidx.activity.result.ActivityResultLauncher<Intent>) {
+    private fun requestDefaultDialerRole(
+        launcher: androidx.activity.result.ActivityResultLauncher<Intent>
+    ): Boolean {
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val roleManager = getSystemService(RoleManager::class.java)
-                if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER) && !roleManager.isRoleHeld(
-                        RoleManager.ROLE_DIALER
-                    )
+                if (roleManager != null &&
+                    roleManager.isRoleAvailable(RoleManager.ROLE_DIALER) &&
+                    !roleManager.isRoleHeld(RoleManager.ROLE_DIALER)
                 ) {
                     val intent = roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
                     launcher.launch(intent)
+                    return true
                 }
             } else {
                 val telecomManager = getSystemService(TELECOM_SERVICE) as? TelecomManager
@@ -367,11 +381,13 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                     launcher.launch(intent)
+                    return true
                 }
             }
         } catch (e: Exception) {
             e.printStackTrace()
         }
+        return false
     }
 
     private fun makeCall(phoneNumber: String, simSlot: Int? = null) {
