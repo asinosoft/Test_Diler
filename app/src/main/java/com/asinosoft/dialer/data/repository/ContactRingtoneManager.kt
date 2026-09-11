@@ -1,6 +1,7 @@
 package com.asinosoft.dialer.data.repository
 
 import android.content.Context
+import com.asinosoft.dialer.R
 import android.media.RingtoneManager
 import android.net.Uri
 import android.provider.ContactsContract
@@ -69,7 +70,7 @@ object ContactRingtoneManager {
     }
 
     fun getRingtoneTitle(context: Context, uriString: String?): String {
-        if (uriString.isNullOrBlank()) return "По умолчанию"
+        if (uriString.isNullOrBlank()) return context.getString(R.string.ringtone_default)
         // Check user added ringtones first
         val userRingtones = getSavedCustomRingtones(context)
         val foundUser = userRingtones.find { it.first == uriString }
@@ -77,9 +78,9 @@ object ContactRingtoneManager {
 
         return try {
             val ringtone = RingtoneManager.getRingtone(context, uriString.toUri())
-            ringtone?.getTitle(context) ?: "По умолчанию"
+            ringtone?.getTitle(context) ?: context.getString(R.string.ringtone_default)
         } catch (_: Exception) {
-            "По умолчанию"
+            context.getString(R.string.ringtone_default)
         }
     }
 

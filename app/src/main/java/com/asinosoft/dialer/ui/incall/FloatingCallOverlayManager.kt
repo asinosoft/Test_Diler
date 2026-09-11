@@ -72,6 +72,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -94,6 +95,7 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.CallState
 import com.asinosoft.dialer.data.repository.QuickRepliesManager
 import com.asinosoft.dialer.service.CallManager
@@ -360,7 +362,11 @@ private fun FloatingIncomingCallOverlayContent(
 
     val isDark = isSystemInDarkTheme()
     val finalName = contactName
-        ?: if (call.displayName.isNotBlank() && call.displayName != call.rawNumber) call.displayName else "Неизвестный номер"
+        ?: if (call.displayName.isNotBlank() && call.displayName != call.rawNumber) {
+            call.displayName
+        } else {
+            stringResource(R.string.incall_unknown_number)
+        }
 
     val quickReplies = remember {
         QuickRepliesManager.getQuickReplies(context)
@@ -434,7 +440,7 @@ private fun FloatingIncomingCallOverlayContent(
                             if (contactPhotoBitmap != null) {
                                 Image(
                                     bitmap = contactPhotoBitmap!!,
-                                    contentDescription = "Фото контакта",
+                                    contentDescription = stringResource(R.string.incall_contact_photo_cd),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -477,7 +483,7 @@ private fun FloatingIncomingCallOverlayContent(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Вызов завершен",
+                                    text = stringResource(R.string.incall_state_disconnected),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MissedRed
@@ -503,7 +509,7 @@ private fun FloatingIncomingCallOverlayContent(
                                 )
                             } else {
                                 Text(
-                                    text = "Входящий вызов",
+                                    text = stringResource(R.string.incall_state_ringing),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
@@ -613,7 +619,7 @@ private fun FloatingIncomingCallOverlayContent(
                             ) {
                                 Icon(
                                     imageVector = if (isSpeakerOn) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
-                                    contentDescription = "Динамик",
+                                    contentDescription = stringResource(R.string.incall_action_speaker),
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -628,7 +634,7 @@ private fun FloatingIncomingCallOverlayContent(
                             ) {
                                 Icon(
                                     imageVector = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
-                                    contentDescription = "Микрофон",
+                                    contentDescription = stringResource(R.string.incall_action_mic),
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -647,7 +653,7 @@ private fun FloatingIncomingCallOverlayContent(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CallEnd,
-                                contentDescription = "Завершить",
+                                contentDescription = stringResource(R.string.incall_end_cd),
                                 modifier = Modifier.size(24.dp)
                             )
                         }
@@ -664,7 +670,7 @@ private fun FloatingIncomingCallOverlayContent(
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                 Icon(
                                     imageVector = Icons.Default.Call,
-                                    contentDescription = "Ответить",
+                                    contentDescription = stringResource(R.string.incall_answer),
                                     modifier = Modifier.size(24.dp)
                                 )
                                 if (isBluetoothConnected) {
@@ -697,7 +703,7 @@ private fun FloatingIncomingCallOverlayContent(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = "Отправить сообщение",
+                                        text = stringResource(R.string.incall_send_message),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface
@@ -705,7 +711,7 @@ private fun FloatingIncomingCallOverlayContent(
                                     Spacer(modifier = Modifier.width(3.dp))
                                     Icon(
                                         imageVector = Icons.Default.KeyboardArrowDown,
-                                        contentDescription = "Быстрый ответ SMS",
+                                        contentDescription = stringResource(R.string.incall_quick_sms_cd),
                                         tint = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier
                                             .size(18.dp)
@@ -728,7 +734,7 @@ private fun FloatingIncomingCallOverlayContent(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CallEnd,
-                                contentDescription = "Отклонить",
+                                contentDescription = stringResource(R.string.incall_decline),
                                 modifier = Modifier.size(24.dp)
                             )
                         }
@@ -832,7 +838,7 @@ private fun FloatingIncomingCallOverlayContent(
                                     )
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Text(
-                                        text = "Создание нового СМС",
+                                        text = stringResource(R.string.incall_new_sms_title),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface
@@ -899,7 +905,7 @@ private fun FloatingIncomingCallOverlayContent(
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Text(
-                                        text = "Написать сообщение",
+                                        text = stringResource(R.string.incall_write_message),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface

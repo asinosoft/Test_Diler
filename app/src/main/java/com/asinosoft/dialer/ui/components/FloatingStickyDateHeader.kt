@@ -23,6 +23,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 
 /** Плавающая дата поверх списка (слева) + плавающий стик фильтра (справа). */
@@ -75,7 +77,7 @@ fun FloatingStickyDateHeader(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Tune,
-                        contentDescription = "Фильтрация вызовов",
+                        contentDescription = stringResource(R.string.cd_call_filter),
                         tint = if (isFilterActive) SamsungGreen else MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f),
                         modifier = Modifier.size(16.dp)
                     )

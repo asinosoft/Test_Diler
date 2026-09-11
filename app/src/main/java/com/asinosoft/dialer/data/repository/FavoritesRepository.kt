@@ -4,6 +4,7 @@ import android.content.ContentUris
 import android.content.Context
 import android.provider.ContactsContract
 import androidx.core.content.edit
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.data.model.FavoriteTab
 import org.json.JSONArray
@@ -170,7 +171,11 @@ class FavoritesRepository(private val context: Context) {
 
                 while (c.moveToNext()) {
                     val id = if (idIndex != -1) c.getString(idIndex) else ""
-                    val name = if (nameIndex != -1) c.getString(nameIndex) else "Без имени"
+                    val name = if (nameIndex != -1) {
+                        c.getString(nameIndex)
+                    } else {
+                        context.getString(R.string.contact_no_name)
+                    }
                     val number = if (numberIndex != -1) c.getString(numberIndex) else ""
                     val photoUri = if (photoIndex != -1) c.getString(photoIndex) else null
 
@@ -211,10 +216,20 @@ class FavoritesRepository(private val context: Context) {
         prefs.edit { putString("favorites_list", array.toString()) }
     }
 
+    private fun defaultTab(): FavoriteTab =
+        FavoriteTab("default", context.getString(R.string.favorites_default_tab_name), 0)
+
+    private fun migrateTabName(id: String, name: String): String {
+        if (id == "default" && name in LEGACY_DEFAULT_TAB_NAMES) {
+            return context.getString(R.string.favorites_default_tab_name)
+        }
+        return name
+    }
+
     fun getTabs(): List<FavoriteTab> {
         val jsonString = prefs.getString("favorites_tabs", null)
         if (jsonString.isNullOrEmpty()) {
-            val defaults = listOf(FavoriteTab("default", "Мои", 0))
+            val defaults = listOf(defaultTab())
             saveTabs(defaults)
             return defaults
         }
@@ -224,24 +239,29 @@ class FavoritesRepository(private val context: Context) {
             val list = mutableListOf<FavoriteTab>()
             for (i in 0 until array.length()) {
                 val obj = array.getJSONObject(i)
+                val id = obj.getString("id")
                 list.add(
                     FavoriteTab(
-                        id = obj.getString("id"),
-                        name = obj.getString("name"),
+                        id = id,
+                        name = migrateTabName(id, obj.getString("name")),
                         order = if (obj.has("order")) obj.getInt("order") else i
                     )
                 )
             }
             if (list.isEmpty()) {
-                val defaults = listOf(FavoriteTab("default", "Мои", 0))
+                val defaults = listOf(defaultTab())
                 saveTabs(defaults)
                 defaults
             } else {
                 list.sortedBy { it.order }
             }
         } catch (_: Exception) {
-            listOf(FavoriteTab("default", "Мои", 0))
+            listOf(defaultTab())
         }
+    }
+
+    private companion object {
+        val LEGACY_DEFAULT_TAB_NAMES = setOf("Основные", "Мои", "My")
     }
 
     fun saveTabs(tabs: List<FavoriteTab>) {

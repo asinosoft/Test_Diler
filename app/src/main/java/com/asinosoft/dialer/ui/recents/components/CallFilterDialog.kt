@@ -40,10 +40,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.ui.components.SimIcon
 import com.asinosoft.dialer.ui.recents.CallTypeFilter
 import com.asinosoft.dialer.ui.recents.SimFilter
@@ -84,7 +86,7 @@ fun CallFilterDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Фильтрация вызовов",
+                        text = stringResource(R.string.filter_dialog_title),
                         fontSize = 20.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -96,7 +98,7 @@ fun CallFilterDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Clear,
-                            contentDescription = "Закрыть",
+                            contentDescription = stringResource(R.string.cd_close),
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                             modifier = Modifier.size(20.dp)
                         )
@@ -108,7 +110,7 @@ fun CallFilterDialog(
                 // SIM Card Section (if phone has multiple SIMs)
                 if (activeSimCount > 1) {
                     Text(
-                        text = "SIM-карта",
+                        text = stringResource(R.string.filter_sim_section),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
@@ -120,21 +122,21 @@ fun CallFilterDialog(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         SimFilterOptionChip(
-                            title = "Все SIM",
+                            title = stringResource(SimFilter.ALL.titleRes),
                             simNumber = null,
                             isSelected = selectedSim == SimFilter.ALL,
                             onClick = { selectedSim = SimFilter.ALL },
                             modifier = Modifier.weight(1f)
                         )
                         SimFilterOptionChip(
-                            title = "SIM 1",
+                            title = stringResource(SimFilter.SIM_1.titleRes),
                             simNumber = 1,
                             isSelected = selectedSim == SimFilter.SIM_1,
                             onClick = { selectedSim = SimFilter.SIM_1 },
                             modifier = Modifier.weight(1f)
                         )
                         SimFilterOptionChip(
-                            title = "SIM 2",
+                            title = stringResource(SimFilter.SIM_2.titleRes),
                             simNumber = 2,
                             isSelected = selectedSim == SimFilter.SIM_2,
                             onClick = { selectedSim = SimFilter.SIM_2 },
@@ -149,7 +151,7 @@ fun CallFilterDialog(
 
                 // Call Type Section
                 Text(
-                    text = "Тип вызова",
+                    text = stringResource(R.string.filter_type_section),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
@@ -164,7 +166,7 @@ fun CallFilterDialog(
                         icon = Icons.Default.Phone,
                         iconTint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                         iconBackground = MaterialTheme.colorScheme.surfaceVariant,
-                        title = "Все вызовы",
+                        title = stringResource(R.string.filter_type_all),
                         isSelected = selectedType == CallTypeFilter.ALL,
                         onClick = { selectedType = CallTypeFilter.ALL }
                     )
@@ -173,7 +175,7 @@ fun CallFilterDialog(
                         icon = Icons.AutoMirrored.Filled.CallReceived,
                         iconTint = IncomingGreen,
                         iconBackground = IncomingGreen.copy(alpha = 0.14f),
-                        title = "Входящие",
+                        title = stringResource(CallTypeFilter.INCOMING.titleRes),
                         isSelected = selectedType == CallTypeFilter.INCOMING,
                         onClick = { selectedType = CallTypeFilter.INCOMING }
                     )
@@ -182,7 +184,7 @@ fun CallFilterDialog(
                         icon = Icons.AutoMirrored.Filled.CallMade,
                         iconTint = OutgoingBlue,
                         iconBackground = OutgoingBlue.copy(alpha = 0.14f),
-                        title = "Исходящие",
+                        title = stringResource(CallTypeFilter.OUTGOING.titleRes),
                         isSelected = selectedType == CallTypeFilter.OUTGOING,
                         onClick = { selectedType = CallTypeFilter.OUTGOING }
                     )
@@ -191,7 +193,7 @@ fun CallFilterDialog(
                         icon = Icons.AutoMirrored.Filled.CallMissed,
                         iconTint = MissedRed,
                         iconBackground = MissedRed.copy(alpha = 0.14f),
-                        title = "Пропущенные",
+                        title = stringResource(CallTypeFilter.MISSED.titleRes),
                         isSelected = selectedType == CallTypeFilter.MISSED,
                         onClick = { selectedType = CallTypeFilter.MISSED }
                     )
@@ -215,7 +217,7 @@ fun CallFilterDialog(
                             .height(48.dp)
                     ) {
                         Text(
-                            text = "Сбросить",
+                            text = stringResource(R.string.action_reset),
                             fontWeight = FontWeight.SemiBold,
                             fontSize = 14.sp
                         )
@@ -236,7 +238,7 @@ fun CallFilterDialog(
                             .height(48.dp)
                     ) {
                         Text(
-                            text = "Применить",
+                            text = stringResource(R.string.action_apply),
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp
                         )
@@ -347,7 +349,7 @@ private fun CallTypeOptionRow(
                 ) {
                     Icon(
                         imageVector = Icons.Default.Check,
-                        contentDescription = "Выбрано",
+                        contentDescription = stringResource(R.string.cd_selected),
                         tint = Color.White,
                         modifier = Modifier.size(14.dp)
                     )

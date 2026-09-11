@@ -98,7 +98,7 @@ fun OnboardingPermissionsScreen(
             Spacer(modifier = Modifier.height(18.dp))
 
             Text(
-                text = "Для продолжения работы предоставьте, пожалуйста, следующие разрешения…",
+                text = stringResource(R.string.onboarding_permissions_intro),
                 fontSize = 15.sp,
                 lineHeight = 21.sp,
                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.62f)
@@ -107,12 +107,12 @@ fun OnboardingPermissionsScreen(
             Spacer(modifier = Modifier.height(22.dp))
 
             PermissionBlock(
-                title = "Разрешения",
-                subtitle = "Для управления контактами и звонками",
+                title = stringResource(R.string.onboarding_permissions_title),
+                subtitle = stringResource(R.string.onboarding_permissions_subtitle),
                 details = listOf(
-                    "Список вызовов",
-                    "К контактам и аккаунтам",
-                    "Совершать звонки и управлять ими"
+                    stringResource(R.string.onboarding_perm_call_log),
+                    stringResource(R.string.onboarding_perm_contacts),
+                    stringResource(R.string.onboarding_perm_phone)
                 ),
                 isGranted = isRuntimeGranted,
                 isHighlighted = highlightedStep == OnboardingPermissionStep.RUNTIME,
@@ -122,8 +122,8 @@ fun OnboardingPermissionsScreen(
             Spacer(modifier = Modifier.height(12.dp))
 
             PermissionBlock(
-                title = "Поверх других окон",
-                subtitle = "Для показа дополнительной информации во время звонка",
+                title = stringResource(R.string.onboarding_overlay_title),
+                subtitle = stringResource(R.string.onboarding_overlay_subtitle),
                 details = emptyList(),
                 isGranted = isOverlayGranted,
                 isHighlighted = highlightedStep == OnboardingPermissionStep.OVERLAY,
@@ -150,7 +150,9 @@ fun OnboardingPermissionsScreen(
                 .padding(bottom = 8.dp)
         ) {
             Text(
-                text = if (allGranted) "Дальше" else "Дальше »",
+                text = stringResource(
+                    if (allGranted) R.string.action_next else R.string.action_next_chevron
+                ),
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -243,7 +245,7 @@ private fun PermissionBlock(
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.Check,
-                            contentDescription = "Разрешено",
+                            contentDescription = stringResource(R.string.onboarding_permission_granted_cd),
                             tint = SamsungGreen,
                             modifier = Modifier.size(22.dp)
                         )
@@ -263,7 +265,7 @@ private fun PermissionBlock(
                     color = Color.Transparent
                 ) {
                     Text(
-                        text = "ВКЛ.",
+                        text = stringResource(R.string.onboarding_toggle_on),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,

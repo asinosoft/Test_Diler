@@ -16,9 +16,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 
@@ -42,14 +44,14 @@ fun FavoritesSection(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Избранные контакты",
+                text = stringResource(R.string.favorites_contacts_section),
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onBackground
             )
 
             Text(
-                text = "Добавить",
+                text = stringResource(R.string.action_add),
                 fontSize = 13.sp,
                 fontWeight = FontWeight.Bold,
                 color = SamsungGreen,
@@ -76,7 +78,7 @@ fun FavoritesSection(
                         .padding(vertical = 18.dp)
                 ) {
                     Text(
-                        text = "+ Добавить избранные контакты",
+                        text = stringResource(R.string.favorites_add_placeholder),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Medium,
                         color = SamsungGreen

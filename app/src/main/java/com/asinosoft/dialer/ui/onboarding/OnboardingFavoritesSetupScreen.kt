@@ -24,9 +24,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.FavoriteTab
 import com.asinosoft.dialer.data.model.FavoritesViewMode
 import com.asinosoft.dialer.ui.recents.components.FavoritesSettingsTab
@@ -62,7 +64,7 @@ fun OnboardingFavoritesSetupScreen(
             .padding(top = 28.dp, bottom = 12.dp)
     ) {
         Text(
-            text = "Избранное",
+            text = stringResource(R.string.onboarding_favorites_title),
             fontSize = 26.sp,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground
@@ -71,7 +73,7 @@ fun OnboardingFavoritesSetupScreen(
         Spacer(modifier = Modifier.height(8.dp))
 
         Text(
-            text = "Настройте вид избранных контактов. Эти параметры всегда можно изменить в настройках.",
+            text = stringResource(R.string.onboarding_favorites_subtitle),
             fontSize = 15.sp,
             lineHeight = 21.sp,
             color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.62f)
@@ -118,7 +120,7 @@ fun OnboardingFavoritesSetupScreen(
                 .height(54.dp)
         ) {
             Text(
-                text = "Готово",
+                text = stringResource(R.string.action_done),
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Bold
             )
@@ -129,13 +131,13 @@ fun OnboardingFavoritesSetupScreen(
         AlertDialog(
             onDismissRequest = { showAddTabDialog = false },
             title = {
-                Text(text = "Новая вкладка", fontWeight = FontWeight.Bold)
+                Text(text = stringResource(R.string.onboarding_new_tab_title), fontWeight = FontWeight.Bold)
             },
             text = {
                 OutlinedTextField(
                     value = newTabNameInput,
                     onValueChange = { newTabNameInput = it },
-                    label = { Text("Название вкладки") },
+                    label = { Text(stringResource(R.string.onboarding_tab_name_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -149,12 +151,12 @@ fun OnboardingFavoritesSetupScreen(
                         }
                     }
                 ) {
-                    Text("Создать", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.action_create), color = SamsungGreen, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showAddTabDialog = false }) {
-                    Text("Отмена")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -164,13 +166,13 @@ fun OnboardingFavoritesSetupScreen(
         AlertDialog(
             onDismissRequest = { tabToRename = null },
             title = {
-                Text(text = "Переименовать вкладку", fontWeight = FontWeight.Bold)
+                Text(text = stringResource(R.string.onboarding_rename_tab_title), fontWeight = FontWeight.Bold)
             },
             text = {
                 OutlinedTextField(
                     value = renameTabInput,
                     onValueChange = { renameTabInput = it },
-                    label = { Text("Название") },
+                    label = { Text(stringResource(R.string.onboarding_tab_rename_label)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -184,12 +186,12 @@ fun OnboardingFavoritesSetupScreen(
                         }
                     }
                 ) {
-                    Text("Сохранить", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.action_save), color = SamsungGreen, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { tabToRename = null }) {
-                    Text("Отмена")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )

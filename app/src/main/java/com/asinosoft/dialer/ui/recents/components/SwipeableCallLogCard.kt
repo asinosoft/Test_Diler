@@ -56,6 +56,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -138,11 +139,11 @@ fun SwipeableCallLogCard(
             contactName = item.name
         )
     }
-    val rightVisuals = remember(customRightAction) {
-        getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true)
+    val rightVisuals = remember(customRightAction, context) {
+        getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true, context = context)
     }
-    val leftVisuals = remember(customLeftAction) {
-        getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false)
+    val leftVisuals = remember(customLeftAction, context) {
+        getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false, context = context)
     }
 
     fun dismissMenu() {
@@ -156,7 +157,7 @@ fun SwipeableCallLogCard(
         if (item.count > 1) "$baseName (${item.count})" else baseName
     }
     val subText = remember(item.name, formattedNumber) {
-        if (item.name != null) formattedNumber else "Не сохранено"
+        if (item.name != null) formattedNumber else context.getString(R.string.call_log_not_saved)
     }
     val timeText = remember(item.timestamp) { formatTimeOnly(item.timestamp) }
     val avatarName = remember(item.name, formattedNumber) { item.name ?: formattedNumber }
@@ -398,7 +399,7 @@ fun SwipeableCallLogCard(
                             if (!showDeleteSubmenu) {
                                 OneUiPopupMenuPainterItem(
                                     painter = painterResource(R.drawable.ic_sim1),
-                                    label = "Вызов через SIM1",
+                                    label = stringResource(R.string.call_log_call_sim1),
                                     iconBackground = SamsungSmsBlue.copy(alpha = 0.12f),
                                     onClick = {
                                         dismissMenu()
@@ -407,7 +408,7 @@ fun SwipeableCallLogCard(
                                 )
                                 OneUiPopupMenuPainterItem(
                                     painter = painterResource(R.drawable.ic_sim2),
-                                    label = "Вызов через SIM2",
+                                    label = stringResource(R.string.call_log_call_sim2),
                                     iconBackground = SamsungGreen.copy(alpha = 0.12f),
                                     onClick = {
                                         dismissMenu()
@@ -416,7 +417,7 @@ fun SwipeableCallLogCard(
                                 )
                                 OneUiPopupMenuItem(
                                     icon = Icons.Default.ContentCopy,
-                                    label = "Копировать номер",
+                                    label = stringResource(R.string.call_log_copy_number),
                                     onClick = {
                                         dismissMenu()
                                         copyNumberToClipboard(context, item.number)
@@ -424,13 +425,17 @@ fun SwipeableCallLogCard(
                                 )
                                 OneUiPopupMenuItem(
                                     icon = Icons.Default.Block,
-                                    label = "Заблокировать",
+                                    label = stringResource(R.string.call_log_block),
                                     onClick = {
                                         dismissMenu()
                                         val ok = onBlockNumber(item)
                                         Toast.makeText(
                                             context,
-                                            if (ok) "Номер заблокирован" else "Не удалось заблокировать",
+                                            if (ok) {
+                                                context.getString(R.string.toast_number_blocked)
+                                            } else {
+                                                context.getString(R.string.toast_block_failed)
+                                            },
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     }
@@ -438,7 +443,7 @@ fun SwipeableCallLogCard(
                                 OneUiPopupMenuDivider()
                                 OneUiPopupMenuItem(
                                     icon = Icons.Default.Delete,
-                                    label = "Удалить",
+                                    label = stringResource(R.string.call_log_delete_title),
                                     destructive = true,
                                     onClick = { showDeleteSubmenu = true }
                                 )
@@ -456,13 +461,13 @@ fun SwipeableCallLogCard(
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                        contentDescription = "Назад",
+                                        contentDescription = stringResource(R.string.cd_back),
                                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = "Удалить",
+                                        text = stringResource(R.string.call_log_delete_title),
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
@@ -471,7 +476,7 @@ fun SwipeableCallLogCard(
                                 OneUiPopupMenuDivider()
                                 OneUiPopupMenuItem(
                                     icon = Icons.Default.Delete,
-                                    label = "Удалить 1 элемент",
+                                    label = stringResource(R.string.call_log_delete_one),
                                     onClick = {
                                         dismissMenu()
                                         onDeleteGroup(item)
@@ -479,7 +484,7 @@ fun SwipeableCallLogCard(
                                 )
                                 OneUiPopupMenuItem(
                                     icon = Icons.Default.Delete,
-                                    label = "Очистить контакт",
+                                    label = stringResource(R.string.call_log_clear_contact),
                                     destructive = true,
                                     onClick = {
                                         dismissMenu()
@@ -498,27 +503,27 @@ fun SwipeableCallLogCard(
 private fun copyNumberToClipboard(context: Context, number: String) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText("Phone Number", number))
-    Toast.makeText(context, "Номер скопирован", Toast.LENGTH_SHORT).show()
+    Toast.makeText(context, context.getString(R.string.toast_number_copied), Toast.LENGTH_SHORT).show()
 }
 
 @Composable
 private fun CallTypeIcon(type: CallType) {
-    val (icon, color, desc) = when (type) {
+    val (icon, color, descRes) = when (type) {
         CallType.INCOMING -> Triple(
             Icons.AutoMirrored.Filled.CallReceived,
             IncomingGreen,
-            "Входящий"
+            R.string.call_type_incoming
         )
 
-        CallType.OUTGOING -> Triple(Icons.AutoMirrored.Filled.CallMade, OutgoingBlue, "Исходящий")
-        CallType.MISSED -> Triple(Icons.AutoMirrored.Filled.CallMissed, MissedRed, "Пропущенный")
-        CallType.REJECTED -> Triple(Icons.Default.CallEnd, MissedRed, "Отклоненный")
-        CallType.BLOCKED -> Triple(Icons.Default.Block, BlockedRed, "Заблокированный")
+        CallType.OUTGOING -> Triple(Icons.AutoMirrored.Filled.CallMade, OutgoingBlue, R.string.call_type_outgoing)
+        CallType.MISSED -> Triple(Icons.AutoMirrored.Filled.CallMissed, MissedRed, R.string.call_type_missed)
+        CallType.REJECTED -> Triple(Icons.Default.CallEnd, MissedRed, R.string.call_type_rejected)
+        CallType.BLOCKED -> Triple(Icons.Default.Block, BlockedRed, R.string.call_type_blocked)
     }
 
     Icon(
         imageVector = icon,
-        contentDescription = desc,
+        contentDescription = stringResource(descRes),
         tint = color,
         modifier = Modifier.size(16.dp)
     )

@@ -67,11 +67,13 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.CallState
 import com.asinosoft.dialer.service.CallManager
 import com.asinosoft.dialer.ui.components.SimIcon
@@ -262,7 +264,11 @@ private fun IncomingCallPopupScreen(
 
     val isDark = isSystemInDarkTheme()
     val finalName = contactName
-        ?: if (call.displayName.isNotBlank() && call.displayName != call.rawNumber) call.displayName else "Неизвестный номер"
+        ?: if (call.displayName.isNotBlank() && call.displayName != call.rawNumber) {
+            call.displayName
+        } else {
+            stringResource(R.string.incall_unknown_number)
+        }
 
     Box(
         modifier = Modifier
@@ -310,7 +316,7 @@ private fun IncomingCallPopupScreen(
                             if (contactPhotoBitmap != null) {
                                 Image(
                                     bitmap = contactPhotoBitmap!!,
-                                    contentDescription = "Фото контакта",
+                                    contentDescription = stringResource(R.string.incall_contact_photo_cd),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier.fillMaxSize()
                                 )
@@ -353,7 +359,7 @@ private fun IncomingCallPopupScreen(
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
-                                    text = "Вызов завершен",
+                                    text = stringResource(R.string.incall_state_disconnected),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MissedRed
@@ -379,7 +385,7 @@ private fun IncomingCallPopupScreen(
                                 )
                             } else {
                                 Text(
-                                    text = "Входящий вызов",
+                                    text = stringResource(R.string.incall_state_ringing),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
@@ -490,7 +496,7 @@ private fun IncomingCallPopupScreen(
                             ) {
                                 Icon(
                                     imageVector = if (isSpeakerOn) Icons.AutoMirrored.Filled.VolumeUp else Icons.AutoMirrored.Filled.VolumeOff,
-                                    contentDescription = "Динамик",
+                                    contentDescription = stringResource(R.string.incall_action_speaker),
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -505,7 +511,7 @@ private fun IncomingCallPopupScreen(
                             ) {
                                 Icon(
                                     imageVector = if (isMuted) Icons.Default.MicOff else Icons.Default.Mic,
-                                    contentDescription = "Микрофон",
+                                    contentDescription = stringResource(R.string.incall_action_mic),
                                     modifier = Modifier.size(22.dp)
                                 )
                             }
@@ -524,7 +530,7 @@ private fun IncomingCallPopupScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CallEnd,
-                                contentDescription = "Завершить",
+                                contentDescription = stringResource(R.string.incall_end_cd),
                                 modifier = Modifier.size(24.dp)
                             )
                         }
@@ -541,7 +547,7 @@ private fun IncomingCallPopupScreen(
                             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
                                 Icon(
                                     imageVector = Icons.Default.Call,
-                                    contentDescription = "Ответить",
+                                    contentDescription = stringResource(R.string.incall_answer),
                                     modifier = Modifier.size(24.dp)
                                 )
                                 if (isBluetoothConnected) {
@@ -576,7 +582,7 @@ private fun IncomingCallPopupScreen(
                                     } catch (_: Exception) {
                                         Toast.makeText(
                                             context,
-                                            "Не удалось открыть отправку сообщений",
+                                            context.getString(R.string.error_open_messages),
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     }
@@ -587,7 +593,7 @@ private fun IncomingCallPopupScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = "Отправить сообщение",
+                                    text = stringResource(R.string.incall_send_message),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -595,7 +601,7 @@ private fun IncomingCallPopupScreen(
                                 Spacer(modifier = Modifier.width(3.dp))
                                 Icon(
                                     imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = "Быстрый ответ SMS",
+                                    contentDescription = stringResource(R.string.incall_quick_sms_cd),
                                     tint = MaterialTheme.colorScheme.onSurface,
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -615,7 +621,7 @@ private fun IncomingCallPopupScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.CallEnd,
-                                contentDescription = "Отклонить",
+                                contentDescription = stringResource(R.string.incall_decline),
                                 modifier = Modifier.size(24.dp)
                             )
                         }

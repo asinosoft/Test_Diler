@@ -48,6 +48,7 @@ import com.asinosoft.dialer.ui.onboarding.OnboardingPermissionsScreen
 import com.asinosoft.dialer.ui.recents.RecentsScreen
 import com.asinosoft.dialer.ui.recents.RecentsViewModel
 import com.asinosoft.dialer.ui.theme.DialerTheme
+import com.asinosoft.dialer.util.PhoneNumberHelper
 
 class MainActivity : ComponentActivity() {
 
@@ -159,7 +160,7 @@ class MainActivity : ComponentActivity() {
                     highlightedStep = OnboardingPermissionStep.OVERLAY
                     Toast.makeText(
                         context,
-                        "Включите Contacts Dialer Messages на этом экране",
+                        context.getString(R.string.onboarding_overlay_toast),
                         Toast.LENGTH_LONG
                     ).show()
                     val intent = Intent(
@@ -174,7 +175,7 @@ class MainActivity : ComponentActivity() {
                         } catch (_: Exception) {
                             Toast.makeText(
                                 context,
-                                "Не удалось открыть настройки",
+                                context.getString(R.string.error_open_settings),
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
@@ -393,8 +394,9 @@ class MainActivity : ComponentActivity() {
     private fun makeCall(phoneNumber: String, simSlot: Int? = null) {
         if (phoneNumber.isBlank()) return
 
-        val cleanNumber = phoneNumber.replace(Regex("[^0-9+]"), "")
-        val uri = "tel:$cleanNumber".toUri()
+        val cleanNumber = PhoneNumberHelper.sanitizeForDial(phoneNumber)
+        if (cleanNumber.isBlank()) return
+        val uri = PhoneNumberHelper.telUri(cleanNumber)
 
         val hasCallPermission = ContextCompat.checkSelfPermission(
             this,
@@ -507,7 +509,7 @@ class MainActivity : ComponentActivity() {
         try {
             startActivity(intent)
         } catch (_: Exception) {
-            Toast.makeText(this, "Не удалось совершить вызов", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.error_place_call), Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -521,7 +523,7 @@ class MainActivity : ComponentActivity() {
         try {
             startActivity(intent)
         } catch (_: Exception) {
-            Toast.makeText(this, "Не удалось открыть SMS", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, getString(R.string.error_open_sms), Toast.LENGTH_SHORT).show()
         }
     }
 }

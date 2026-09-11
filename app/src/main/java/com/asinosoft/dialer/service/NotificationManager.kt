@@ -49,10 +49,10 @@ class NotificationManager(val service: Service) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Текущие вызовы",
+                service.getString(R.string.channel_ongoing_calls),
                 NotificationManager.IMPORTANCE_LOW
             ).apply {
-                description = "Уведомление активного звонка"
+                description = service.getString(R.string.channel_ongoing_calls_desc)
                 setSound(null, null)
                 enableVibration(false)
                 setShowBadge(false)
@@ -262,10 +262,10 @@ class NotificationManager(val service: Service) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val channel = NotificationChannel(
                     MISSED_CHANNEL_ID,
-                    "Пропущенные вызовы",
+                    service.getString(R.string.channel_missed_calls),
                     NotificationManager.IMPORTANCE_DEFAULT
                 ).apply {
-                    description = "Уведомления о пропущенных звонках"
+                    description = service.getString(R.string.channel_missed_calls_desc)
                     enableVibration(true)
                     setShowBadge(true)
                 }
@@ -273,7 +273,7 @@ class NotificationManager(val service: Service) {
             }
 
             val formattedNumber = PhoneNumberHelper.format(rawNumber)
-            val title = "Пропущенный вызов"
+            val title = service.getString(R.string.notification_missed_call)
             val contactDisplayName = contactName ?: formattedNumber
 
             val appIntent = Intent(service, MainActivity::class.java).apply {
@@ -326,12 +326,12 @@ class NotificationManager(val service: Service) {
                     .setWhen(System.currentTimeMillis())
                     .addAction(
                         android.R.drawable.ic_menu_call,
-                        "Перезвонить",
+                        service.getString(R.string.notification_action_callback),
                         callBackPendingIntent
                     )
                     .addAction(
                         android.R.drawable.ic_menu_send,
-                        "Сообщение",
+                        service.getString(R.string.notification_action_message),
                         smsPendingIntent
                     )
 

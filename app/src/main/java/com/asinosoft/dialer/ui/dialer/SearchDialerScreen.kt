@@ -89,6 +89,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -98,6 +99,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.CallType
 import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.ui.components.Header
@@ -216,7 +218,7 @@ fun SearchDialerScreen(
                 }) {
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Назад",
+                        contentDescription = stringResource(R.string.cd_back),
                         tint = MaterialTheme.colorScheme.onBackground
                     )
                 }
@@ -227,7 +229,7 @@ fun SearchDialerScreen(
                     state = searchQuery,
                     placeholder = {
                         Text(
-                            text = "Поиск...",
+                            text = stringResource(R.string.dialer_search_placeholder),
                             fontSize = 15.sp,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                         )
@@ -235,7 +237,7 @@ fun SearchDialerScreen(
                     leadingIcon = {
                         Icon(
                             imageVector = Icons.Default.Search,
-                            contentDescription = "Поиск",
+                            contentDescription = stringResource(R.string.cd_search),
                             tint = SamsungGreen
                         )
                     },
@@ -244,7 +246,7 @@ fun SearchDialerScreen(
                             IconButton(onClick = { searchQuery.setTextAndPlaceCursorAtEnd("") }) {
                                 Icon(
                                     imageVector = Icons.Default.Clear,
-                                    contentDescription = "Очистить"
+                                    contentDescription = stringResource(R.string.cd_clear)
                                 )
                             }
                         }
@@ -296,7 +298,11 @@ fun SearchDialerScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = if (searchQuery.text.isEmpty()) "Введите номер или имя" else "Контакты не найдены",
+                                text = if (searchQuery.text.isEmpty()) {
+                                    stringResource(R.string.dialer_empty_prompt)
+                                } else {
+                                    stringResource(R.string.dialer_no_results)
+                                },
                                 fontSize = 15.sp,
                                 color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.5f)
                             )
@@ -315,7 +321,7 @@ fun SearchDialerScreen(
                         ) {
                             if (results.calls.isNotEmpty()) {
                                 item {
-                                    Header("История звонков")
+                                    Header(stringResource(R.string.dialer_section_call_history))
                                 }
                                 items(
                                     items = results.calls,
@@ -342,7 +348,7 @@ fun SearchDialerScreen(
                             }
                             if (results.contacts.isNotEmpty()) {
                                 item {
-                                    Header("Контакты")
+                                    Header(stringResource(R.string.dialer_section_contacts))
                                 }
                                 items(
                                     items = results.contacts,
@@ -398,7 +404,7 @@ fun SearchDialerScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Dialpad,
-                            contentDescription = "Развернуть клавиатуру",
+                            contentDescription = stringResource(R.string.dialer_expand_keyboard_cd),
                             modifier = Modifier.size(28.dp)
                         )
                     }
@@ -434,22 +440,20 @@ fun SearchDialerScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             // T9 Dialpad Buttons Grid (3x4)
-                            val dialpadButtons = remember {
-                                listOf(
+                            val dialpadButtons = listOf(
                                 Triple("1", "", ""),
-                                Triple("2", "ABC", "АБВГ"),
-                                Triple("3", "DEF", "ДЕЖЗ"),
-                                Triple("4", "GHI", "ИЙКЛ"),
-                                Triple("5", "JKL", "МНОПР"),
-                                Triple("6", "MNO", "СТУФ"),
-                                Triple("7", "PQRS", "ХЦЧШ"),
-                                Triple("8", "TUV", "ЩЪЫЬ"),
-                                Triple("9", "WXYZ", "ЭЮЯ"),
+                                Triple("2", stringResource(R.string.dialer_key_letters_2), ""),
+                                Triple("3", stringResource(R.string.dialer_key_letters_3), ""),
+                                Triple("4", stringResource(R.string.dialer_key_letters_4), ""),
+                                Triple("5", stringResource(R.string.dialer_key_letters_5), ""),
+                                Triple("6", stringResource(R.string.dialer_key_letters_6), ""),
+                                Triple("7", stringResource(R.string.dialer_key_letters_7), ""),
+                                Triple("8", stringResource(R.string.dialer_key_letters_8), ""),
+                                Triple("9", stringResource(R.string.dialer_key_letters_9), ""),
                                 Triple("*", "", ""),
                                 Triple("0", "+", ""),
                                 Triple("#", "", "")
                             )
-                        }
 
                         Column(
                             verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -503,7 +507,7 @@ fun SearchDialerScreen(
                                                 if (digit == "1") {
                                                     Icon(
                                                         imageVector = Icons.Default.Voicemail,
-                                                        contentDescription = "Голосовая почта",
+                                                        contentDescription = stringResource(R.string.dialer_voicemail_cd),
                                                         tint = MaterialTheme.colorScheme.onBackground.copy(
                                                             alpha = 0.6f
                                                         ),
@@ -585,7 +589,7 @@ fun SearchDialerScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Call,
-                                    contentDescription = "Позвонить",
+                                    contentDescription = stringResource(R.string.dialer_call_cd),
                                     modifier = Modifier.size(28.dp)
                                 )
                             }
@@ -611,7 +615,7 @@ fun SearchDialerScreen(
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.Backspace,
-                                    contentDescription = "Удалить",
+                                    contentDescription = stringResource(R.string.action_delete),
                                     tint = if (searchQuery.text.isNotEmpty()) MaterialTheme.colorScheme.onBackground else MaterialTheme.colorScheme.onBackground.copy(
                                         alpha = 0.3f
                                     ),
@@ -848,7 +852,7 @@ fun SwipeableSearchDialerCard(
                         if (photoBitmap != null) {
                             Image(
                                 bitmap = photoBitmap!!,
-                                contentDescription = "Аватар",
+                                contentDescription = stringResource(R.string.dialer_avatar_cd),
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier.fillMaxSize()
                             )

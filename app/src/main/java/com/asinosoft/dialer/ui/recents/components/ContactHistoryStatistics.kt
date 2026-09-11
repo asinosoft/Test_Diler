@@ -58,6 +58,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.CallLogItem
 import com.asinosoft.dialer.data.model.CallType
 import com.asinosoft.dialer.ui.components.OneUiPopupMenu
@@ -71,16 +74,16 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
-enum class StatisticsPeriod(val title: String) {
-    ALL_TIME("Все время"),
-    THIS_MONTH("Этот месяц"),
-    LAST_MONTH("Прошлый месяц"),
-    CUSTOM_RANGE("Выбрать период")
+enum class StatisticsPeriod(@androidx.annotation.StringRes val titleRes: Int) {
+    ALL_TIME(R.string.stats_period_all_time),
+    THIS_MONTH(R.string.stats_period_this_month),
+    LAST_MONTH(R.string.stats_period_last_month),
+    CUSTOM_RANGE(R.string.stats_period_custom)
 }
 
-enum class DiagramMetric(val title: String) {
-    TIME("Время"),
-    COUNT("Количество")
+enum class DiagramMetric(@androidx.annotation.StringRes val titleRes: Int) {
+    TIME(R.string.stats_metric_time),
+    COUNT(R.string.stats_metric_count)
 }
 
 data class BarChartGroup(
@@ -98,6 +101,7 @@ fun ContactHistoryStatistics(
     historyLogs: List<CallLogItem>,
     modifier: Modifier = Modifier
 ) {
+    val context = LocalContext.current
     var isExpanded by remember { mutableStateOf(false) }
     var selectedPeriod by remember { mutableStateOf(StatisticsPeriod.ALL_TIME) }
     var showPeriodMenu by remember { mutableStateOf(false) }
@@ -206,18 +210,32 @@ fun ContactHistoryStatistics(
     val outgoingCount = remember(outgoingCalls) { outgoingCalls.sumOf { it.count } }
     val totalCount = incomingCount + outgoingCount
 
-    val periodDisplayTitle = remember(selectedPeriod, customStartDateMillis, customEndDateMillis) {
+    val periodDisplayTitle = remember(
+        selectedPeriod,
+        customStartDateMillis,
+        customEndDateMillis,
+        context
+    ) {
         if (selectedPeriod == StatisticsPeriod.CUSTOM_RANGE && customStartDateMillis != null && customEndDateMillis != null) {
             val fmt = SimpleDateFormat("dd.MM", Locale.getDefault())
             "${fmt.format(Date(customStartDateMillis!!))} - ${fmt.format(Date(customEndDateMillis!!))}"
         } else {
-            selectedPeriod.title
+            context.getString(selectedPeriod.titleRes)
         }
     }
 
     // Build grouped bar chart intervals (by days or by months)
-    val chartGroups = remember(filteredLogs, selectedPeriod, customStartDateMillis, customEndDateMillis, selectedMetric, oldestStartOfDayMillis) {
+    val chartGroups = remember(
+        filteredLogs,
+        selectedPeriod,
+        customStartDateMillis,
+        customEndDateMillis,
+        selectedMetric,
+        oldestStartOfDayMillis,
+        context
+    ) {
         buildChartGroups(
+            context = context,
             logs = filteredLogs,
             period = selectedPeriod,
             metric = selectedMetric,
@@ -261,14 +279,16 @@ fun ContactHistoryStatistics(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        text = "Статистика",
+                        text = stringResource(R.string.stats_title),
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Icon(
                         imageVector = Icons.Default.KeyboardArrowDown,
-                        contentDescription = if (isExpanded) "Свернуть" else "Развернуть",
+                        contentDescription = stringResource(
+                            if (isExpanded) R.string.stats_cd_collapse else R.string.stats_cd_expand
+                        ),
                         tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         modifier = Modifier
                             .size(20.dp)
@@ -292,7 +312,7 @@ fun ContactHistoryStatistics(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.CallReceived,
-                                contentDescription = "Входящие",
+                                contentDescription = stringResource(R.string.stats_incoming_cd),
                                 tint = IncomingGreen,
                                 modifier = Modifier.size(15.dp)
                             )
@@ -313,7 +333,7 @@ fun ContactHistoryStatistics(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.CallMade,
-                                contentDescription = "Исходящие",
+                                contentDescription = stringResource(R.string.stats_outgoing_cd),
                                 tint = OutgoingBlue,
                                 modifier = Modifier.size(15.dp)
                             )
@@ -349,7 +369,7 @@ fun ContactHistoryStatistics(
                                 )
                                 Icon(
                                     imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = "Выбор периода",
+                                    contentDescription = stringResource(R.string.stats_pick_period),
                                     tint = SamsungGreen,
                                     modifier = Modifier.size(16.dp)
                                 )
@@ -365,7 +385,7 @@ fun ContactHistoryStatistics(
                                 val isCurrent = selectedPeriod == period
                                 OneUiPopupMenuItem(
                                     icon = Icons.Default.Check,
-                                    label = period.title,
+                                    label = stringResource(period.titleRes),
                                     labelColor = if (isCurrent) SamsungGreen else MaterialTheme.colorScheme.onSurface,
                                     iconTint = if (isCurrent) SamsungGreen else Color.Transparent,
                                     iconBackground = if (isCurrent) SamsungGreen.copy(alpha = 0.12f) else Color.Transparent,
@@ -421,7 +441,7 @@ fun ContactHistoryStatistics(
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.CallReceived,
-                                        contentDescription = "Входящие",
+                                        contentDescription = stringResource(R.string.stats_incoming_cd),
                                         tint = IncomingGreen,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -434,7 +454,7 @@ fun ContactHistoryStatistics(
                                 ) {
                                     Icon(
                                         imageVector = Icons.AutoMirrored.Filled.CallMade,
-                                        contentDescription = "Исходящие",
+                                        contentDescription = stringResource(R.string.stats_outgoing_cd),
                                         tint = OutgoingBlue,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -446,7 +466,7 @@ fun ContactHistoryStatistics(
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(
-                                        text = "Всего",
+                                        text = stringResource(R.string.stats_total),
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
@@ -467,7 +487,7 @@ fun ContactHistoryStatistics(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Text(
-                                    text = formatExactDuration(incomingDurationSec),
+                                    text = formatExactDuration(context, incomingDurationSec),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface,
@@ -475,7 +495,7 @@ fun ContactHistoryStatistics(
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    text = formatExactDuration(outgoingDurationSec),
+                                    text = formatExactDuration(context, outgoingDurationSec),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onSurface,
@@ -483,7 +503,7 @@ fun ContactHistoryStatistics(
                                     modifier = Modifier.weight(1f)
                                 )
                                 Text(
-                                    text = formatExactDuration(totalDurationSec),
+                                    text = formatExactDuration(context, totalDurationSec),
                                     fontSize = 13.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface,
@@ -561,7 +581,7 @@ fun ContactHistoryStatistics(
                                             }
                                     ) {
                                         Text(
-                                            text = metric.title,
+                                            text = stringResource(metric.titleRes),
                                             fontSize = 11.sp,
                                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                             color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
@@ -593,7 +613,7 @@ fun ContactHistoryStatistics(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "Нет данных за выбранный период",
+                                text = stringResource(R.string.stats_no_data),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
                             )
@@ -642,12 +662,12 @@ fun ContactHistoryStatistics(
                     },
                     colors = ButtonDefaults.textButtonColors(contentColor = SamsungGreen)
                 ) {
-                    Text("Применить", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.action_apply), fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDateRangePickerDialog = false }) {
-                    Text("Отмена")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         ) {
@@ -655,7 +675,7 @@ fun ContactHistoryStatistics(
                 state = dateRangePickerState,
                 title = {
                     Text(
-                        text = "Выберите период",
+                        text = stringResource(R.string.stats_pick_period),
                         modifier = Modifier.padding(start = 24.dp, top = 16.dp),
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold
@@ -673,6 +693,7 @@ private fun GroupedBarChartView(
     selectedIndex: Int?,
     onSelectGroup: (Int) -> Unit
 ) {
+    val context = LocalContext.current
     val scrollState = rememberScrollState()
 
     LaunchedEffect(groups.size) {
@@ -711,13 +732,19 @@ private fun GroupedBarChartView(
                     )
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            text = "Вх: ${selectedGroup.incomingDisplay}",
+                            text = stringResource(
+                                R.string.stats_incoming_short,
+                                selectedGroup.incomingDisplay
+                            ),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = IncomingGreen
                         )
                         Text(
-                            text = "Исх: ${selectedGroup.outgoingDisplay}",
+                            text = stringResource(
+                                R.string.stats_outgoing_short,
+                                selectedGroup.outgoingDisplay
+                            ),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = OutgoingBlue
@@ -815,6 +842,7 @@ private fun GroupedBarChartView(
  * Builds groups by days or months depending on the selected period.
  */
 private fun buildChartGroups(
+    context: android.content.Context,
     logs: List<CallLogItem>,
     period: StatisticsPeriod,
     metric: DiagramMetric,
@@ -850,7 +878,7 @@ private fun buildChartGroups(
                 cal.set(Calendar.MILLISECOND, 0)
 
                 val dayLogs = logs.filter { it.timestamp in dayStart..dayEnd }
-                buildGroup("$day", "$day $monthName", dayLogs, isTime)
+                buildGroup(context, "$day", "$day $monthName", dayLogs, isTime)
             }
         }
         StatisticsPeriod.LAST_MONTH -> {
@@ -879,7 +907,7 @@ private fun buildChartGroups(
                 cal.set(Calendar.MILLISECOND, 0)
 
                 val dayLogs = logs.filter { it.timestamp in dayStart..dayEnd }
-                buildGroup("$day", "$day $monthName", dayLogs, isTime)
+                buildGroup(context, "$day", "$day $monthName", dayLogs, isTime)
             }
         }
         StatisticsPeriod.CUSTOM_RANGE, StatisticsPeriod.ALL_TIME -> {
@@ -911,6 +939,7 @@ private fun buildChartGroups(
                     val dayLogs = logs.filter { it.timestamp in dayStart..dayEnd }
                     result.add(
                         buildGroup(
+                            context,
                             dayFormat.format(Date(dayStart)),
                             fullFormat.format(Date(dayStart)),
                             dayLogs,
@@ -952,6 +981,7 @@ private fun buildChartGroups(
                     val monthLogs = logs.filter { it.timestamp in monthStart..monthEnd }
                     result.add(
                         buildGroup(
+                            context,
                             monthFormat.format(Date(monthStart)).replaceFirstChar { it.uppercase() },
                             fullFormat.format(Date(monthStart)),
                             monthLogs,
@@ -973,6 +1003,7 @@ private fun buildChartGroups(
 }
 
 private fun buildGroup(
+    context: android.content.Context,
     label: String,
     fullLabel: String,
     logs: List<CallLogItem>,
@@ -990,8 +1021,8 @@ private fun buildGroup(
     val incVal = if (isTime) ((incSec + 59) / 60).toFloat() else incCount.toFloat()
     val outVal = if (isTime) ((outSec + 59) / 60).toFloat() else outCount.toFloat()
 
-    val incDisplay = if (isTime) formatExactDuration(incSec) else "$incCount"
-    val outDisplay = if (isTime) formatExactDuration(outSec) else "$outCount"
+    val incDisplay = if (isTime) formatExactDuration(context, incSec) else "$incCount"
+    val outDisplay = if (isTime) formatExactDuration(context, outSec) else "$outCount"
 
     return BarChartGroup(
         label = label,
@@ -1006,14 +1037,18 @@ private fun buildGroup(
 /**
  * Formats duration in exact minutes and hours: e.g. "12ч 15м", "12м", "1ч 07м", "0м".
  */
-fun formatExactDuration(totalSeconds: Long): String {
+fun formatExactDuration(context: android.content.Context, totalSeconds: Long): String {
     val totalMinutes = if (totalSeconds > 0) ((totalSeconds + 59) / 60) else 0L
-    if (totalMinutes <= 0) return "0м"
+    if (totalMinutes <= 0) return context.getString(R.string.duration_zero)
     val hours = totalMinutes / 60
     val minutes = totalMinutes % 60
     return if (hours > 0) {
-        if (minutes > 0) "${hours}ч ${minutes}м" else "${hours}ч"
+        if (minutes > 0) {
+            context.getString(R.string.duration_hours_minutes, hours, minutes)
+        } else {
+            context.getString(R.string.duration_hours_only, hours)
+        }
     } else {
-        "${minutes}м"
+        context.getString(R.string.duration_minutes_only, minutes)
     }
 }

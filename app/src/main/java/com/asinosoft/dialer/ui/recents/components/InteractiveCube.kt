@@ -36,6 +36,8 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.ui.theme.SamsungSmsBlue
 import kotlinx.coroutines.launch
@@ -62,10 +64,30 @@ fun InteractiveCubeSection(
     val radiusPx = cubeSizePx / 2f
 
     val faces = listOf(
-        CubeFaceData("Быстрый набор", "Телефон", Icons.Default.Phone, SamsungGreen),
-        CubeFaceData("Сообщения", "SMS", Icons.AutoMirrored.Filled.Message, SamsungSmsBlue),
-        CubeFaceData("Избранные", "Контакты", Icons.Default.Star, Color(0xFF8E24AA)),
-        CubeFaceData("Инфо", "Поддержка", Icons.Default.Info, Color(0xFFFF8A65))
+        CubeFaceData(
+            stringResource(R.string.interactive_cube_speed_dial),
+            stringResource(R.string.phones),
+            Icons.Default.Phone,
+            SamsungGreen
+        ),
+        CubeFaceData(
+            stringResource(R.string.interactive_cube_messages),
+            stringResource(R.string.swipe_label_message),
+            Icons.AutoMirrored.Filled.Message,
+            SamsungSmsBlue
+        ),
+        CubeFaceData(
+            stringResource(R.string.interactive_cube_favorites),
+            stringResource(R.string.contacts),
+            Icons.Default.Star,
+            Color(0xFF8E24AA)
+        ),
+        CubeFaceData(
+            stringResource(R.string.interactive_cube_info),
+            stringResource(R.string.about_support_title),
+            Icons.Default.Info,
+            Color(0xFFFF8A65)
+        )
     )
 
     Column(

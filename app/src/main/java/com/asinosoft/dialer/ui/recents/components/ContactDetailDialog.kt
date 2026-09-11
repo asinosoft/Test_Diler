@@ -145,6 +145,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalWindowInfo
@@ -192,6 +193,8 @@ import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.OutgoingBlue
 import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.ui.theme.SamsungSmsBlue
+import com.asinosoft.dialer.util.ContactLabelHelper
+import com.asinosoft.dialer.util.DateHeaderFormatter
 import com.asinosoft.dialer.util.PhoneNumberHelper
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
@@ -235,12 +238,19 @@ fun ContactDetailDialog(
         photoBitmap: Bitmap?
     ) -> Unit = { _, updated, _, _, _, _ -> onUpdateContact(updated) },
     onDeleteContact: (FavoriteContact) -> Unit = {},
-    onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", "Мои") }
+    onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", it) }
 ) {
     val context = LocalContext.current
     var avatarBitmap by remember(contact.photoUri) { mutableStateOf<ImageBitmap?>(null) }
     var phoneNumbersList by remember(contact) {
-        mutableStateOf(listOf(ContactPhoneNumber(number = contact.number, label = "Мобильный")))
+        mutableStateOf(
+            listOf(
+                ContactPhoneNumber(
+                    number = contact.number,
+                    label = ContactLabelHelper.defaultMobileLabel(context)
+                )
+            )
+        )
     }
     var activeSimCount by remember { mutableIntStateOf(1) }
     var selectedTab by remember(initialTab, contact) { mutableIntStateOf(initialTab) }
@@ -363,8 +373,8 @@ fun ContactDetailDialog(
         }
     }
 
-    val groupedHistoryLogs = remember(filteredHistoryLogs) {
-        filteredHistoryLogs.groupBy { formatDateHeader(it.timestamp) }.toList()
+    val groupedHistoryLogs = remember(filteredHistoryLogs, context) {
+        filteredHistoryLogs.groupBy { DateHeaderFormatter.formatDateHeader(context, it.timestamp) }.toList()
     }
 
     Dialog(
@@ -630,7 +640,7 @@ fun ContactDetailDialog(
                                                         contentAlignment = Alignment.Center
                                                     ) {
                                                         Text(
-                                                            text = "Загрузка истории...",
+                                                            text = stringResource(R.string.contact_history_loading),
                                                             fontSize = 15.sp,
                                                             color = MaterialTheme.colorScheme.onBackground.copy(
                                                                 alpha = 0.5f
@@ -653,7 +663,7 @@ fun ContactDetailDialog(
                                                             contentAlignment = Alignment.Center
                                                         ) {
                                                             Text(
-                                                                text = "История вызовов отсутствует",
+                                                                text = stringResource(R.string.contact_history_empty),
                                                                 fontSize = 15.sp,
                                                                 color = MaterialTheme.colorScheme.onSurface.copy(
                                                                     alpha = 0.5f
@@ -872,7 +882,7 @@ fun ContactDetailDialog(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Назад",
+                            contentDescription = stringResource(R.string.cd_back),
                             tint = Color.White,
                             modifier = Modifier.size(22.dp)
                         )
@@ -891,7 +901,7 @@ fun ContactDetailDialog(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.MoreVert,
-                                contentDescription = "Еще",
+                                contentDescription = stringResource(R.string.cd_more),
                                 tint = Color.White,
                                 modifier = Modifier.size(22.dp)
                             )
@@ -904,7 +914,7 @@ fun ContactDetailDialog(
                         ) {
                             OneUiPopupMenuItem(
                                 icon = Icons.Default.Share,
-                                label = "Поделиться",
+                                label = stringResource(R.string.action_share),
                                 onClick = {
                                     topMenuExpanded = false
                                     showShareFormatDialog = true
@@ -912,7 +922,7 @@ fun ContactDetailDialog(
                             )
                             OneUiPopupMenuItem(
                                 icon = Icons.Default.Edit,
-                                label = "Изменить",
+                                label = stringResource(R.string.action_edit),
                                 onClick = {
                                     topMenuExpanded = false
                                     showEditContactDialog = true
@@ -921,7 +931,7 @@ fun ContactDetailDialog(
                             OneUiPopupMenuDivider()
                             OneUiPopupMenuItem(
                                 icon = Icons.Default.Delete,
-                                label = "Удалить",
+                                label = stringResource(R.string.action_delete),
                                 destructive = true,
                                 onClick = {
                                     topMenuExpanded = false
@@ -938,14 +948,14 @@ fun ContactDetailDialog(
                     onDismissRequest = { showDeleteConfirmDialog = false },
                     title = {
                         Text(
-                            text = "Удалить контакт?",
+                            text = stringResource(R.string.contact_delete_title),
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp
                         )
                     },
                     text = {
                         Text(
-                            text = "Контакт «${contact.name}» будет удалён.",
+                            text = stringResource(R.string.contact_delete_message, contact.name),
                             fontSize = 15.sp
                         )
                     },
@@ -957,7 +967,7 @@ fun ContactDetailDialog(
                             }
                         ) {
                             Text(
-                                text = "Удалить",
+                                text = stringResource(R.string.action_delete),
                                 color = MaterialTheme.colorScheme.error,
                                 fontWeight = FontWeight.Bold
                             )
@@ -965,7 +975,7 @@ fun ContactDetailDialog(
                     },
                     dismissButton = {
                         TextButton(onClick = { showDeleteConfirmDialog = false }) {
-                            Text("Отмена")
+                            Text(stringResource(R.string.action_cancel))
                         }
                     }
                 )
@@ -1094,9 +1104,9 @@ private fun FloatingTabBar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             val tabs = listOf(
-                Triple(0, "Контакт", Icons.Default.Person),
-                Triple(1, "История", Icons.Default.History),
-                Triple(2, "Настройки", Icons.Default.Settings)
+                Triple(0, stringResource(R.string.contact_tab_contact), Icons.Default.Person),
+                Triple(1, stringResource(R.string.contact_tab_history), Icons.Default.History),
+                Triple(2, stringResource(R.string.contact_tab_settings), Icons.Default.Settings)
             )
 
             tabs.forEach { (index, title, icon) ->
@@ -1305,7 +1315,7 @@ private fun ContactTabContent(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Phone,
-                                            contentDescription = "Вызов SIM 1",
+                                            contentDescription = stringResource(R.string.contact_call_sim1),
                                             tint = SamsungSmsBlue,
                                             modifier = Modifier
                                                 .size(26.dp)
@@ -1338,7 +1348,7 @@ private fun ContactTabContent(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Phone,
-                                            contentDescription = "Вызов SIM 2",
+                                            contentDescription = stringResource(R.string.contact_call_sim2),
                                             tint = SamsungGreen,
                                             modifier = Modifier
                                                 .size(26.dp)
@@ -1368,7 +1378,7 @@ private fun ContactTabContent(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Phone,
-                                        contentDescription = "Вызов",
+                                        contentDescription = stringResource(R.string.contact_call),
                                         tint = SamsungGreen,
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -1542,7 +1552,10 @@ private fun ContactTabContent(
                                             } catch (_: Exception) {
                                                 Toast.makeText(
                                                     context,
-                                                    "Не удалось открыть ссылку ${messenger.messengerName}",
+                                                    context.getString(
+                                                        R.string.error_open_messenger_link,
+                                                        messenger.messengerName
+                                                    ),
                                                     Toast.LENGTH_SHORT
                                                 ).show()
                                             }
@@ -1554,7 +1567,7 @@ private fun ContactTabContent(
                                     ) {
                                         Icon(
                                             imageVector = Icons.AutoMirrored.Filled.Message,
-                                            contentDescription = "Чат",
+                                            contentDescription = stringResource(R.string.contact_messenger_chat),
                                             tint = messenger.brandColor,
                                             modifier = Modifier.size(18.dp)
                                         )
@@ -1570,7 +1583,10 @@ private fun ContactTabContent(
                                             } catch (_: Exception) {
                                                 Toast.makeText(
                                                     context,
-                                                    "Не удалось совершить звонок в ${messenger.messengerName}",
+                                                    context.getString(
+                                                        R.string.error_messenger_call,
+                                                        messenger.messengerName
+                                                    ),
                                                     Toast.LENGTH_SHORT
                                                 ).show()
                                             }
@@ -1582,7 +1598,7 @@ private fun ContactTabContent(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Phone,
-                                            contentDescription = "Аудиовызов",
+                                            contentDescription = stringResource(R.string.swipe_label_call),
                                             tint = messenger.brandColor,
                                             modifier = Modifier.size(18.dp)
                                         )
@@ -1598,7 +1614,10 @@ private fun ContactTabContent(
                                             } catch (_: Exception) {
                                                 Toast.makeText(
                                                     context,
-                                                    "Не удалось начать видеовызов в ${messenger.messengerName}",
+                                                    context.getString(
+                                                        R.string.error_messenger_video,
+                                                        messenger.messengerName
+                                                    ),
                                                     Toast.LENGTH_SHORT
                                                 ).show()
                                             }
@@ -1610,7 +1629,7 @@ private fun ContactTabContent(
                                     ) {
                                         Icon(
                                             imageVector = Icons.Default.Videocam,
-                                            contentDescription = "Видеовызов",
+                                            contentDescription = stringResource(R.string.swipe_label_video_call),
                                             tint = messenger.brandColor,
                                             modifier = Modifier.size(18.dp)
                                         )
@@ -1642,7 +1661,7 @@ private fun ContactTabContent(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
-                                contentDescription = "Добавить ссылку",
+                                contentDescription = stringResource(R.string.add_link),
                                 tint = SamsungGreen,
                                 modifier = Modifier.size(20.dp)
                             )
@@ -1772,7 +1791,7 @@ private fun ContactTabContent(
                                     } catch (_: Exception) {
                                         Toast.makeText(
                                             context,
-                                            "Не удалось открыть почту",
+                                            context.getString(R.string.error_open_email),
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     }
@@ -1784,7 +1803,7 @@ private fun ContactTabContent(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Email,
-                                    contentDescription = "Написать письмо",
+                                    contentDescription = stringResource(R.string.contact_write_email_cd),
                                     tint = Color(0xFFFFB300),
                                     modifier = Modifier.size(18.dp)
                                 )
@@ -1814,7 +1833,7 @@ private fun ContactTabContent(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "День рождения",
+                            text = stringResource(R.string.contact_birthday),
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
@@ -1849,7 +1868,9 @@ private fun ContactTabContent(
         // CUSTOM IMPORTANT DATES CARDS (STYLED LIKE BIRTHDAY CARD)
         importantDatesList.forEach { dateItem ->
             val parsedDate =
-                remember(dateItem.dateString) { parseBirthdayString(dateItem.dateString) }
+                remember(dateItem.dateString) {
+                    parseBirthdayString(context, dateItem.dateString)
+                }
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -1912,9 +1933,10 @@ private fun ContactTabContent(
             Column {
                 OptionRow(
                     icon = Icons.Default.ContentCopy,
-                    label = "Скопировать данные контакта",
+                    label = stringResource(R.string.contact_copy_data),
                     onClick = {
                         val contactFullText = buildContactShareText(
+                            context = context,
                             contact = contact,
                             phoneNumbers = editablePhoneList,
                             emails = editableEmailList,
@@ -1926,7 +1948,11 @@ private fun ContactTabContent(
                             context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         val clip = ClipData.newPlainText("Contact Data", contactFullText)
                         clipboard.setPrimaryClip(clip)
-                        Toast.makeText(context, "Данные контакта скопированы", Toast.LENGTH_SHORT)
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.toast_contact_data_copied),
+                            Toast.LENGTH_SHORT
+                        )
                             .show()
                     }
                 )
@@ -1946,7 +1972,7 @@ private fun ContactTabContent(
             )
         }
         val leftVisuals = remember(swipeLeftAction) {
-            getSwipeBackgroundVisuals(swipeLeftAction, defaultIsRight = false)
+            getSwipeBackgroundVisuals(swipeLeftAction, defaultIsRight = false, context = context)
         }
 
         Row(
@@ -1956,7 +1982,7 @@ private fun ContactTabContent(
         ) {
             ActionButtonItem(
                 icon = Icons.Default.Phone,
-                label = "Вызов",
+                label = stringResource(R.string.contact_call),
                 containerColor = SamsungGreen,
                 contentColor = Color.White,
                 onClick = {
@@ -1987,7 +2013,7 @@ private fun ContactTabContent(
 
             ActionButtonItem(
                 icon = Icons.Default.Person,
-                label = "Инфо",
+                label = stringResource(R.string.incall_action_info),
                 containerColor = MaterialTheme.colorScheme.surfaceVariant,
                 contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                 onClick = {
@@ -2013,6 +2039,7 @@ private fun ContactTabContent(
 
 @Composable
 private fun HistoryCallRow(item: CallLogItem) {
+    val context = LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2024,37 +2051,38 @@ private fun HistoryCallRow(item: CallLogItem) {
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
         ) {
-            val (icon, color, desc) = when (item.type) {
+            val (icon, color, descRes) = when (item.type) {
                 CallType.INCOMING -> Triple(
                     Icons.AutoMirrored.Filled.CallReceived,
                     IncomingGreen,
-                    "Входящий"
+                    R.string.call_type_incoming
                 )
 
                 CallType.OUTGOING -> Triple(
                     Icons.AutoMirrored.Filled.CallMade,
                     OutgoingBlue,
-                    "Исходящий"
+                    R.string.call_type_outgoing
                 )
 
                 CallType.MISSED -> Triple(
                     Icons.AutoMirrored.Filled.CallMissed,
                     MissedRed,
-                    "Пропущенный"
+                    R.string.call_type_missed
                 )
 
                 CallType.REJECTED -> Triple(
                     Icons.Default.CallEnd,
                     MissedRed,
-                    "Отклоненный"
+                    R.string.call_type_rejected
                 )
 
                 CallType.BLOCKED -> Triple(
                     Icons.Default.Block,
                     BlockedRed,
-                    "Заблокированный"
+                    R.string.call_type_blocked
                 )
             }
+            val desc = stringResource(descRes)
 
             Icon(
                 imageVector = icon,
@@ -2094,7 +2122,7 @@ private fun HistoryCallRow(item: CallLogItem) {
         Spacer(modifier = Modifier.width(12.dp))
 
         Text(
-            text = formatCallDuration(item.duration),
+            text = formatCallDuration(context, item.duration),
             fontSize = 13.sp,
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
@@ -2148,13 +2176,13 @@ private fun SettingsTabContent(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
                             imageVector = Icons.Default.Star,
-                            contentDescription = "Избранное",
+                            contentDescription = stringResource(R.string.recents_favorites_header),
                             tint = Color(0xFFFFB300),
                             modifier = Modifier.size(22.dp)
                         )
                         Spacer(modifier = Modifier.width(14.dp))
                         Text(
-                            text = "В избранных",
+                            text = stringResource(R.string.favorites_in_list),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Medium,
                             color = MaterialTheme.colorScheme.onSurface
@@ -2185,7 +2213,8 @@ private fun SettingsTabContent(
                     var showCreateTabDialog by remember { mutableStateOf(false) }
                     var newTabNameInput by remember { mutableStateOf("") }
 
-                    val currentTabName = tabs.find { it.id == selectedTabId }?.name ?: "Мои"
+                    val currentTabName = tabs.find { it.id == selectedTabId }?.name
+                        ?: stringResource(R.string.favorites_default_tab_name)
 
                     Row(
                         modifier = Modifier
@@ -2198,13 +2227,13 @@ private fun SettingsTabContent(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(
                                 imageVector = Icons.Default.FolderSpecial,
-                                contentDescription = "Вкладка",
+                                contentDescription = stringResource(R.string.contact_tab_label),
                                 tint = SamsungGreen,
                                 modifier = Modifier.size(22.dp)
                             )
                             Spacer(modifier = Modifier.width(14.dp))
                             Text(
-                                text = "Вкладка",
+                                text = stringResource(R.string.contact_tab_label),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface
@@ -2224,7 +2253,7 @@ private fun SettingsTabContent(
                                 Spacer(modifier = Modifier.width(4.dp))
                                 Icon(
                                     imageVector = Icons.Default.ArrowDropDown,
-                                    contentDescription = "Выбрать",
+                                    contentDescription = stringResource(R.string.action_select),
                                     tint = SamsungGreen,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -2257,13 +2286,13 @@ private fun SettingsTabContent(
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(
                                                 imageVector = Icons.Default.Add,
-                                                contentDescription = "Создать",
+                                                contentDescription = stringResource(R.string.action_create),
                                                 tint = SamsungGreen,
                                                 modifier = Modifier.size(18.dp)
                                             )
                                             Spacer(modifier = Modifier.width(8.dp))
                                             Text(
-                                                text = "Создать новую",
+                                                text = stringResource(R.string.contact_tab_create_new),
                                                 fontWeight = FontWeight.Bold,
                                                 color = SamsungGreen
                                             )
@@ -2284,7 +2313,7 @@ private fun SettingsTabContent(
                             onDismissRequest = { showCreateTabDialog = false },
                             title = {
                                 Text(
-                                    "Новая вкладка избранного",
+                                    stringResource(R.string.contact_favorite_new_tab_title),
                                     fontWeight = FontWeight.Bold
                                 )
                             },
@@ -2292,7 +2321,7 @@ private fun SettingsTabContent(
                                 OutlinedTextField(
                                     value = newTabNameInput,
                                     onValueChange = { newTabNameInput = it },
-                                    label = { Text("Название вкладки") },
+                                    label = { Text(stringResource(R.string.onboarding_tab_name_label)) },
                                     singleLine = true,
                                     modifier = Modifier.fillMaxWidth()
                                 )
@@ -2309,7 +2338,7 @@ private fun SettingsTabContent(
                                     }
                                 ) {
                                     Text(
-                                        "Создать",
+                                        stringResource(R.string.action_create),
                                         color = SamsungGreen,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -2317,7 +2346,7 @@ private fun SettingsTabContent(
                             },
                             dismissButton = {
                                 TextButton(onClick = { showCreateTabDialog = false }) {
-                                    Text("Отмена")
+                                    Text(stringResource(R.string.action_cancel))
                                 }
                             }
                         )
@@ -2366,7 +2395,7 @@ private fun SettingsTabContent(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Настройка свайпов",
+                        text = stringResource(R.string.contact_swipe_settings),
                         fontSize = 17.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -2400,21 +2429,22 @@ private fun SettingsTabContent(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = "Свайп вправо",
+                            contentDescription = stringResource(R.string.contact_swipe_right),
                             tint = SamsungGreen,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Свайп вправо",
+                                text = stringResource(R.string.contact_swipe_right),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = swipeRightAction?.label ?: "Вызов по умолчанию",
+                                text = swipeRightAction?.label
+                                    ?: stringResource(R.string.contact_swipe_default_call),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             )
@@ -2432,7 +2462,7 @@ private fun SettingsTabContent(
                             Box(modifier = Modifier.fillMaxSize()) {
                                 Icon(
                                     imageVector = rightVisuals.icon,
-                                    contentDescription = "Изменить свайп вправо",
+                                    contentDescription = stringResource(R.string.change_swipe_right),
                                     tint = rightVisuals.color,
                                     modifier = Modifier
                                         .size(26.dp)
@@ -2450,7 +2480,7 @@ private fun SettingsTabContent(
                         } else {
                             Icon(
                                 imageVector = rightVisuals.icon,
-                                contentDescription = "Изменить свайп вправо",
+                                contentDescription = stringResource(R.string.change_swipe_right),
                                 tint = rightVisuals.color,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -2485,21 +2515,22 @@ private fun SettingsTabContent(
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Свайп влево",
+                            contentDescription = stringResource(R.string.contact_swipe_left),
                             tint = SamsungSmsBlue,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Свайп влево",
+                                text = stringResource(R.string.contact_swipe_left),
                                 fontSize = 15.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = swipeLeftAction?.label ?: "SMS по умолчанию",
+                                text = swipeLeftAction?.label
+                                    ?: stringResource(R.string.contact_swipe_default_sms),
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                             )
@@ -2517,7 +2548,7 @@ private fun SettingsTabContent(
                             Box(modifier = Modifier.fillMaxSize()) {
                                 Icon(
                                     imageVector = leftVisuals.icon,
-                                    contentDescription = "Изменить свайп влево",
+                                    contentDescription = stringResource(R.string.change_swipe_left),
                                     tint = leftVisuals.color,
                                     modifier = Modifier
                                         .size(26.dp)
@@ -2535,7 +2566,7 @@ private fun SettingsTabContent(
                         } else {
                             Icon(
                                 imageVector = leftVisuals.icon,
-                                contentDescription = "Изменить свайп влево",
+                                contentDescription = stringResource(R.string.change_swipe_left),
                                 tint = leftVisuals.color,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -2620,7 +2651,7 @@ private fun SettingsTabContent(
             Column {
                 OptionRow(
                     icon = Icons.Default.MusicNote,
-                    label = "Мелодия звонка",
+                    label = stringResource(R.string.contact_ringtone),
                     value = ringtoneTitle,
                     onClick = {
                         showRingtonePickerDialog = true
@@ -2635,7 +2666,7 @@ private fun SettingsTabContent(
 
                 OptionRow(
                     icon = Icons.Default.AddHome,
-                    label = "Добавить на главный экран",
+                    label = stringResource(R.string.contact_add_to_home),
                     onClick = {
                         addContactShortcutToHomeScreen(
                             context,
@@ -2657,7 +2688,9 @@ private fun SettingsTabContent(
 
                 OptionRow(
                     icon = Icons.Default.Block,
-                    label = if (isContactBlocked) "Контакт заблокирован" else "Заблокировать контакт",
+                    label = stringResource(
+                        if (isContactBlocked) R.string.contact_blocked else R.string.contact_block
+                    ),
                     labelColor = if (isContactBlocked) SamsungGreen else MaterialTheme.colorScheme.error,
                     iconTint = if (isContactBlocked) SamsungGreen else MaterialTheme.colorScheme.error,
                     onClick = {
@@ -2665,12 +2698,16 @@ private fun SettingsTabContent(
                             val ok = blockContactNumber(context, contact.number)
                             if (ok) {
                                 isContactBlocked = true
-                                Toast.makeText(context, "Контакт заблокирован", Toast.LENGTH_SHORT)
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.toast_contact_blocked),
+                                    Toast.LENGTH_SHORT
+                                )
                                     .show()
                             } else {
                                 Toast.makeText(
                                     context,
-                                    "Не удалось заблокировать номер",
+                                    context.getString(R.string.toast_block_number_failed),
                                     Toast.LENGTH_SHORT
                                 ).show()
                             }
@@ -2678,12 +2715,16 @@ private fun SettingsTabContent(
                             val ok = unblockContactNumber(context, contact.number)
                             if (ok) {
                                 isContactBlocked = false
-                                Toast.makeText(context, "Контакт разблокирован", Toast.LENGTH_SHORT)
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.toast_contact_unblocked),
+                                    Toast.LENGTH_SHORT
+                                )
                                     .show()
                             } else {
                                 Toast.makeText(
                                     context,
-                                    "Не удалось разблокировать номер",
+                                    context.getString(R.string.toast_unblock_failed),
                                     Toast.LENGTH_SHORT
                                 ).show()
                             }
@@ -2880,7 +2921,7 @@ private suspend fun loadContactPhoneNumbers(
                 val cleanNum = num.filter { it.isDigit() || it == '+' }
                 if (cleanNum.isNotBlank() && !addedCleanNumbers.contains(cleanNum)) {
                     addedCleanNumbers.add(cleanNum)
-                    val labelStr = getPhoneTypeLabel(type, customLabel)
+                    val labelStr = ContactLabelHelper.phoneTypeLabel(context, type, customLabel)
                     numbersList.add(ContactPhoneNumber(number = num, label = labelStr))
                 }
             }
@@ -2891,9 +2932,20 @@ private suspend fun loadContactPhoneNumbers(
 
     val cleanMain = contact.number.filter { it.isDigit() || it == '+' }
     if (cleanMain.isNotBlank() && !addedCleanNumbers.contains(cleanMain)) {
-        numbersList.add(0, ContactPhoneNumber(number = contact.number, label = "Мобильный"))
+        numbersList.add(
+            0,
+            ContactPhoneNumber(
+                number = contact.number,
+                label = ContactLabelHelper.defaultMobileLabel(context)
+            )
+        )
     } else if (numbersList.isEmpty() && contact.number.isNotBlank()) {
-        numbersList.add(ContactPhoneNumber(number = contact.number, label = "Мобильный"))
+        numbersList.add(
+            ContactPhoneNumber(
+                number = contact.number,
+                label = ContactLabelHelper.defaultMobileLabel(context)
+            )
+        )
     }
 
     val contactKey = getContactCustomKey(contact)
@@ -2908,21 +2960,6 @@ private suspend fun loadContactPhoneNumbers(
     }
 
     numbersList
-}
-
-private fun getPhoneTypeLabel(type: Int, customLabel: String?): String {
-    return when (type) {
-        ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE -> "Мобильный"
-        ContactsContract.CommonDataKinds.Phone.TYPE_HOME -> "Домашний"
-        ContactsContract.CommonDataKinds.Phone.TYPE_WORK -> "Рабочий"
-        ContactsContract.CommonDataKinds.Phone.TYPE_MAIN -> "Основной"
-        ContactsContract.CommonDataKinds.Phone.TYPE_FAX_WORK -> "Рабочий факс"
-        ContactsContract.CommonDataKinds.Phone.TYPE_FAX_HOME -> "Домашний факс"
-        ContactsContract.CommonDataKinds.Phone.TYPE_PAGER -> "Пейджер"
-        ContactsContract.CommonDataKinds.Phone.TYPE_OTHER -> "Другой"
-        ContactsContract.CommonDataKinds.Phone.TYPE_CUSTOM -> customLabel ?: "Другой"
-        else -> "Мобильный"
-    }
 }
 
 private fun openSystemContact(context: Context, contactNumber: String) {
@@ -2940,36 +2977,10 @@ private fun openSystemContact(context: Context, contactNumber: String) {
             }
             context.startActivity(intent)
         } catch (_: Exception) {
-            Toast.makeText(context, "Не удалось открыть информацию о контакте", Toast.LENGTH_SHORT)
+            Toast.makeText(context, context.getString(R.string.error_open_contact_info), Toast.LENGTH_SHORT)
                 .show()
         }
     }
-}
-
-private fun formatShortWeekday(timestamp: Long): String {
-    val cal = Calendar.getInstance().apply { timeInMillis = timestamp }
-    return when (cal.get(Calendar.DAY_OF_WEEK)) {
-        Calendar.MONDAY -> "пн"
-        Calendar.TUESDAY -> "вт"
-        Calendar.WEDNESDAY -> "ср"
-        Calendar.THURSDAY -> "чт"
-        Calendar.FRIDAY -> "пт"
-        Calendar.SATURDAY -> "сб"
-        Calendar.SUNDAY -> "вс"
-        else -> ""
-    }
-}
-
-private fun formatDateHeader(timestamp: Long): String {
-    if (timestamp == 0L) return ""
-    if (android.text.format.DateUtils.isToday(timestamp)) return "Сегодня"
-    if (android.text.format.DateUtils.isToday(timestamp + 24 * 3600 * 1000L)) return "Вчера"
-
-    val ruLocale = Locale.forLanguageTag("ru")
-    val dateStr = SimpleDateFormat("d MMMM", ruLocale).format(Date(timestamp))
-    val shortWeekday = formatShortWeekday(timestamp)
-
-    return if (shortWeekday.isNotEmpty()) "$dateStr, $shortWeekday" else dateStr
 }
 
 private fun formatTimeOnly(timestamp: Long): String {
@@ -3006,19 +3017,15 @@ private fun getHighResContactPhotoUri(context: Context, contactNumber: String): 
     }
 }
 
-private fun formatCallDuration(seconds: Long): String {
-    if (seconds <= 0L) return "Без ответа"
-    val m = seconds / 60
-    val s = seconds % 60
-    return if (m > 0) "$m мин $s сек" else "$s сек"
-}
+private fun formatCallDuration(context: Context, seconds: Long): String =
+    ContactLabelHelper.formatCallDuration(context, seconds)
 
 private fun copyToClipboard(context: Context, label: String, textToCopy: String) {
     try {
         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         val clip = ClipData.newPlainText(label, textToCopy)
         clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "Скопировано!", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.toast_copied), Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
         e.printStackTrace()
     }
@@ -3484,17 +3491,6 @@ private data class ContactBirthday(
     val ageText: String?
 )
 
-private fun getEmailTypeLabel(type: Int, customLabel: String?): String {
-    return when (type) {
-        ContactsContract.CommonDataKinds.Email.TYPE_HOME -> "Личный"
-        ContactsContract.CommonDataKinds.Email.TYPE_WORK -> "Рабочий"
-        ContactsContract.CommonDataKinds.Email.TYPE_MOBILE -> "Мобильный"
-        ContactsContract.CommonDataKinds.Email.TYPE_OTHER -> "Другой"
-        ContactsContract.CommonDataKinds.Email.TYPE_CUSTOM -> customLabel ?: "Другой"
-        else -> "Личный"
-    }
-}
-
 private fun saveEmailOrder(context: Context, contactKey: String, emails: List<ContactEmail>) {
     try {
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
@@ -3587,7 +3583,7 @@ private suspend fun loadContactEmails(
                 val cleanEmail = email.trim().lowercase()
                 if (cleanEmail.isNotBlank() && !addedAddresses.contains(cleanEmail)) {
                     addedAddresses.add(cleanEmail)
-                    val labelStr = getEmailTypeLabel(type, customLabel)
+                    val labelStr = ContactLabelHelper.emailTypeLabel(context, type, customLabel)
                     list.add(ContactEmail(email.trim(), labelStr))
                 }
             }
@@ -3609,18 +3605,7 @@ private suspend fun loadContactEmails(
     list
 }
 
-private fun formatAgeRu(age: Int): String {
-    val rem100 = age % 100
-    val rem10 = age % 10
-    if (rem100 in 11..14) return "$age лет"
-    return when (rem10) {
-        1 -> "$age год"
-        in 2..4 -> "$age года"
-        else -> "$age лет"
-    }
-}
-
-private fun parseBirthdayString(rawDate: String): ContactBirthday {
+private fun parseBirthdayString(context: Context, rawDate: String): ContactBirthday {
     val cleanDate = rawDate.trim()
     if (cleanDate.isBlank()) return ContactBirthday("", "", null)
 
@@ -3629,26 +3614,17 @@ private fun parseBirthdayString(rawDate: String): ContactBirthday {
         val currentMonth = Calendar.getInstance().get(Calendar.MONTH) + 1
         val currentDay = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
 
-        val monthNames = arrayOf(
-            "января",
-            "февраля",
-            "марта",
-            "апреля",
-            "мая",
-            "июня",
-            "июля",
-            "августа",
-            "сентября",
-            "октября",
-            "ноября",
-            "декабря"
-        )
+        val monthNames = DateHeaderFormatter.monthGenitiveNames(context)
 
         if (cleanDate.startsWith("--") || cleanDate.length == 5) {
             val mm = cleanDate.takeLast(5).substring(0, 2).toIntOrNull() ?: 1
             val dd = cleanDate.takeLast(2).toIntOrNull() ?: 1
             val mName = if (mm in 1..12) monthNames[mm - 1] else ""
-            return ContactBirthday(cleanDate, "$dd $mName", null)
+            return ContactBirthday(
+                cleanDate,
+                context.getString(R.string.contact_birthday_day_month_format, dd, mName),
+                null
+            )
         }
 
         // Search for 4-digit year e.g. 1990 or 2005
@@ -3698,10 +3674,15 @@ private fun parseBirthdayString(rawDate: String): ContactBirthday {
                     age--
                 }
             }
-            val ageText = if (age in 0..120) formatAgeRu(age) else null
+            val ageText = if (age in 0..120) ContactLabelHelper.formatAge(context, age) else null
 
             val formatted = if (birthDay != null && birthMonth != null && birthMonth in 1..12) {
-                "$birthDay ${monthNames[birthMonth - 1]} $birthYear г."
+                context.getString(
+                    R.string.contact_birthday_full_format,
+                    birthDay,
+                    monthNames[birthMonth - 1],
+                    birthYear
+                )
             } else cleanDate
 
             return ContactBirthday(cleanDate, formatted, ageText)
@@ -3776,7 +3757,7 @@ private suspend fun loadContactBirthday(
             if (c.moveToFirst()) {
                 val rawDate = if (dateIdx != -1) c.getString(dateIdx) else null
                 if (!rawDate.isNullOrBlank()) {
-                    return@withContext parseBirthdayString(rawDate)
+                    return@withContext parseBirthdayString(context, rawDate)
                 }
             }
         }
@@ -4069,7 +4050,7 @@ fun executeCustomSwipeAction(
             else -> onCall(action.targetValue, null)
         }
     } catch (_: Exception) {
-        Toast.makeText(context, "Не удалось выполнить действие", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.error_swipe_action), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -4080,23 +4061,30 @@ data class SwipeBackgroundVisuals(
     val iconBitmap: ImageBitmap? = null
 )
 
+private fun swipeActionLabel(context: Context?, @androidx.annotation.StringRes resId: Int, fallback: String): String =
+    context?.getString(resId) ?: fallback
+
 fun getSwipeBackgroundVisuals(
     customAction: CustomSwipeAction?,
     defaultIsRight: Boolean,
     context: Context? = null
 ): SwipeBackgroundVisuals {
+    val callLabel = swipeActionLabel(context, R.string.contact_call, "Call")
+    val messageLabel = swipeActionLabel(context, R.string.swipe_label_message, "Message")
+    val videoLabel = swipeActionLabel(context, R.string.swipe_label_video_call, "Video call")
+
     if (customAction == null) {
         return if (defaultIsRight) {
             SwipeBackgroundVisuals(
                 icon = Icons.Default.Phone,
                 backgroundColor = SamsungGreen,
-                label = "Вызов"
+                label = callLabel
             )
         } else {
             SwipeBackgroundVisuals(
                 icon = Icons.AutoMirrored.Filled.Message,
                 backgroundColor = SamsungSmsBlue,
-                label = "SMS"
+                label = messageLabel
             )
         }
     }
@@ -4107,7 +4095,7 @@ fun getSwipeBackgroundVisuals(
             SwipeBackgroundVisuals(
                 icon = Icons.Default.Phone,
                 backgroundColor = SamsungGreen,
-                label = if (!messenger.isNullOrBlank()) messenger else "Вызов"
+                label = if (!messenger.isNullOrBlank()) messenger else callLabel
             )
         }
 
@@ -4116,12 +4104,12 @@ fun getSwipeBackgroundVisuals(
             SwipeBackgroundVisuals(
                 icon = Icons.AutoMirrored.Filled.Message,
                 backgroundColor = SamsungSmsBlue,
-                label = if (!messenger.isNullOrBlank()) messenger else "SMS"
+                label = if (!messenger.isNullOrBlank()) messenger else messageLabel
             )
         }
 
         "messenger_chat" -> {
-            val messenger = customAction.messengerName ?: "Сообщение"
+            val messenger = customAction.messengerName ?: messageLabel
             val appIcon = if (context != null) {
                 val candidate =
                     "${customAction.messengerName} ${customAction.targetValue} ${customAction.label}".lowercase(
@@ -4150,7 +4138,7 @@ fun getSwipeBackgroundVisuals(
         }
 
         "messenger_audio" -> {
-            val messenger = customAction.messengerName ?: "Вызов"
+            val messenger = customAction.messengerName ?: callLabel
             SwipeBackgroundVisuals(
                 icon = Icons.Default.Phone,
                 backgroundColor = SamsungGreen,
@@ -4159,7 +4147,7 @@ fun getSwipeBackgroundVisuals(
         }
 
         "messenger_video" -> {
-            val messenger = customAction.messengerName ?: "Видеовызов"
+            val messenger = customAction.messengerName ?: videoLabel
             SwipeBackgroundVisuals(
                 icon = Icons.Default.Videocam,
                 backgroundColor = Color(0xFF7360F2),
@@ -4177,9 +4165,9 @@ fun getSwipeBackgroundVisuals(
 
         else -> {
             if (defaultIsRight) {
-                SwipeBackgroundVisuals(Icons.Default.Phone, SamsungGreen, "Вызов")
+                SwipeBackgroundVisuals(Icons.Default.Phone, SamsungGreen, callLabel)
             } else {
-                SwipeBackgroundVisuals(Icons.AutoMirrored.Filled.Message, SamsungSmsBlue, "SMS")
+                SwipeBackgroundVisuals(Icons.AutoMirrored.Filled.Message, SamsungSmsBlue, messageLabel)
             }
         }
     }
@@ -4258,12 +4246,15 @@ private fun SwipeActionPickerDialog(
                 .padding(bottom = 32.dp)
                 .verticalScroll(rememberScrollState())
         ) {
-            Header("Выберите иконку действия для свайпа", Modifier.padding(bottom = 16.dp))
+            Header(
+                stringResource(R.string.contact_swipe_picker_title),
+                Modifier.padding(bottom = 16.dp)
+            )
 
             // Section 1: Телефоны
             if (phoneNumbersList.isNotEmpty()) {
                 Text(
-                    text = "Телефоны",
+                    text = stringResource(R.string.contact_section_phones),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
@@ -4318,11 +4309,10 @@ private fun SwipeActionPickerDialog(
                                                     CustomSwipeAction(
                                                         actionType = "call_sim1",
                                                         targetValue = phoneItem.number,
-                                                        label = "Вызов SIM 1 (${
-                                                            PhoneNumberHelper.format(
-                                                                phoneItem.number
-                                                            )
-                                                        })"
+                                                        label = context.getString(
+                                                            R.string.contact_call_sim1_label,
+                                                            PhoneNumberHelper.format(phoneItem.number)
+                                                        )
                                                     )
                                                 )
                                             },
@@ -4334,7 +4324,7 @@ private fun SwipeActionPickerDialog(
                                             Box(modifier = Modifier.fillMaxSize()) {
                                                 Icon(
                                                     imageVector = Icons.Default.Phone,
-                                                    contentDescription = "Вызов SIM 1",
+                                                    contentDescription = stringResource(R.string.contact_call_sim1),
                                                     tint = SamsungSmsBlue,
                                                     modifier = Modifier
                                                         .size(26.dp)
@@ -4358,11 +4348,10 @@ private fun SwipeActionPickerDialog(
                                                     CustomSwipeAction(
                                                         actionType = "call_sim2",
                                                         targetValue = phoneItem.number,
-                                                        label = "Вызов SIM 2 (${
-                                                            PhoneNumberHelper.format(
-                                                                phoneItem.number
-                                                            )
-                                                        })"
+                                                        label = context.getString(
+                                                            R.string.contact_call_sim2_label,
+                                                            PhoneNumberHelper.format(phoneItem.number)
+                                                        )
                                                     )
                                                 )
                                             },
@@ -4374,7 +4363,7 @@ private fun SwipeActionPickerDialog(
                                             Box(modifier = Modifier.fillMaxSize()) {
                                                 Icon(
                                                     imageVector = Icons.Default.Phone,
-                                                    contentDescription = "Вызов SIM 2",
+                                                    contentDescription = stringResource(R.string.contact_call_sim2),
                                                     tint = SamsungGreen,
                                                     modifier = Modifier
                                                         .size(26.dp)
@@ -4398,11 +4387,10 @@ private fun SwipeActionPickerDialog(
                                                     CustomSwipeAction(
                                                         actionType = "call_single",
                                                         targetValue = phoneItem.number,
-                                                        label = "Вызов (${
-                                                            PhoneNumberHelper.format(
-                                                                phoneItem.number
-                                                            )
-                                                        })"
+                                                        label = context.getString(
+                                                            R.string.contact_call_single_label,
+                                                            PhoneNumberHelper.format(phoneItem.number)
+                                                        )
                                                     )
                                                 )
                                             },
@@ -4413,7 +4401,7 @@ private fun SwipeActionPickerDialog(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Phone,
-                                                contentDescription = "Вызов",
+                                                contentDescription = stringResource(R.string.contact_call),
                                                 tint = SamsungGreen,
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -4470,7 +4458,7 @@ private fun SwipeActionPickerDialog(
 
             if (visiblePickerMessengers.isNotEmpty()) {
                 Text(
-                    text = "Мессенджеры",
+                    text = stringResource(R.string.contact_section_messengers),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
@@ -4540,7 +4528,10 @@ private fun SwipeActionPickerDialog(
                                                         actionType = "messenger_chat",
                                                         targetValue = messenger.chatIntent.dataString
                                                             ?: "",
-                                                        label = "${messenger.messengerName} Чат",
+                                                        label = context.getString(
+                                                            R.string.contact_messenger_chat_suffix,
+                                                            messenger.messengerName
+                                                        ),
                                                         messengerName = messenger.messengerName
                                                     )
                                                 )
@@ -4552,7 +4543,7 @@ private fun SwipeActionPickerDialog(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.AutoMirrored.Filled.Message,
-                                                contentDescription = "Чат",
+                                                contentDescription = stringResource(R.string.contact_messenger_chat),
                                                 tint = messenger.brandColor,
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -4568,7 +4559,10 @@ private fun SwipeActionPickerDialog(
                                                         actionType = "messenger_audio",
                                                         targetValue = messenger.audioCallIntent.dataString
                                                             ?: "",
-                                                        label = "${messenger.messengerName} Аудиовызов",
+                                                        label = context.getString(
+                                                            R.string.contact_messenger_audio_suffix,
+                                                            messenger.messengerName
+                                                        ),
                                                         messengerName = messenger.messengerName
                                                     )
                                                 )
@@ -4580,7 +4574,7 @@ private fun SwipeActionPickerDialog(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Phone,
-                                                contentDescription = "Аудиовызов",
+                                                contentDescription = stringResource(R.string.swipe_label_call),
                                                 tint = messenger.brandColor,
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -4596,7 +4590,10 @@ private fun SwipeActionPickerDialog(
                                                         actionType = "messenger_video",
                                                         targetValue = messenger.videoCallIntent.dataString
                                                             ?: "",
-                                                        label = "${messenger.messengerName} Видеовызов",
+                                                        label = context.getString(
+                                                            R.string.contact_messenger_video_suffix,
+                                                            messenger.messengerName
+                                                        ),
                                                         messengerName = messenger.messengerName
                                                     )
                                                 )
@@ -4608,7 +4605,7 @@ private fun SwipeActionPickerDialog(
                                         ) {
                                             Icon(
                                                 imageVector = Icons.Default.Videocam,
-                                                contentDescription = "Видеовызов",
+                                                contentDescription = stringResource(R.string.swipe_label_video_call),
                                                 tint = messenger.brandColor,
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -4640,7 +4637,7 @@ private fun SwipeActionPickerDialog(
                             ) {
                                 Icon(
                                     imageVector = Icons.Default.Add,
-                                    contentDescription = "Добавить ссылку",
+                                    contentDescription = stringResource(R.string.add_link),
                                     tint = SamsungGreen,
                                     modifier = Modifier.size(20.dp)
                                 )
@@ -4722,7 +4719,7 @@ private fun SwipeActionPickerDialog(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.Email,
-                                        contentDescription = "Письмо",
+                                        contentDescription = stringResource(R.string.cd_email),
                                         tint = Color(0xFFFFB300),
                                         modifier = Modifier.size(18.dp)
                                     )
@@ -4768,7 +4765,7 @@ private fun AddCustomMessengerLinkDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Добавить ссылку мессенджера",
+                text = stringResource(R.string.contact_add_messenger_link),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
@@ -4776,7 +4773,7 @@ private fun AddCustomMessengerLinkDialog(
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Выберите мессенджер",
+                    text = stringResource(R.string.contact_pick_messenger),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
@@ -4803,14 +4800,15 @@ private fun AddCustomMessengerLinkDialog(
                                     Spacer(modifier = Modifier.width(10.dp))
                                 }
                                 Text(
-                                    text = activeMessenger?.messengerName ?: "Мессенджер",
+                                    text = activeMessenger?.messengerName
+                                        ?: stringResource(R.string.contact_messenger_generic),
                                     fontWeight = FontWeight.Bold,
                                     color = Color.Black
                                 )
                             }
                             Icon(
                                 imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = "Выбрать",
+                                contentDescription = stringResource(R.string.action_select),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -4847,7 +4845,7 @@ private fun AddCustomMessengerLinkDialog(
                 OutlinedTextField(
                     value = customLinkInput,
                     onValueChange = { customLinkInput = it },
-                    label = { Text("Вставьте ссылку") },
+                    label = { Text(stringResource(R.string.contact_paste_link)) },
                     placeholder = { Text("https://t.me/username") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -4868,13 +4866,13 @@ private fun AddCustomMessengerLinkDialog(
                 ) {
                     Icon(
                         imageVector = Icons.Default.QrCodeScanner,
-                        contentDescription = "Сканировать QR-код",
+                        contentDescription = stringResource(R.string.cd_scan_qr),
                         tint = SamsungGreen,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        text = "Добавить через QR-код",
+                        text = stringResource(R.string.contact_add_via_qr),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = SamsungGreen
@@ -4910,12 +4908,12 @@ private fun AddCustomMessengerLinkDialog(
                     }
                 }
             ) {
-                Text("Добавить", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.action_add), color = SamsungGreen, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Отмена")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )
@@ -4959,13 +4957,13 @@ private fun AddCustomMessengerLinkDialog(
                                 showQrScannerDialog = false
                                 Toast.makeText(
                                     context,
-                                    "QR-код из галереи успешно распознан!",
+                                    context.getString(R.string.qr_toast_scanned_gallery),
                                     Toast.LENGTH_SHORT
                                 ).show()
                             } else {
                                 Toast.makeText(
                                     context,
-                                    "Не удалось найти QR-код на изображении",
+                                    context.getString(R.string.qr_toast_no_qr_in_image),
                                     Toast.LENGTH_SHORT
                                 ).show()
                             }
@@ -4973,14 +4971,14 @@ private fun AddCustomMessengerLinkDialog(
                         .addOnFailureListener {
                             Toast.makeText(
                                 context,
-                                "Ошибка анализа изображения",
+                                context.getString(R.string.qr_toast_image_analysis_failed),
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
                 } catch (_: Exception) {
                     Toast.makeText(
                         context,
-                        "Не удалось загрузить фото из галереи",
+                        context.getString(R.string.qr_toast_gallery_load_failed),
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -4993,12 +4991,16 @@ private fun AddCustomMessengerLinkDialog(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Default.QrCodeScanner,
-                        contentDescription = "QR-код",
+                        contentDescription = stringResource(R.string.cd_qr_code),
                         tint = SamsungGreen,
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Сканирование QR-кода", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                    Text(
+                        stringResource(R.string.contact_qr_scan_title),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
                 }
             },
             text = {
@@ -5034,7 +5036,7 @@ private fun AddCustomMessengerLinkDialog(
                                     showQrScannerDialog = false
                                     Toast.makeText(
                                         context,
-                                        "QR-код успешно сканирован!",
+                                        context.getString(R.string.qr_toast_scanned),
                                         Toast.LENGTH_SHORT
                                     ).show()
                                 }
@@ -5045,7 +5047,7 @@ private fun AddCustomMessengerLinkDialog(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Default.QrCodeScanner,
-                                        contentDescription = "Камера",
+                                        contentDescription = stringResource(R.string.cd_camera),
                                         tint = SamsungGreen,
                                         modifier = Modifier.size(48.dp)
                                     )
@@ -5056,7 +5058,7 @@ private fun AddCustomMessengerLinkDialog(
                                         }
                                     ) {
                                         Text(
-                                            "Разрешить камеру",
+                                            context.getString(R.string.contact_allow_camera),
                                             color = SamsungGreen,
                                             fontWeight = FontWeight.Bold,
                                             fontSize = 13.sp
@@ -5070,7 +5072,7 @@ private fun AddCustomMessengerLinkDialog(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text(
-                        text = "Наведите камеру или введите ссылку ручным вводом",
+                        text = stringResource(R.string.contact_qr_scan_hint),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         textAlign = TextAlign.Center
@@ -5081,7 +5083,7 @@ private fun AddCustomMessengerLinkDialog(
                     OutlinedTextField(
                         value = qrInputText,
                         onValueChange = { qrInputText = it },
-                        label = { Text("Ссылка из QR-кода") },
+                        label = { Text(stringResource(R.string.contact_qr_link_label)) },
                         placeholder = { Text("https://t.me/username") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -5102,13 +5104,13 @@ private fun AddCustomMessengerLinkDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.PhotoLibrary,
-                            contentDescription = "Выбрать в галерее",
+                            contentDescription = stringResource(R.string.contact_pick_from_gallery),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Выбрать в галерее",
+                            text = stringResource(R.string.contact_pick_from_gallery),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -5125,12 +5127,12 @@ private fun AddCustomMessengerLinkDialog(
                         }
                     }
                 ) {
-                    Text("Использовать", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.action_use), color = SamsungGreen, fontWeight = FontWeight.Bold)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showQrScannerDialog = false }) {
-                    Text("Отмена")
+                    Text(stringResource(R.string.action_cancel))
                 }
             }
         )
@@ -5226,22 +5228,14 @@ private fun showCalendarDatePicker(
     val picker = android.app.DatePickerDialog(
         context,
         { _, year, month, dayOfMonth ->
-            val monthNames = arrayOf(
-                "января",
-                "февраля",
-                "марта",
-                "апреля",
-                "мая",
-                "июня",
-                "июля",
-                "августа",
-                "сентября",
-                "октября",
-                "ноября",
-                "декабря"
-            )
+            val monthNames = DateHeaderFormatter.monthGenitiveNames(context)
             val mName = monthNames.getOrElse(month) { "" }
-            val formatted = "$dayOfMonth $mName $year г."
+            val formatted = context.getString(
+                R.string.contact_birthday_full_format,
+                dayOfMonth,
+                mName,
+                year
+            )
             onDateSelected(formatted)
         },
         cal.get(Calendar.YEAR),
@@ -5262,7 +5256,7 @@ fun UnsavedNumberChoiceDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Добавить контакт",
+                text = stringResource(R.string.contact_add_flow_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
                 modifier = Modifier.fillMaxWidth(),
@@ -5286,21 +5280,21 @@ fun UnsavedNumberChoiceDialog(
                     modifier = Modifier.fillMaxWidth(),
                     colors = ButtonDefaults.buttonColors(containerColor = SamsungGreen)
                 ) {
-                    Text("Создать новый", fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.contact_create_new), fontWeight = FontWeight.Bold)
                 }
                 Spacer(modifier = Modifier.height(8.dp))
                 OutlinedButton(
                     onClick = onAddToExisting,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Добавить в существующий", fontWeight = FontWeight.SemiBold)
+                    Text(stringResource(R.string.contact_add_to_existing), fontWeight = FontWeight.SemiBold)
                 }
             }
         },
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Отмена")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )
@@ -5328,7 +5322,7 @@ fun CallLogAddContactDialog(
     }
     EditContactDialog(
         contact = contact,
-        phoneNumbersList = listOf(ContactPhoneNumber(number = phoneNumber, label = "Мобильный")),
+        phoneNumbersList = listOf(ContactPhoneNumber(number = phoneNumber, label = ContactLabelHelper.defaultMobileLabel(context))),
         emailsList = emptyList(),
         birthdayInfo = null,
         importantDatesList = emptyList(),
@@ -5404,7 +5398,7 @@ fun CallLogAddToExistingContactDialog(
             }
             if (!alreadyHas && phoneNumberToAdd.isNotBlank()) {
                 loadedNumbers.add(
-                    ContactPhoneNumber(number = phoneNumberToAdd, label = "Мобильный")
+                    ContactPhoneNumber(number = phoneNumberToAdd, label = ContactLabelHelper.defaultMobileLabel(context))
                 )
             }
             phoneNumbersList = loadedNumbers
@@ -5422,7 +5416,7 @@ fun CallLogAddToExistingContactDialog(
             onDismissRequest = onDismiss,
             title = {
                 Text(
-                    text = "Редактирование контакта",
+                    text = stringResource(R.string.contact_edit_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 20.sp
                 )
@@ -5538,12 +5532,17 @@ private fun EditContactDialog(
                     val bitmap = BitmapFactory.decodeStream(stream)
                     if (bitmap != null) {
                         currentAvatarBitmap = bitmap.asImageBitmap()
-                        Toast.makeText(context, "Фото контакта обновлено", Toast.LENGTH_SHORT)
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.toast_contact_photo_updated),
+                            Toast.LENGTH_SHORT
+                        )
                             .show()
                     }
                 }
             } catch (_: Exception) {
-                Toast.makeText(context, "Не удалось загрузить фото", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.error_load_photo), Toast.LENGTH_SHORT)
+                    .show()
             }
         }
     }
@@ -5552,7 +5551,9 @@ private fun EditContactDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = if (isNewContact) "Создать контакт" else "Редактирование контакта",
+                text = stringResource(
+                    if (isNewContact) R.string.contact_create_title else R.string.contact_edit_title
+                ),
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp
             )
@@ -5575,7 +5576,7 @@ private fun EditContactDialog(
                     if (bitmap != null) {
                         Image(
                             bitmap = bitmap,
-                            contentDescription = "Аватар контакта",
+                            contentDescription = stringResource(R.string.contact_photo_cd),
                             modifier = Modifier.fillMaxSize(),
                             contentScale = ContentScale.Crop
                         )
@@ -5615,7 +5616,7 @@ private fun EditContactDialog(
                     ) {
                         Icon(
                             imageVector = Icons.Default.PhotoCamera,
-                            contentDescription = "Изменить фото",
+                            contentDescription = stringResource(R.string.contact_change_photo_cd),
                             tint = Color.White,
                             modifier = Modifier.size(16.dp)
                         )
@@ -5626,7 +5627,7 @@ private fun EditContactDialog(
 
                 // Name Field
                 Text(
-                    text = "Имя контакта",
+                    text = stringResource(R.string.contact_name),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
@@ -5649,23 +5650,25 @@ private fun EditContactDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "Телефоны",
+                        stringResource(R.string.contact_section_phones),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                     IconButton(
                         onClick = {
-                            editablePhones = (editablePhones + ContactPhoneNumber(
-                                "",
-                                "Мобильный"
-                            )).toMutableList()
+                            editablePhones = (
+                                editablePhones + ContactPhoneNumber(
+                                    "",
+                                    ContactLabelHelper.defaultMobileLabel(context)
+                                )
+                            ).toMutableList()
                         },
                         modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
                             Icons.Default.Add,
-                            contentDescription = "Добавить номер",
+                            contentDescription = stringResource(R.string.contact_add_phone_cd),
                             tint = SamsungGreen,
                             modifier = Modifier.size(20.dp)
                         )
@@ -5701,7 +5704,7 @@ private fun EditContactDialog(
                             ) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = "Удалить номер",
+                                    contentDescription = stringResource(R.string.contact_delete_phone_cd),
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -5718,7 +5721,7 @@ private fun EditContactDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "Мессенджеры (видимость)",
+                        stringResource(R.string.contact_messengers_visibility),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
@@ -5729,7 +5732,7 @@ private fun EditContactDialog(
                     ) {
                         Icon(
                             Icons.Default.Add,
-                            contentDescription = "Добавить мессенджер",
+                            contentDescription = stringResource(R.string.contact_add_messenger_link),
                             tint = SamsungGreen,
                             modifier = Modifier.size(20.dp)
                         )
@@ -5797,7 +5800,7 @@ private fun EditContactDialog(
                                         ) {
                                             Icon(
                                                 Icons.Default.Edit,
-                                                contentDescription = "Изменить ссылку",
+                                                contentDescription = stringResource(R.string.contact_edit_messenger_link_cd),
                                                 tint = SamsungGreen,
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -5814,7 +5817,7 @@ private fun EditContactDialog(
                                         ) {
                                             Icon(
                                                 Icons.Default.Delete,
-                                                contentDescription = "Удалить ссылку",
+                                                contentDescription = stringResource(R.string.contact_delete_messenger_link_cd),
                                                 tint = MaterialTheme.colorScheme.error,
                                                 modifier = Modifier.size(18.dp)
                                             )
@@ -5833,7 +5836,9 @@ private fun EditContactDialog(
                                         ) {
                                             Icon(
                                                 imageVector = if (isHidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
-                                                contentDescription = if (isHidden) "Показать" else "Скрыть",
+                                                contentDescription = stringResource(
+                                                    if (isHidden) R.string.cd_show else R.string.cd_hide
+                                                ),
                                                 tint = if (isHidden) Color.Gray else SamsungGreen,
                                                 modifier = Modifier.size(20.dp)
                                             )
@@ -5854,7 +5859,7 @@ private fun EditContactDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "E-mail адреса",
+                        stringResource(R.string.contact_emails_section),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
@@ -5862,13 +5867,18 @@ private fun EditContactDialog(
                     IconButton(
                         onClick = {
                             editableEmails =
-                                (editableEmails + ContactEmail("", "Личный")).toMutableList()
+                                (
+                                    editableEmails + ContactEmail(
+                                        "",
+                                        context.getString(R.string.email_type_personal)
+                                    )
+                                ).toMutableList()
                         },
                         modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
                             Icons.Default.Add,
-                            contentDescription = "Добавить email",
+                            contentDescription = stringResource(R.string.contact_add_email_cd),
                             tint = SamsungGreen,
                             modifier = Modifier.size(20.dp)
                         )
@@ -5878,7 +5888,7 @@ private fun EditContactDialog(
 
                 if (editableEmails.isEmpty()) {
                     Text(
-                        "E-mail адреса не заданы",
+                        stringResource(R.string.contact_emails_not_set),
                         fontSize = 12.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         modifier = Modifier.fillMaxWidth()
@@ -5912,7 +5922,7 @@ private fun EditContactDialog(
                             ) {
                                 Icon(
                                     Icons.Default.Delete,
-                                    contentDescription = "Удалить email",
+                                    contentDescription = stringResource(R.string.contact_delete_email_cd),
                                     tint = MaterialTheme.colorScheme.error
                                 )
                             }
@@ -5924,7 +5934,7 @@ private fun EditContactDialog(
 
                 // 5. BIRTHDAY & IMPORTANT DATES SECTION
                 Text(
-                    "Важные даты",
+                    stringResource(R.string.contact_important_date),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
@@ -5942,8 +5952,8 @@ private fun EditContactDialog(
                         OutlinedTextField(
                             value = birthdayInput,
                             onValueChange = { birthdayInput = it },
-                            label = { Text("День рождения") },
-                            placeholder = { Text("15 мая 1990 г.") },
+                            label = { Text(stringResource(R.string.contact_birthday)) },
+                            placeholder = { Text(stringResource(R.string.contact_birthday_placeholder)) },
                             singleLine = true,
                             trailingIcon = {
                                 IconButton(
@@ -5955,7 +5965,7 @@ private fun EditContactDialog(
                                 ) {
                                     Icon(
                                         Icons.Default.Event,
-                                        contentDescription = "Календарь",
+                                        contentDescription = stringResource(R.string.calendar),
                                         tint = SamsungGreen
                                     )
                                 }
@@ -5971,7 +5981,7 @@ private fun EditContactDialog(
                         ) {
                             Icon(
                                 Icons.Default.Delete,
-                                contentDescription = "Удалить день рождения",
+                                contentDescription = stringResource(R.string.contact_delete_birthday_cd),
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
@@ -5984,20 +5994,20 @@ private fun EditContactDialog(
                             .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                             .clickable {
                                 isEditingBirthday = true
-                                birthdayInput = "15 мая 1990 г."
+                                birthdayInput = context.getString(R.string.contact_birthday_placeholder)
                             }
                             .padding(horizontal = 14.dp, vertical = 10.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
                             Icons.Default.Cake,
-                            contentDescription = "День рождения",
+                            contentDescription = stringResource(R.string.contact_birthday),
                             tint = SamsungGreen,
                             modifier = Modifier.size(20.dp)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "+ Добавить день рождения",
+                            stringResource(R.string.contact_add_birthday),
                             fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = SamsungGreen
@@ -6020,8 +6030,8 @@ private fun EditContactDialog(
                                 updated[index] = dateItem.copy(label = newLabel)
                                 customImportantDates = updated
                             },
-                            label = { Text("Название даты") },
-                            placeholder = { Text("Годовщина") },
+                            label = { Text(stringResource(R.string.contact_custom_date_label)) },
+                            placeholder = { Text(stringResource(R.string.contact_custom_date_placeholder)) },
                             singleLine = true,
                             modifier = Modifier.weight(0.45f)
                         )
@@ -6035,8 +6045,8 @@ private fun EditContactDialog(
                                 updated[index] = dateItem.copy(dateString = newDate)
                                 customImportantDates = updated
                             },
-                            label = { Text("Дата") },
-                            placeholder = { Text("15 мая 2020 г.") },
+                            label = { Text(stringResource(R.string.contact_date_label)) },
+                            placeholder = { Text(stringResource(R.string.contact_date_example_placeholder)) },
                             singleLine = true,
                             trailingIcon = {
                                 IconButton(
@@ -6053,7 +6063,7 @@ private fun EditContactDialog(
                                 ) {
                                     Icon(
                                         Icons.Default.Event,
-                                        contentDescription = "Календарь",
+                                        contentDescription = stringResource(R.string.calendar),
                                         tint = SamsungGreen
                                     )
                                 }
@@ -6070,7 +6080,7 @@ private fun EditContactDialog(
                         ) {
                             Icon(
                                 Icons.Default.Delete,
-                                contentDescription = "Удалить дату",
+                                contentDescription = stringResource(R.string.contact_delete_date_cd),
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
@@ -6085,10 +6095,16 @@ private fun EditContactDialog(
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
                         .clickable {
-                            val labels =
-                                listOf("Годовщина", "Юбилей", "Именины", "Памятная дата", "Свадьба")
-                            val nextLabel =
-                                labels.getOrElse(customImportantDates.size % labels.size) { "Важная дата" }
+                            val labels = listOf(
+                                context.getString(R.string.contact_important_preset_anniversary),
+                                context.getString(R.string.contact_important_preset_jubilee),
+                                context.getString(R.string.contact_important_preset_name_day),
+                                context.getString(R.string.contact_important_preset_memorable),
+                                context.getString(R.string.contact_important_preset_wedding)
+                            )
+                            val nextLabel = labels.getOrElse(customImportantDates.size % labels.size) {
+                                context.getString(R.string.contact_important_date)
+                            }
                             customImportantDates = (customImportantDates + ContactImportantDate(
                                 label = nextLabel,
                                 dateString = ""
@@ -6099,13 +6115,13 @@ private fun EditContactDialog(
                 ) {
                     Icon(
                         Icons.Default.Event,
-                        contentDescription = "Важная дата",
+                        contentDescription = stringResource(R.string.contact_important_date),
                         tint = SamsungGreen,
                         modifier = Modifier.size(20.dp)
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
-                        "+ Добавить другую важную дату",
+                        stringResource(R.string.contact_add_important_date),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
                         color = SamsungGreen
@@ -6118,14 +6134,18 @@ private fun EditContactDialog(
                 onClick = {
                     val trimmedName = nameInput.trim()
                     if (isNewContact && trimmedName.isEmpty()) {
-                        Toast.makeText(context, "Введите имя контакта", Toast.LENGTH_SHORT).show()
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.error_contact_name_required),
+                            Toast.LENGTH_SHORT
+                        ).show()
                         return@TextButton
                     }
 
                     val cleanPhones = editablePhones.filter { it.number.isNotBlank() }
                     val cleanEmails = editableEmails.filter { it.email.isNotBlank() }
                     val newBday = if (isEditingBirthday && birthdayInput.isNotBlank()) {
-                        parseBirthdayString(birthdayInput.trim())
+                        parseBirthdayString(context, birthdayInput.trim())
                     } else null
 
                     onSave(
@@ -6140,12 +6160,12 @@ private fun EditContactDialog(
                     )
                 }
             ) {
-                Text("Сохранить", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.action_save), color = SamsungGreen, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Отмена")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )
@@ -6205,7 +6225,7 @@ private fun EditCustomMessengerLinkDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Редактировать ссылку",
+                text = stringResource(R.string.contact_edit_link_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp
             )
@@ -6213,7 +6233,7 @@ private fun EditCustomMessengerLinkDialog(
         text = {
             Column(modifier = Modifier.fillMaxWidth()) {
                 Text(
-                    text = "Выберите мессенджер",
+                    text = stringResource(R.string.contact_pick_messenger),
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
@@ -6239,14 +6259,15 @@ private fun EditCustomMessengerLinkDialog(
                                     Spacer(modifier = Modifier.width(10.dp))
                                 }
                                 Text(
-                                    text = activeMessenger?.messengerName ?: "Мессенджер",
+                                    text = activeMessenger?.messengerName
+                                        ?: stringResource(R.string.contact_messenger_generic),
                                     fontWeight = FontWeight.Bold,
                                     color = Color.Black
                                 )
                             }
                             Icon(
                                 imageVector = Icons.Default.ArrowDropDown,
-                                contentDescription = "Выбрать",
+                                contentDescription = stringResource(R.string.action_select),
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
@@ -6283,7 +6304,7 @@ private fun EditCustomMessengerLinkDialog(
                 OutlinedTextField(
                     value = customLinkInput,
                     onValueChange = { customLinkInput = it },
-                    label = { Text("Вставьте ссылку") },
+                    label = { Text(stringResource(R.string.contact_paste_link)) },
                     placeholder = { Text("https://t.me/username") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
@@ -6316,12 +6337,12 @@ private fun EditCustomMessengerLinkDialog(
                     }
                 }
             ) {
-                Text("Сохранить", color = SamsungGreen, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.action_save), color = SamsungGreen, fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Отмена")
+                Text(stringResource(R.string.action_cancel))
             }
         }
     )
@@ -6340,7 +6361,7 @@ private fun ShareFormatChoiceDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = "Поделиться контактом",
+                text = stringResource(R.string.contact_share_title),
                 fontWeight = FontWeight.Bold,
                 fontSize = 20.sp,
                 color = MaterialTheme.colorScheme.onSurface
@@ -6374,13 +6395,13 @@ private fun ShareFormatChoiceDialog(
                         Spacer(modifier = Modifier.width(14.dp))
                         Column {
                             Text(
-                                text = "Файл vCard (VCF)",
+                                text = stringResource(R.string.contact_share_vcard_title),
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Для сохранения в телефонную книгу",
+                                text = stringResource(R.string.contact_share_vcard_subtitle),
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
@@ -6411,13 +6432,13 @@ private fun ShareFormatChoiceDialog(
                         Spacer(modifier = Modifier.width(14.dp))
                         Column {
                             Text(
-                                text = "Текст",
+                                text = stringResource(R.string.contact_share_text_title),
                                 fontSize = 16.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Text(
-                                text = "Выбрать поля для отправки сообщением",
+                                text = stringResource(R.string.contact_share_text_subtitle),
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                             )
@@ -6429,7 +6450,7 @@ private fun ShareFormatChoiceDialog(
         confirmButton = {},
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Отмена", color = SamsungGreen)
+                Text(stringResource(R.string.action_cancel), color = SamsungGreen)
             }
         }
     )
@@ -6449,6 +6470,7 @@ private fun ShareTextSelectionDialog(
     onSend: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
     data class ShareFieldItem(
         val id: String,
         val title: String,
@@ -6456,14 +6478,14 @@ private fun ShareTextSelectionDialog(
         val isName: Boolean = false
     )
 
-    val items = remember(contact, phoneNumbers, emails, birthday, importantDates, messengers) {
+    val items = remember(contact, phoneNumbers, emails, birthday, importantDates, messengers, context) {
         val list = mutableListOf<ShareFieldItem>()
         // 1. Имя
         if (contact.name.isNotBlank()) {
             list.add(
                 ShareFieldItem(
                     id = "name",
-                    title = "Имя контакта",
+                    title = context.getString(R.string.contact_name),
                     subtitle = contact.name,
                     isName = true
                 )
@@ -6472,7 +6494,11 @@ private fun ShareTextSelectionDialog(
         // 2. Телефоны
         phoneNumbers.forEachIndexed { idx, p ->
             if (p.number.isNotBlank()) {
-                val labelText = if (p.label.isNotBlank()) p.label else "Телефон"
+                val labelText = if (p.label.isNotBlank()) {
+                    p.label
+                } else {
+                    context.getString(R.string.contact_phone_generic)
+                }
                 list.add(
                     ShareFieldItem(
                         id = "phone_$idx",
@@ -6500,7 +6526,7 @@ private fun ShareTextSelectionDialog(
             list.add(
                 ShareFieldItem(
                     id = "birthday",
-                    title = "День рождения",
+                    title = context.getString(R.string.contact_birthday),
                     subtitle = birthday.dateString
                 )
             )
@@ -6511,7 +6537,7 @@ private fun ShareTextSelectionDialog(
                 list.add(
                     ShareFieldItem(
                         id = "date_$idx",
-                        title = d.label.ifBlank { "Дата" },
+                        title = d.label.ifBlank { context.getString(R.string.contact_date_label) },
                         subtitle = d.dateString
                     )
                 )
@@ -6567,13 +6593,13 @@ private fun ShareTextSelectionDialog(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Назад",
+                                contentDescription = stringResource(R.string.cd_back),
                                 tint = MaterialTheme.colorScheme.onBackground
                             )
                         }
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = "Выбор контактной информации для отправки",
+                            text = stringResource(R.string.contact_share_fields_title),
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onBackground,
@@ -6686,7 +6712,7 @@ private fun ShareTextSelectionDialog(
                         )
                     ) {
                         Text(
-                            text = "Отмена",
+                            text = stringResource(R.string.action_cancel),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -6717,7 +6743,7 @@ private fun ShareTextSelectionDialog(
                         enabled = selectedIds.isNotEmpty()
                     ) {
                         Text(
-                            text = "Готово",
+                            text = stringResource(R.string.action_done),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -6746,7 +6772,12 @@ private fun shareContactAsVCard(
         vcardBuilder.append("N:;${contact.name};;;\n")
 
         val validPhones = phoneNumbers.filter { it.number.isNotBlank() }.ifEmpty {
-            listOf(ContactPhoneNumber(contact.number, "Мобильный"))
+            listOf(
+                ContactPhoneNumber(
+                    contact.number,
+                    ContactLabelHelper.defaultMobileLabel(context)
+                )
+            )
         }
         validPhones.forEach { p ->
             val vcardType = when (p.label.lowercase(Locale.getDefault())) {
@@ -6791,9 +6822,11 @@ private fun shareContactAsVCard(
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
 
-        context.startActivity(Intent.createChooser(intent, "Поделиться vCard"))
+        context.startActivity(
+            Intent.createChooser(intent, context.getString(R.string.contact_share_vcard_chooser))
+        )
     } catch (_: Exception) {
-        Toast.makeText(context, "Не удалось создать файл vCard", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.error_create_vcard), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -6807,9 +6840,11 @@ private fun shareContactText(context: Context, text: String) {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, text)
         }
-        context.startActivity(Intent.createChooser(intent, "Поделиться контактом"))
+        context.startActivity(
+            Intent.createChooser(intent, context.getString(R.string.contact_share_title))
+        )
     } catch (_: Exception) {
-        Toast.makeText(context, "Не удалось отправить контакт", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.error_send_contact), Toast.LENGTH_SHORT).show()
     }
 }
 
@@ -6817,6 +6852,7 @@ private fun shareContactText(context: Context, text: String) {
  * Формирование полного текста со всеми данными контакта (как при отправке текстом)
  */
 private fun buildContactShareText(
+    context: Context,
     contact: FavoriteContact,
     phoneNumbers: List<ContactPhoneNumber>,
     emails: List<ContactEmail>,
@@ -6829,7 +6865,11 @@ private fun buildContactShareText(
         sb.append(contact.name).append("\n")
     }
     phoneNumbers.filter { it.number.isNotBlank() }.forEach { p ->
-        val labelText = if (p.label.isNotBlank()) p.label else "Телефон"
+        val labelText = if (p.label.isNotBlank()) {
+            p.label
+        } else {
+            context.getString(R.string.contact_phone_generic)
+        }
         sb.append("$labelText: ${PhoneNumberHelper.format(p.number)}\n")
     }
     emails.filter { it.email.isNotBlank() }.forEach { e ->
@@ -6837,10 +6877,10 @@ private fun buildContactShareText(
         sb.append("$labelText: ${e.email}\n")
     }
     if (birthday != null && birthday.dateString.isNotBlank()) {
-        sb.append("День рождения: ${birthday.dateString}\n")
+        sb.append(context.getString(R.string.birthday_share_line, birthday.dateString)).append("\n")
     }
     importantDates.filter { it.dateString.isNotBlank() }.forEach { d ->
-        val label = d.label.ifBlank { "Дата" }
+        val label = d.label.ifBlank { context.getString(R.string.contact_date_label) }
         sb.append("$label: ${d.dateString}\n")
     }
     messengers.filter { it.accountDetail.isNotBlank() }.forEach { m ->
@@ -6867,7 +6907,7 @@ private fun OneUiRingtonePickerDialog(
 
     fun loadAllRingtones(): List<RingtoneEntry> {
         val list = mutableListOf<RingtoneEntry>()
-        list.add(RingtoneEntry(null, "По умолчанию"))
+        list.add(RingtoneEntry(null, context.getString(R.string.ringtone_default)))
 
         // Add user-added custom ringtones at the top
         val userAdded = ContactRingtoneManager.getSavedCustomRingtones(context)
@@ -6886,7 +6926,12 @@ private fun OneUiRingtonePickerDialog(
                 val title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX)
                 val uriStr = ringtoneUri.toString()
                 if (userAdded.none { it.first == uriStr }) {
-                    list.add(RingtoneEntry(uriStr, title ?: "Мелодия"))
+                    list.add(
+                        RingtoneEntry(
+                            uriStr,
+                            title ?: context.getString(R.string.contact_ringtone)
+                        )
+                    )
                 }
             }
         } catch (_: Exception) {
@@ -6957,7 +7002,7 @@ private fun OneUiRingtonePickerDialog(
                     displayName.substringBeforeLast(".")
                 } else {
                     RingtoneManager.getRingtone(context, pickedUri)?.getTitle(context)
-                        ?: "Пользовательская мелодия"
+                        ?: context.getString(R.string.ringtone_custom_fallback)
                 }
 
                 val uriString = pickedUri.toString()
@@ -6971,7 +7016,8 @@ private fun OneUiRingtonePickerDialog(
                 selectedEntry = newEntry
                 playPreview(uriString)
             } catch (_: Exception) {
-                Toast.makeText(context, "Не удалось добавить мелодию", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.error_add_ringtone), Toast.LENGTH_SHORT)
+                    .show()
             }
         }
     }
@@ -7033,13 +7079,13 @@ private fun OneUiRingtonePickerDialog(
                             ) {
                                 Icon(
                                     imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "Назад",
+                                    contentDescription = stringResource(R.string.cd_back),
                                     tint = MaterialTheme.colorScheme.onBackground
                                 )
                             }
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Мелодия звонка",
+                                text = stringResource(R.string.contact_ringtone),
                                 fontSize = 20.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.onBackground
@@ -7058,7 +7104,7 @@ private fun OneUiRingtonePickerDialog(
                         ) {
                             Icon(
                                 imageVector = Icons.Default.Add,
-                                contentDescription = "Добавить мелодию",
+                                contentDescription = stringResource(R.string.cd_add_ringtone),
                                 tint = SamsungGreen,
                                 modifier = Modifier.size(24.dp)
                             )
@@ -7111,7 +7157,7 @@ private fun OneUiRingtonePickerDialog(
                                 if (isSelected) {
                                     Icon(
                                         imageVector = Icons.Default.Check,
-                                        contentDescription = "Выбрано",
+                                        contentDescription = stringResource(R.string.cd_selected),
                                         tint = SamsungGreen,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -7160,7 +7206,7 @@ private fun OneUiRingtonePickerDialog(
                         )
                     ) {
                         Text(
-                            text = "Отмена",
+                            text = stringResource(R.string.action_cancel),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -7186,7 +7232,7 @@ private fun OneUiRingtonePickerDialog(
                         )
                     ) {
                         Text(
-                            text = "Сохранить",
+                            text = stringResource(R.string.action_save),
                             fontSize = 15.sp,
                             fontWeight = FontWeight.Bold
                         )
@@ -7209,7 +7255,7 @@ private fun addContactShortcutToHomeScreen(
         if (!ShortcutManagerCompat.isRequestPinShortcutSupported(context)) {
             Toast.makeText(
                 context,
-                "Создание ярлыков не поддерживается лаунчером",
+                context.getString(R.string.error_shortcut_not_supported),
                 Toast.LENGTH_SHORT
             ).show()
             return
@@ -7252,9 +7298,10 @@ private fun addContactShortcutToHomeScreen(
             .build()
 
         ShortcutManagerCompat.requestPinShortcut(context, shortcutInfo, null)
-        Toast.makeText(context, "Запрос на добавление ярлыка отправлен", Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, context.getString(R.string.toast_shortcut_requested), Toast.LENGTH_SHORT)
+            .show()
     } catch (_: Exception) {
-        Toast.makeText(context, "Не удалось добавить ярлык на главный экран", Toast.LENGTH_SHORT)
+        Toast.makeText(context, context.getString(R.string.error_add_shortcut), Toast.LENGTH_SHORT)
             .show()
     }
 }

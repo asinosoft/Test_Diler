@@ -23,10 +23,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.asinosoft.dialer.R
 import com.asinosoft.dialer.data.model.FavoriteContact
 import com.asinosoft.dialer.ui.theme.MissedRed
 import com.asinosoft.dialer.ui.theme.SamsungGreen
@@ -69,14 +71,14 @@ fun FavoritesTopBar(
                         .padding(end = 8.dp)
                 ) {
                     Text(
-                        text = "Выбран контакт",
+                        text = stringResource(R.string.favorites_contact_selected),
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
                     Text(
-                        text = selectedContact?.name ?: "Избранный",
+                        text = selectedContact?.name ?: stringResource(R.string.favorites_contact_fallback_name),
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -97,7 +99,7 @@ fun FavoritesTopBar(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Delete,
-                            contentDescription = "Удалить из избранного",
+                            contentDescription = stringResource(R.string.favorites_remove_cd),
                             tint = if (selectedContact != null) MissedRed else Color.Gray,
                             modifier = Modifier.size(24.dp)
                         )
@@ -109,7 +111,7 @@ fun FavoritesTopBar(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Add,
-                            contentDescription = "Добавить новый",
+                            contentDescription = stringResource(R.string.favorites_add_new_cd),
                             tint = SamsungGreen,
                             modifier = Modifier.size(26.dp)
                         )
@@ -121,7 +123,7 @@ fun FavoritesTopBar(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Settings,
-                            contentDescription = "Настройки",
+                            contentDescription = stringResource(R.string.cd_settings),
                             tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                             modifier = Modifier.size(24.dp)
                         )
