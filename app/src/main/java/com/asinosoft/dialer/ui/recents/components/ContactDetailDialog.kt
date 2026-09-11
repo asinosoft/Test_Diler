@@ -235,7 +235,7 @@ fun ContactDetailDialog(
         photoBitmap: Bitmap?
     ) -> Unit = { _, updated, _, _, _, _ -> onUpdateContact(updated) },
     onDeleteContact: (FavoriteContact) -> Unit = {},
-    onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", "Основные") }
+    onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", "Мои") }
 ) {
     val context = LocalContext.current
     var avatarBitmap by remember(contact.photoUri) { mutableStateOf<ImageBitmap?>(null) }

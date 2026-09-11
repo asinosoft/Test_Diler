@@ -7,9 +7,11 @@ import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.CallLog
+import android.provider.Settings
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
 import android.telephony.SubscriptionManager
@@ -19,44 +21,32 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import com.asinosoft.dialer.service.MissedCallNotificationListener
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Phone
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.core.content.edit
 import androidx.core.net.toUri
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.asinosoft.dialer.data.model.FavoriteContact
+import com.asinosoft.dialer.service.MissedCallNotificationListener
+import com.asinosoft.dialer.ui.onboarding.OnboardingFavoritesSetupScreen
+import com.asinosoft.dialer.ui.onboarding.OnboardingPermissionStep
+import com.asinosoft.dialer.ui.onboarding.OnboardingPermissionsScreen
 import com.asinosoft.dialer.ui.recents.RecentsScreen
 import com.asinosoft.dialer.ui.recents.RecentsViewModel
-import com.asinosoft.dialer.ui.theme.SamsungGreen
 import com.asinosoft.dialer.ui.theme.DialerTheme
 
 class MainActivity : ComponentActivity() {
@@ -82,16 +72,25 @@ class MainActivity : ComponentActivity() {
             DialerTheme {
                 val viewModel: RecentsViewModel = viewModel()
                 mainViewModel = viewModel
+                val context = LocalContext.current
+                val lifecycleOwner = LocalLifecycleOwner.current
 
-                var isPermissionsGranted by remember {
-                    mutableStateOf(
-                        requiredPermissions.all { perm ->
-                            ContextCompat.checkSelfPermission(
-                                this,
-                                perm
-                            ) == PackageManager.PERMISSION_GRANTED
-                        }
-                    )
+                val onboardingPrefs = remember {
+                    getSharedPreferences("dialer_settings", MODE_PRIVATE)
+                }
+                var isOnboardingComplete by remember {
+                    mutableStateOf(resolveOnboardingComplete(onboardingPrefs))
+                }
+                var isPermissionsStepDone by remember { mutableStateOf(false) }
+
+                var isRuntimeGranted by remember {
+                    mutableStateOf(areRuntimePermissionsGranted())
+                }
+                var isOverlayGranted by remember {
+                    mutableStateOf(Settings.canDrawOverlays(this))
+                }
+                var highlightedStep by remember {
+                    mutableStateOf<OnboardingPermissionStep?>(null)
                 }
 
                 val roleLauncher = rememberLauncherForActivityResult(
@@ -102,27 +101,40 @@ class MainActivity : ComponentActivity() {
 
                 val permissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestMultiplePermissions()
-                ) { permissions ->
-                    val allGranted = requiredPermissions.all { perm ->
-                        permissions[perm] == true || ContextCompat.checkSelfPermission(
-                            this,
-                            perm
-                        ) == PackageManager.PERMISSION_GRANTED
+                ) {
+                    isRuntimeGranted = areRuntimePermissionsGranted()
+                    highlightedStep = if (isRuntimeGranted) {
+                        if (!Settings.canDrawOverlays(this)) OnboardingPermissionStep.OVERLAY else null
+                    } else {
+                        OnboardingPermissionStep.RUNTIME
                     }
-                    isPermissionsGranted = allGranted
-                    if (allGranted) {
-                        requestDefaultDialerRole(roleLauncher)
+                    if (isRuntimeGranted) {
                         viewModel.loadCallLogs()
                     }
                 }
 
-                LaunchedEffect(Unit) {
-                    if (isPermissionsGranted) {
+                val overlayLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.StartActivityForResult()
+                ) {
+                    isOverlayGranted = Settings.canDrawOverlays(this)
+                    highlightedStep = if (isOverlayGranted) null else OnboardingPermissionStep.OVERLAY
+                }
+
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        if (event == Lifecycle.Event.ON_RESUME) {
+                            isRuntimeGranted = areRuntimePermissionsGranted()
+                            isOverlayGranted = Settings.canDrawOverlays(this@MainActivity)
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+                }
+
+                LaunchedEffect(isOnboardingComplete, isRuntimeGranted) {
+                    if (isOnboardingComplete && isRuntimeGranted) {
                         requestDefaultDialerRole(roleLauncher)
                         viewModel.loadCallLogs()
-                    } else {
-                        // System dialog only — custom screen stays as fallback if user denies
-                        permissionLauncher.launch(requiredPermissions)
                     }
                 }
 
@@ -130,19 +142,121 @@ class MainActivity : ComponentActivity() {
                     handleContactOpenIntent(intent)
                 }
 
-                if (isPermissionsGranted) {
-                    RecentsScreen(
-                        viewModel = viewModel,
-                        onCall = { number, simSlot -> makeCall(number, simSlot) },
-                        onSms = { number -> sendSms(number) }
+                fun openOverlaySettings() {
+                    highlightedStep = OnboardingPermissionStep.OVERLAY
+                    Toast.makeText(
+                        context,
+                        "Включите Contacts Dialer Messages на этом экране",
+                        Toast.LENGTH_LONG
+                    ).show()
+                    // Open the system "Appear on top" list focused on this app when possible.
+                    val intent = Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:$packageName")
                     )
-                } else {
-                    PermissionRequestScreen(
-                        onRequestPermissions = { permissionLauncher.launch(requiredPermissions) }
-                    )
+                    try {
+                        overlayLauncher.launch(intent)
+                    } catch (_: Exception) {
+                        try {
+                            overlayLauncher.launch(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION))
+                        } catch (_: Exception) {
+                            Toast.makeText(
+                                context,
+                                "Не удалось открыть настройки",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                }
+
+                fun requestRuntime() {
+                    highlightedStep = OnboardingPermissionStep.RUNTIME
+                    permissionLauncher.launch(requiredPermissions)
+                }
+
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    when {
+                        !isOnboardingComplete && !isPermissionsStepDone -> {
+                            OnboardingPermissionsScreen(
+                                isRuntimeGranted = isRuntimeGranted,
+                                isOverlayGranted = isOverlayGranted,
+                                highlightedStep = highlightedStep,
+                                onRequestRuntimePermissions = { requestRuntime() },
+                                onRequestOverlayPermission = { openOverlaySettings() },
+                                onContinue = {
+                                    if (isRuntimeGranted && isOverlayGranted) {
+                                        highlightedStep = null
+                                        isPermissionsStepDone = true
+                                    }
+                                }
+                            )
+                        }
+
+                        !isOnboardingComplete -> {
+                            val favoriteRowsCount by viewModel.currentFavoriteRowsCount.collectAsState()
+                            val favoritesViewMode by viewModel.favoritesViewMode.collectAsState()
+                            val tabs by viewModel.tabs.collectAsState()
+
+                            OnboardingFavoritesSetupScreen(
+                                selectedRowsCount = favoriteRowsCount,
+                                favoritesViewMode = favoritesViewMode,
+                                maxPossibleRows = 8,
+                                tabs = tabs,
+                                onRowsCountSelected = { viewModel.setFavoriteRowsCount(it) },
+                                onFavoritesViewModeSelected = { viewModel.setFavoritesViewMode(it) },
+                                onAddTab = { viewModel.addTab(it) },
+                                onRenameTab = { id, name -> viewModel.renameTab(id, name) },
+                                onDeleteTab = { viewModel.deleteTab(it) },
+                                onReorderTabs = { viewModel.reorderTabs(it) },
+                                onFinish = {
+                                    onboardingPrefs.edit {
+                                        putBoolean(KEY_ONBOARDING_COMPLETE, true)
+                                    }
+                                    isOnboardingComplete = true
+                                    requestDefaultDialerRole(roleLauncher)
+                                    viewModel.loadCallLogs()
+                                }
+                            )
+                        }
+
+                        else -> {
+                            RecentsScreen(
+                                viewModel = viewModel,
+                                onCall = { number, simSlot -> makeCall(number, simSlot) },
+                                onSms = { number -> sendSms(number) }
+                            )
+                        }
+                    }
                 }
             }
         }
+    }
+
+    private fun areRuntimePermissionsGranted(): Boolean {
+        return requiredPermissions.all { perm ->
+            ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun resolveOnboardingComplete(prefs: android.content.SharedPreferences): Boolean {
+        if (prefs.contains(KEY_ONBOARDING_COMPLETE)) {
+            return prefs.getBoolean(KEY_ONBOARDING_COMPLETE, false)
+        }
+        // Existing installs (app update) should not see first-run onboarding again.
+        val isExistingInstall = try {
+            val info = packageManager.getPackageInfo(packageName, 0)
+            info.firstInstallTime != info.lastUpdateTime
+        } catch (_: Exception) {
+            false
+        }
+        if (isExistingInstall) {
+            prefs.edit { putBoolean(KEY_ONBOARDING_COMPLETE, true) }
+            return true
+        }
+        return false
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -154,7 +268,6 @@ class MainActivity : ComponentActivity() {
     private fun handleContactOpenIntent(intent: Intent?) {
         if (intent == null) return
 
-        // 1. Explicit internal contact card open intent
         val numberExtra = intent.getStringExtra(EXTRA_OPEN_CONTACT_NUMBER)
         if (!numberExtra.isNullOrBlank()) {
             val name = intent.getStringExtra(EXTRA_OPEN_CONTACT_NAME)
@@ -169,7 +282,6 @@ class MainActivity : ComponentActivity() {
             return
         }
 
-        // 2. External dial/call intents (ACTION_DIAL, ACTION_VIEW, ACTION_CALL with tel: URI)
         val action = intent.action
         val data = intent.data
         if (data != null && (action == Intent.ACTION_DIAL || action == Intent.ACTION_VIEW || action == Intent.ACTION_CALL)) {
@@ -188,6 +300,7 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_OPEN_CONTACT_NUMBER = "extra_open_contact_number"
         const val EXTRA_OPEN_CONTACT_NAME = "extra_open_contact_name"
         const val EXTRA_OPEN_CONTACT_ID = "extra_open_contact_id"
+        private const val KEY_ONBOARDING_COMPLETE = "onboarding_complete"
     }
 
     override fun onResume() {
@@ -197,14 +310,12 @@ class MainActivity : ComponentActivity() {
 
     private fun clearMissedCallNotifications() {
         try {
-            // 1. Cancel own app's notifications (missed calls, etc.)
             val notificationManager = getSystemService(NOTIFICATION_SERVICE) as? NotificationManager
             notificationManager?.cancelAll()
         } catch (_: Exception) {
         }
 
         try {
-            // 2. Cancel Telecom system missed call notification
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val telecomManager = getSystemService(TELECOM_SERVICE) as? TelecomManager
                 @Suppress("MissingPermission")
@@ -214,13 +325,11 @@ class MainActivity : ComponentActivity() {
         }
 
         try {
-            // 3. Cancel through MissedCallNotificationListener if active
             MissedCallNotificationListener.cancelActiveIfConnected()
         } catch (_: Exception) {
         }
 
         try {
-            // 4. Mark missed calls as read/seen in CallLog
             if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_CALL_LOG) == PackageManager.PERMISSION_GRANTED) {
                 val values = ContentValues().apply {
                     put(CallLog.Calls.NEW, 0)
@@ -285,7 +394,7 @@ class MainActivity : ComponentActivity() {
                 val extras = Bundle()
                 if (telecomManager != null && subscriptionManager != null && simSlot != null) {
                     try {
-                        val targetSlotIndex = simSlot - 1 // 0 for SIM1, 1 for SIM2
+                        val targetSlotIndex = simSlot - 1
                         val activeSubscriptions = try {
                             subscriptionManager.activeSubscriptionInfoList
                         } catch (_: SecurityException) {
@@ -361,9 +470,7 @@ class MainActivity : ComponentActivity() {
                     return
                 }
             } catch (_: SecurityException) {
-                // Fallback
             } catch (_: Exception) {
-                // Fallback
             }
         }
 
@@ -399,70 +506,6 @@ class MainActivity : ComponentActivity() {
             startActivity(intent)
         } catch (_: Exception) {
             Toast.makeText(this, "Не удалось открыть SMS", Toast.LENGTH_SHORT).show()
-        }
-    }
-}
-
-@Composable
-private fun PermissionRequestScreen(
-    onRequestPermissions: () -> Unit
-) {
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .padding(24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
-        ) {
-            Icon(
-                imageVector = Icons.Default.Phone,
-                contentDescription = "Телефон",
-                tint = SamsungGreen,
-                modifier = Modifier.size(72.dp)
-            )
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            Text(
-                text = "Доступ к вызовам и контактам",
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            Text(
-                text = "Для отображения списка последних вызовов и совершения звонков приложению требуются разрешения.",
-                fontSize = 15.sp,
-                color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
-                textAlign = TextAlign.Center
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            Button(
-                onClick = onRequestPermissions,
-                shape = RoundedCornerShape(24.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = SamsungGreen,
-                    contentColor = Color.White
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp)
-            ) {
-                Text(
-                    text = "Предоставить разрешения",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
         }
     }
 }

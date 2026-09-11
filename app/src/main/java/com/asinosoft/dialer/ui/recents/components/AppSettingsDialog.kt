@@ -425,7 +425,7 @@ private fun DialerOpenModeOption(
 }
 
 @Composable
-private fun FavoritesSettingsTab(
+internal fun FavoritesSettingsTab(
     selectedRowsCount: Int,
     favoritesViewMode: FavoritesViewMode,
     maxPossibleRows: Int,

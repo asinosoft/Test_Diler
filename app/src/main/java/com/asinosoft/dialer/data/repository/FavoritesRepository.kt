@@ -214,7 +214,7 @@ class FavoritesRepository(private val context: Context) {
     fun getTabs(): List<FavoriteTab> {
         val jsonString = prefs.getString("favorites_tabs", null)
         if (jsonString.isNullOrEmpty()) {
-            val defaults = listOf(FavoriteTab("default", "Основные", 0))
+            val defaults = listOf(FavoriteTab("default", "Мои", 0))
             saveTabs(defaults)
             return defaults
         }
@@ -233,14 +233,14 @@ class FavoritesRepository(private val context: Context) {
                 )
             }
             if (list.isEmpty()) {
-                val defaults = listOf(FavoriteTab("default", "Основные", 0))
+                val defaults = listOf(FavoriteTab("default", "Мои", 0))
                 saveTabs(defaults)
                 defaults
             } else {
                 list.sortedBy { it.order }
             }
         } catch (_: Exception) {
-            listOf(FavoriteTab("default", "Основные", 0))
+            listOf(FavoriteTab("default", "Мои", 0))
         }
     }
 
