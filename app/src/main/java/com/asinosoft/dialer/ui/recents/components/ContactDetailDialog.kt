@@ -7276,7 +7276,7 @@ private fun addContactShortcutToHomeScreen(
         } else {
             IconCompat.createWithResource(
                 context,
-                R.mipmap.ic_launcher
+                R.drawable.ic_launcher
             )
         }
 
