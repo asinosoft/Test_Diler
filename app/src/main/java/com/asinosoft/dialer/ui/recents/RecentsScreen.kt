@@ -1,7 +1,6 @@
 package com.asinosoft.dialer.ui.recents
 
 import android.annotation.SuppressLint
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -265,16 +264,9 @@ fun RecentsScreen(
     // Handle system Back button: return to initial startup scroll position if scrolled at least 1 row away (above or below)
     val isScrolledAway = listState.firstVisibleItemIndex != initialItemIndex
 
-    BackHandler {
-        if (isScrolledAway) {
-            coroutineScope.launch {
-                listState.animateScrollToItem(initialItemIndex, 0)
-            }
-        } else {
-            coroutineScope.launch {
-                listState.scrollToItem(initialItemIndex, 0)
-            }
-            (context as? ComponentActivity)?.finish()
+    BackHandler(isScrolledAway) {
+        coroutineScope.launch {
+            listState.animateScrollToItem(initialItemIndex, 0)
         }
     }
 

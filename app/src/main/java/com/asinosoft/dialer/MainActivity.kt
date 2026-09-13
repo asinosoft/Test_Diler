@@ -51,8 +51,8 @@ import com.asinosoft.dialer.ui.onboarding.OnboardingPermissionsScreen
 import com.asinosoft.dialer.ui.recents.RecentsScreen
 import com.asinosoft.dialer.ui.recents.RecentsViewModel
 import com.asinosoft.dialer.ui.theme.DialerTheme
-import com.asinosoft.dialer.util.PhoneNumberHelper
 import com.asinosoft.dialer.ui.theme.SamsungGreen
+import com.asinosoft.dialer.util.PhoneNumberHelper
 
 class MainActivity : ComponentActivity() {
 
@@ -172,7 +172,7 @@ class MainActivity : ComponentActivity() {
                     highlightedStep = OnboardingPermissionStep.OVERLAY
                     Toast.makeText(
                         context,
-                        context.getString(R.string.onboarding_overlay_toast),
+                        getString(R.string.onboarding_overlay_toast),
                         Toast.LENGTH_LONG
                     ).show()
                     val intent = Intent(
@@ -187,7 +187,7 @@ class MainActivity : ComponentActivity() {
                         } catch (_: Exception) {
                             Toast.makeText(
                                 context,
-                                context.getString(R.string.error_open_settings),
+                                getString(R.string.error_open_settings),
                                 Toast.LENGTH_SHORT
                             ).show()
                         }
@@ -205,11 +205,8 @@ class MainActivity : ComponentActivity() {
                 ) {
                     when {
                         isCheckingPermissions -> {
-                            Box(Modifier.fillMaxSize()) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.align(Alignment.Center),
-                                    color = SamsungGreen
-                                )
+                            Box(Modifier.fillMaxSize(), Alignment.Center) {
+                                CircularProgressIndicator(color = SamsungGreen)
                             }
                         }
 
