@@ -147,6 +147,7 @@
     <string name="incall_action_mic">Mute</string>
     <string name="incall_action_mic_off">Unmute</string>
     <string name="incall_action_keypad">Keypad</string>
+    <string name="incall_bluetooth_devices">Bluetooth devices</string>
     <string name="incall_end_call_cd">End call</string>
     <string name="incall_end_cd">End</string>
     <string name="incall_merge">Merge</string>

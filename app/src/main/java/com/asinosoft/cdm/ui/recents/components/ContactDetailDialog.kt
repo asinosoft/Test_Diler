@@ -253,7 +253,9 @@ fun ContactDetailDialog(
         )
     }
     var activeSimCount by remember { mutableIntStateOf(1) }
-    var selectedTab by remember(initialTab, contact) { mutableIntStateOf(initialTab) }
+    var selectedTab by remember(initialTab, contact.id, contact.number) {
+        mutableIntStateOf(initialTab)
+    }
 
     var historyLogs by remember { mutableStateOf<List<CallLogItem>>(emptyList()) }
     var isLoadingHistory by remember { mutableStateOf(false) }

@@ -77,7 +77,6 @@ import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -119,9 +118,8 @@ import androidx.core.net.toUri
 import com.asinosoft.cdm.MainActivity
 import com.asinosoft.cdm.R
 import com.asinosoft.cdm.data.repository.QuickRepliesManager
+import com.asinosoft.cdm.service.BluetoothAudioDevice
 import com.asinosoft.cdm.service.CallManager
-import com.asinosoft.cdm.ui.components.OneUiPopupMenu
-import com.asinosoft.cdm.ui.components.OneUiPopupMenuItem
 import com.asinosoft.cdm.ui.components.SimIcon
 import com.asinosoft.cdm.ui.recents.components.executeCustomSwipeAction
 import com.asinosoft.cdm.ui.recents.components.getCustomSwipeAction
@@ -822,43 +820,18 @@ fun InCallScreen(
                         }
                         val hasMultipleBtDevices = bluetoothDevices.size > 1
 
-                        Box(contentAlignment = Alignment.Center) {
-                            InCallActionButton(
-                                icon = if (isBluetoothActive) Icons.Default.BluetoothAudio else Icons.Default.Bluetooth,
-                                label = if (hasMultipleBtDevices) "$btDeviceName ›" else btDeviceName,
-                                isActive = isBluetoothActive,
-                                activeColor = SamsungSmsBlue,
-                                onClick = {
-                                    if (hasMultipleBtDevices) {
-                                        showBluetoothMenu = true
-                                    } else {
-                                        CallManager.toggleBluetooth()
-                                    }
-                                }
-                            )
-
-                            if (hasMultipleBtDevices) {
-                                OneUiPopupMenu(
-                                    expanded = showBluetoothMenu,
-                                    onDismissRequest = { showBluetoothMenu = false }
-                                ) {
-                                    bluetoothDevices.forEach { device ->
-                                        val isSelected = device.isCurrent || (isBluetoothActive && device.name == currentBtName)
-                                        OneUiPopupMenuItem(
-                                            icon = if (isSelected) Icons.Default.Check else Icons.Default.Bluetooth,
-                                            label = device.name,
-                                            labelColor = if (isSelected) SamsungGreen else MaterialTheme.colorScheme.onSurface,
-                                            iconTint = if (isSelected) SamsungGreen else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                            iconBackground = if (isSelected) SamsungGreen.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surfaceVariant,
-                                            onClick = {
-                                                showBluetoothMenu = false
-                                                CallManager.selectBluetoothDevice(device)
-                                            }
-                                        )
-                                    }
-                                }
+                        InCallActionButton(
+                            icon = if (isBluetoothActive) Icons.Default.BluetoothAudio else Icons.Default.Bluetooth,
+                            label = if (hasMultipleBtDevices) "$btDeviceName ›" else btDeviceName,
+                            isActive = isBluetoothActive,
+                            activeColor = SamsungSmsBlue,
+                            onClick = { CallManager.toggleBluetooth() },
+                            onLabelClick = if (hasMultipleBtDevices) {
+                                { showBluetoothMenu = true }
+                            } else {
+                                null
                             }
-                        }
+                        )
                     }
 
                     // Row 2
@@ -969,6 +942,19 @@ fun InCallScreen(
                 CallManager.playDtmf(digit)
             },
             onDismiss = { showKeypadSheet = false }
+        )
+    }
+
+    if (showBluetoothMenu) {
+        BluetoothDevicesSheet(
+            devices = bluetoothDevices,
+            currentDeviceName = currentBtName,
+            isBluetoothActive = audioRoute == CallAudioState.ROUTE_BLUETOOTH,
+            onSelect = { device ->
+                showBluetoothMenu = false
+                CallManager.selectBluetoothDevice(device)
+            },
+            onDismiss = { showBluetoothMenu = false }
         )
     }
 }
@@ -1500,20 +1486,39 @@ private fun InCallActionButton(
     label: String,
     isActive: Boolean = false,
     activeColor: Color = SamsungGreen,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    onLabelClick: (() -> Unit)? = null
 ) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
             .width(84.dp)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
+            .then(
+                if (onLabelClick == null) {
+                    Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onClick
+                    )
+                } else {
+                    Modifier
+                }
             )
     ) {
         Surface(
-            modifier = Modifier.size(64.dp),
+            modifier = Modifier
+                .size(64.dp)
+                .then(
+                    if (onLabelClick != null) {
+                        Modifier.clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onClick
+                        )
+                    } else {
+                        Modifier
+                    }
+                ),
             shape = CircleShape,
             color = if (isActive) activeColor else Color.White.copy(alpha = 0.12f),
             shadowElevation = if (isActive) 6.dp else 0.dp
@@ -1547,8 +1552,110 @@ private fun InCallActionButton(
             fontWeight = FontWeight.Medium,
             color = if (isActive) activeColor else Color.White.copy(alpha = 0.85f),
             textAlign = TextAlign.Center,
-            maxLines = 1
+            maxLines = 1,
+            modifier = if (onLabelClick != null) {
+                Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onLabelClick
+                )
+            } else {
+                Modifier
+            }
         )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun BluetoothDevicesSheet(
+    devices: List<BluetoothAudioDevice>,
+    currentDeviceName: String?,
+    isBluetoothActive: Boolean,
+    onSelect: (BluetoothAudioDevice) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = Color(0xFF1E232E),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 36.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.incall_bluetooth_devices),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color.White,
+                modifier = Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            devices.forEach { device ->
+                val isSelected = device.isCurrent ||
+                        (isBluetoothActive && device.name == currentDeviceName)
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onSelect(device) }
+                        .padding(horizontal = 12.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .background(
+                                if (isSelected) SamsungSmsBlue.copy(alpha = 0.22f)
+                                else Color.White.copy(alpha = 0.1f)
+                            )
+                    ) {
+                        Icon(
+                            imageVector = if (isSelected) {
+                                Icons.Default.BluetoothAudio
+                            } else {
+                                Icons.Default.Bluetooth
+                            },
+                            contentDescription = null,
+                            tint = if (isSelected) SamsungSmsBlue else Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(14.dp))
+
+                    Text(
+                        text = device.name,
+                        fontSize = 16.sp,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                        color = if (isSelected) Color.White else Color.White.copy(alpha = 0.9f),
+                        modifier = Modifier.weight(1f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

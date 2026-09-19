@@ -141,6 +141,7 @@
     <string name="incall_action_mic">Микрофон</string>
     <string name="incall_action_mic_off">Выкл. микр.</string>
     <string name="incall_action_keypad">Клавиатура</string>
+    <string name="incall_bluetooth_devices">Устройства Bluetooth</string>
     <string name="incall_end_call_cd">Завершить вызов</string>
     <string name="incall_end_cd">Завершить</string>
     <string name="incall_merge">Объединить</string>
