@@ -1,0 +1,7370 @@
+package com.asinosoft.cdm.ui.recents.components
+
+import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.ContentValues
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.media.AudioAttributes
+import android.media.Ringtone
+import android.media.RingtoneManager
+import android.net.Uri
+import android.provider.BlockedNumberContract
+import android.provider.ContactsContract
+import android.provider.OpenableColumns
+import android.telephony.SubscriptionManager
+import android.util.Log
+import android.widget.Toast
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.Preview
+import androidx.camera.lifecycle.ProcessCameraProvider
+import androidx.camera.view.PreviewView
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.automirrored.filled.CallMade
+import androidx.compose.material.icons.automirrored.filled.CallMissed
+import androidx.compose.material.icons.automirrored.filled.CallReceived
+import androidx.compose.material.icons.automirrored.filled.Message
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AddHome
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.Cake
+import androidx.compose.material.icons.filled.CallEnd
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.FolderSpecial
+import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.QrCodeScanner
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Videocam
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CheckboxDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.zIndex
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
+import androidx.core.content.edit
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.drawable.IconCompat
+import androidx.core.net.toUri
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.asinosoft.cdm.MainActivity
+import com.asinosoft.cdm.R
+import com.asinosoft.cdm.data.model.CallLogItem
+import com.asinosoft.cdm.data.model.CallType
+import com.asinosoft.cdm.data.model.FavoriteContact
+import com.asinosoft.cdm.data.model.FavoriteTab
+import com.asinosoft.cdm.data.repository.CallLogRepository
+import com.asinosoft.cdm.data.repository.ContactRingtoneManager
+import com.asinosoft.cdm.data.repository.ContactsRepository
+import com.asinosoft.cdm.data.repository.ContactsWriteRepository
+import com.asinosoft.cdm.ui.components.FloatingStickyDateHeader
+import com.asinosoft.cdm.ui.components.Header
+import com.asinosoft.cdm.ui.components.LazyListVerticalScrollbar
+import com.asinosoft.cdm.ui.components.OneUiPopupMenu
+import com.asinosoft.cdm.ui.components.OneUiPopupMenuDivider
+import com.asinosoft.cdm.ui.components.OneUiPopupMenuItem
+import com.asinosoft.cdm.ui.components.SimIcon
+import com.asinosoft.cdm.ui.recents.CallTypeFilter
+import com.asinosoft.cdm.ui.recents.SimFilter
+import com.asinosoft.cdm.ui.theme.BlockedRed
+import com.asinosoft.cdm.ui.theme.IncomingGreen
+import com.asinosoft.cdm.ui.theme.MissedRed
+import com.asinosoft.cdm.ui.theme.OutgoingBlue
+import com.asinosoft.cdm.ui.theme.SamsungGreen
+import com.asinosoft.cdm.ui.theme.SamsungSmsBlue
+import com.asinosoft.cdm.util.ContactLabelHelper
+import com.asinosoft.cdm.util.DateHeaderFormatter
+import com.asinosoft.cdm.util.PhoneNumberHelper
+import com.google.mlkit.vision.barcode.BarcodeScanning
+import com.google.mlkit.vision.common.InputImage
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+import kotlin.math.roundToInt
+
+data class ContactPhoneNumber(
+    val number: String,
+    val label: String
+)
+
+@Composable
+fun ContactDetailDialog(
+    contact: FavoriteContact,
+    initialTab: Int = 0,
+    isFavorite: Boolean = false,
+    tabs: List<FavoriteTab> = emptyList(),
+    onDismiss: () -> Unit,
+    onCall: (String, Int?) -> Unit,
+    onSms: (String) -> Unit,
+    onRemoveFavorite: (FavoriteContact) -> Unit,
+    onToggleFavorite: (FavoriteContact, Boolean) -> Unit = { c, fav ->
+        if (!fav) onRemoveFavorite(c)
+    },
+    onUpdateContact: (FavoriteContact) -> Unit = {},
+    onSaveEditedContact: (
+        original: FavoriteContact,
+        updated: FavoriteContact,
+        phones: List<ContactsWriteRepository.PhoneEntry>,
+        emails: List<ContactsWriteRepository.EmailEntry>,
+        birthdayDateString: String?,
+        photoBitmap: Bitmap?
+    ) -> Unit = { _, updated, _, _, _, _ -> onUpdateContact(updated) },
+    onDeleteContact: (FavoriteContact) -> Unit = {},
+    onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", it) }
+) {
+    val context = LocalContext.current
+    var avatarBitmap by remember(contact.photoUri) { mutableStateOf<ImageBitmap?>(null) }
+    var phoneNumbersList by remember(contact) {
+        mutableStateOf(
+            listOf(
+                ContactPhoneNumber(
+                    number = contact.number,
+                    label = ContactLabelHelper.defaultMobileLabel(context)
+                )
+            )
+        )
+    }
+    var activeSimCount by remember { mutableIntStateOf(1) }
+    var selectedTab by remember(initialTab, contact) { mutableIntStateOf(initialTab) }
+
+    var historyLogs by remember { mutableStateOf<List<CallLogItem>>(emptyList()) }
+    var isLoadingHistory by remember { mutableStateOf(false) }
+
+    LaunchedEffect(contact) {
+        historyLogs = emptyList()
+        isLoadingHistory = false
+    }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            try {
+                val sm =
+                    context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+
+                @Suppress("MissingPermission")
+                val count = sm?.activeSubscriptionInfoCount ?: 1
+                activeSimCount = if (count > 1) count else 1
+            } catch (_: Exception) {
+                activeSimCount = 1
+            }
+        }
+    }
+
+    var messengerAccountsList by remember(contact) {
+        mutableStateOf<List<MessengerAccount>>(
+            emptyList()
+        )
+    }
+    var emailsList by remember(contact) { mutableStateOf<List<ContactEmail>>(emptyList()) }
+    var birthdayInfo by remember(contact) { mutableStateOf<ContactBirthday?>(null) }
+    var importantDatesList by remember(contact) {
+        mutableStateOf<List<ContactImportantDate>>(
+            emptyList()
+        )
+    }
+
+    LaunchedEffect(contact) {
+        withContext(Dispatchers.IO) {
+            val highResPhotoUri =
+                getHighResContactPhotoUri(context, contact.number) ?: contact.photoUri
+            if (!highResPhotoUri.isNullOrEmpty()) {
+                try {
+                    val uri = highResPhotoUri.toUri()
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        val bitmap = BitmapFactory.decodeStream(stream)
+                        avatarBitmap = bitmap?.asImageBitmap()
+                    }
+                } catch (_: Exception) {
+                    avatarBitmap = null
+                }
+            } else {
+                avatarBitmap = null
+            }
+
+            // Query all phone numbers for this contact
+            val loadedNumbers = loadContactPhoneNumbers(context, contact)
+            if (loadedNumbers.isNotEmpty()) {
+                phoneNumbersList = loadedNumbers
+            }
+
+            // Load messenger accounts for this contact
+            messengerAccountsList = loadMessengerAccounts(context, contact)
+
+            // Load emails for this contact
+            emailsList = loadContactEmails(context, contact)
+
+            // Load birthday for this contact
+            birthdayInfo = loadContactBirthday(context, contact)
+
+            // Load custom important dates
+            importantDatesList =
+                getImportantDates(context, getContactCustomKey(contact), contact.number)
+        }
+    }
+
+    // Load call history when History tab selected (scoped query, not full CallLog scan)
+    LaunchedEffect(selectedTab, contact, phoneNumbersList) {
+        if (selectedTab != 1) return@LaunchedEffect
+        val numbers = buildList {
+            add(contact.number)
+            phoneNumbersList.forEach { add(it.number) }
+        }
+        val showSpinner = historyLogs.isEmpty()
+        if (showSpinner) isLoadingHistory = true
+        withContext(Dispatchers.IO) {
+            try {
+                val repository = CallLogRepository(context)
+                historyLogs = repository.getCallLogsForNumbers(numbers)
+            } catch (_: Exception) {
+                if (historyLogs.isEmpty()) historyLogs = emptyList()
+            }
+        }
+        isLoadingHistory = false
+    }
+
+    var callTypeFilter by remember { mutableStateOf(CallTypeFilter.ALL) }
+    var simFilter by remember { mutableStateOf(SimFilter.ALL) }
+    var showCallFilterDialog by remember { mutableStateOf(false) }
+
+    val isFilterActive = callTypeFilter != CallTypeFilter.ALL || simFilter != SimFilter.ALL
+
+    val filteredHistoryLogs = remember(historyLogs, callTypeFilter, simFilter) {
+        historyLogs.filter { item ->
+            val matchesType = when (callTypeFilter) {
+                CallTypeFilter.ALL -> true
+                CallTypeFilter.INCOMING -> item.type == CallType.INCOMING
+                CallTypeFilter.OUTGOING -> item.type == CallType.OUTGOING
+                CallTypeFilter.MISSED -> item.type == CallType.MISSED || item.type == CallType.REJECTED || item.type == CallType.BLOCKED
+            }
+            val matchesSim = when (simFilter) {
+                SimFilter.ALL -> true
+                SimFilter.SIM_1 -> item.simNumber == 1
+                SimFilter.SIM_2 -> item.simNumber == 2
+            }
+            matchesType && matchesSim
+        }
+    }
+
+    val groupedHistoryLogs = remember(filteredHistoryLogs, context) {
+        filteredHistoryLogs.groupBy { DateHeaderFormatter.formatDateHeader(context, it.timestamp) }.toList()
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        BackHandler {
+            onDismiss()
+        }
+
+        val avatarBgColor = remember(contact.name) {
+            val colors = listOf(
+                Color(0xFFE57373), Color(0xFFF06292), Color(0xFFBA68C8),
+                Color(0xFF9575CD), Color(0xFF7986CB), Color(0xFF64B5F6),
+                Color(0xFF4FC3F7), Color(0xFF4DB6AC), Color(0xFF81C784),
+                Color(0xFFAED581), Color(0xFFFF8A65), Color(0xFFA1887F)
+            )
+            val index = (contact.name.hashCode() and Int.MAX_VALUE) % colors.size
+            colors[index]
+        }
+
+        val listState = rememberLazyListState()
+        val density = LocalDensity.current
+        val topBarrierPx = with(density) { 86.dp.toPx() }
+        val haptic = LocalHapticFeedback.current
+        var totalHorizontalDrag by remember { mutableFloatStateOf(0f) }
+        var swipeConsumed by remember { mutableStateOf(false) }
+
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+                .pointerInput(selectedTab) {
+                    detectHorizontalDragGestures(
+                        onDragStart = {
+                            totalHorizontalDrag = 0f
+                            swipeConsumed = false
+                        },
+                        onDragEnd = {
+                            totalHorizontalDrag = 0f
+                            swipeConsumed = false
+                        },
+                        onDragCancel = {
+                            totalHorizontalDrag = 0f
+                            swipeConsumed = false
+                        },
+                        onHorizontalDrag = { change, dragAmount ->
+                            if (!swipeConsumed) {
+                                totalHorizontalDrag += dragAmount
+                                val threshold = 55.dp.toPx()
+                                if (totalHorizontalDrag < -threshold) {
+                                    // Swipe left -> next tab
+                                    if (selectedTab < 2) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        selectedTab++
+                                        swipeConsumed = true
+                                        change.consume()
+                                    }
+                                } else if (totalHorizontalDrag > threshold) {
+                                    // Swipe right -> previous tab
+                                    if (selectedTab > 0) {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        selectedTab--
+                                        swipeConsumed = true
+                                        change.consume()
+                                    }
+                                }
+                            }
+                        }
+                    )
+                }
+        ) {
+            // Expand contact photo up to half-screen
+            val minHeight = 280f
+            val maxHeight = LocalWindowInfo.current.containerDpSize.height.value / 2f
+            var heroHeight by remember { mutableFloatStateOf(minHeight) }
+            val scrollConnection = remember {
+                object : NestedScrollConnection {
+                    override fun onPreScroll(
+                        available: Offset,
+                        source: NestedScrollSource
+                    ): Offset {
+                        val previousHeight = heroHeight
+                        heroHeight = (heroHeight + available.y / 2).coerceIn(minHeight, maxHeight)
+                        val consumed = heroHeight - previousHeight
+
+                        Log.d("hero", "Available = $available, Consumed = $consumed")
+
+                        return Offset(0f, consumed)
+                    }
+                }
+            }
+
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .nestedScroll(scrollConnection)
+            ) {
+                item(key = "hero") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(heroHeight.dp)
+                            .background(avatarBgColor)
+                    ) {
+                        val bitmap = avatarBitmap
+                        if (bitmap != null) {
+                            Image(
+                                bitmap = bitmap,
+                                contentDescription = contact.name,
+                                modifier = Modifier.fillMaxSize(),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colors = listOf(
+                                                avatarBgColor,
+                                                avatarBgColor.copy(alpha = 0.7f)
+                                            )
+                                        )
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                val initial =
+                                    contact.name.trim().firstOrNull()?.uppercaseChar()?.toString()
+                                        ?: "?"
+                                Text(
+                                    text = initial,
+                                    color = Color.White,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 80.sp
+                                )
+                            }
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(100.dp)
+                                .align(Alignment.BottomCenter)
+                                .background(
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.Transparent,
+                                            Color.Black.copy(alpha = 0.4f)
+                                        )
+                                    )
+                                )
+                        )
+                    }
+                }
+
+                item(key = "content_header") {
+                    Surface(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .offset(y = (-24).dp),
+                        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                        color = MaterialTheme.colorScheme.background
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    start = 20.dp,
+                                    end = 20.dp,
+                                    top = 24.dp,
+                                    bottom = if (selectedTab == 1 && !isLoadingHistory && historyLogs.isNotEmpty()) 0.dp else 8.dp
+                                ),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                text = contact.name,
+                                fontSize = 26.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground,
+                                textAlign = TextAlign.Center,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            FloatingTabBar(
+                                selectedTab = selectedTab,
+                                onTabSelected = { selectedTab = it }
+                            )
+
+                            if (selectedTab != 1 || isLoadingHistory || historyLogs.isEmpty()) {
+                                Spacer(modifier = Modifier.height(24.dp))
+                            }
+
+                            AnimatedContent(
+                                targetState = selectedTab,
+                                transitionSpec = {
+                                    if (targetState > initialState) {
+                                        (slideInHorizontally(animationSpec = tween(260)) { width -> width } + fadeIn(
+                                            tween(260)
+                                        ))
+                                            .togetherWith(
+                                                slideOutHorizontally(
+                                                    animationSpec = tween(
+                                                        260
+                                                    )
+                                                ) { width -> -width } + fadeOut(tween(260)))
+                                    } else {
+                                        (slideInHorizontally(animationSpec = tween(260)) { width -> -width } + fadeIn(
+                                            tween(260)
+                                        ))
+                                            .togetherWith(
+                                                slideOutHorizontally(
+                                                    animationSpec = tween(
+                                                        260
+                                                    )
+                                                ) { width -> width } + fadeOut(tween(260)))
+                                    }.using(SizeTransform(clip = false))
+                                },
+                                label = "tabTransition"
+                            ) { targetTab ->
+                                when (targetTab) {
+                                    0 -> {
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            ContactTabContent(
+                                                phoneNumbersList = phoneNumbersList,
+                                                messengerAccountsList = messengerAccountsList,
+                                                onUpdateMessengerAccounts = {
+                                                    messengerAccountsList = it
+                                                },
+                                                onUpdatePhoneNumbers = { phoneNumbersList = it },
+                                                onUpdateEmails = { emailsList = it },
+                                                emailsList = emailsList,
+                                                birthdayInfo = birthdayInfo,
+                                                importantDatesList = importantDatesList,
+                                                activeSimCount = activeSimCount,
+                                                contact = contact,
+                                                context = context,
+                                                onCall = onCall,
+                                                onSms = onSms,
+                                                onDismiss = onDismiss,
+                                                onRemoveFavorite = onRemoveFavorite
+                                            )
+                                            Spacer(modifier = Modifier.height(40.dp))
+                                        }
+                                    }
+
+                                    1 -> {
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            when {
+                                                isLoadingHistory -> {
+                                                    Box(
+                                                        modifier = Modifier
+                                                            .fillMaxWidth()
+                                                            .height(120.dp),
+                                                        contentAlignment = Alignment.Center
+                                                    ) {
+                                                        Text(
+                                                            text = stringResource(R.string.contact_history_loading),
+                                                            fontSize = 15.sp,
+                                                            color = MaterialTheme.colorScheme.onBackground.copy(
+                                                                alpha = 0.5f
+                                                            )
+                                                        )
+                                                    }
+                                                }
+
+                                                historyLogs.isEmpty() -> {
+                                                    Surface(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        shape = RoundedCornerShape(20.dp),
+                                                        color = MaterialTheme.colorScheme.surface,
+                                                        tonalElevation = 1.dp
+                                                    ) {
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .fillMaxWidth()
+                                                                .padding(vertical = 32.dp),
+                                                            contentAlignment = Alignment.Center
+                                                        ) {
+                                                            Text(
+                                                                text = stringResource(R.string.contact_history_empty),
+                                                                fontSize = 15.sp,
+                                                                color = MaterialTheme.colorScheme.onSurface.copy(
+                                                                    alpha = 0.5f
+                                                                )
+                                                            )
+                                                        }
+                                                    }
+                                                    Spacer(modifier = Modifier.height(40.dp))
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    2 -> {
+                                        Column(modifier = Modifier.fillMaxWidth()) {
+                                            SettingsTabContent(
+                                                contact = contact,
+                                                isFavoriteInitial = isFavorite,
+                                                phoneNumbersList = phoneNumbersList,
+                                                messengerAccountsList = messengerAccountsList,
+                                                onUpdateMessengerAccounts = {
+                                                    messengerAccountsList = it
+                                                },
+                                                emailsList = emailsList,
+                                                activeSimCount = activeSimCount,
+                                                context = context,
+                                                tabs = tabs,
+                                                avatarBitmap = avatarBitmap,
+                                                onDismiss = onDismiss,
+                                                onRemoveFavorite = onRemoveFavorite,
+                                                onToggleFavorite = onToggleFavorite,
+                                                onUpdateContact = onUpdateContact,
+                                                onAddTab = onAddTab
+                                            )
+                                            Spacer(modifier = Modifier.height(40.dp))
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (selectedTab == 1 && !isLoadingHistory && historyLogs.isNotEmpty()) {
+                    item(key = "history_statistics") {
+                        ContactHistoryStatistics(
+                            historyLogs = filteredHistoryLogs,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 4.dp)
+                        )
+                    }
+
+                    groupedHistoryLogs.forEachIndexed { dateIndex, (dateHeader, logsInDay) ->
+                        if (dateHeader.isNotEmpty()) {
+                            stickyHeader(key = "history_header_$dateHeader") { _ ->
+                                val headerOffsetPx by remember(listState) {
+                                    derivedStateOf {
+                                        val layoutInfo = listState.layoutInfo
+                                        val currentItem =
+                                            layoutInfo.visibleItemsInfo.find { it.key == "history_header_$dateHeader" }
+                                        if (currentItem == null) {
+                                            0f
+                                        } else {
+                                            val nextHeader = layoutInfo.visibleItemsInfo.find {
+                                                it.key.toString()
+                                                    .startsWith("history_header_") && it.index > currentItem.index
+                                            }
+                                            val headerHeight =
+                                                currentItem.size.toFloat().coerceAtLeast(1f)
+
+                                            if (currentItem.offset <= 0) {
+                                                if (nextHeader != null) {
+                                                    minOf(
+                                                        topBarrierPx,
+                                                        (nextHeader.offset - headerHeight).coerceAtLeast(
+                                                            0f
+                                                        )
+                                                    )
+                                                } else {
+                                                    topBarrierPx
+                                                }
+                                            } else if (currentItem.offset < topBarrierPx) {
+                                                if (nextHeader != null && nextHeader.offset < topBarrierPx + headerHeight) {
+                                                    minOf(
+                                                        topBarrierPx - currentItem.offset,
+                                                        (nextHeader.offset - headerHeight).coerceAtLeast(
+                                                            0f
+                                                        )
+                                                    )
+                                                } else {
+                                                    topBarrierPx - currentItem.offset
+                                                }
+                                            } else {
+                                                0f
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .zIndex(2f)
+                                        .offset { IntOffset(0, headerOffsetPx.roundToInt()) }
+                                ) {
+                                    FloatingStickyDateHeader(
+                                        text = dateHeader,
+                                        onFilterClick = if (dateIndex == 0) {
+                                            { showCallFilterDialog = true }
+                                        } else null,
+                                        isFilterActive = isFilterActive,
+                                        startPadding = 20.dp,
+                                        endPadding = 20.dp,
+                                        topPadding = 6.dp
+                                    )
+                                }
+                            }
+                        }
+
+                        items(
+                            count = logsInDay.size,
+                            key = { index -> "history_${dateHeader}_${logsInDay[index].id}" }
+                        ) { index ->
+                            val item = logsInDay[index]
+                            val isFirst = index == 0
+                            val isLast = index == logsInDay.lastIndex
+
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(
+                                        start = 20.dp,
+                                        end = 20.dp,
+                                        bottom = if (isLast) 12.dp else 0.dp
+                                    )
+                            ) {
+                                Surface(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    shape = RoundedCornerShape(
+                                        topStart = if (isFirst) 20.dp else 0.dp,
+                                        topEnd = if (isFirst) 20.dp else 0.dp,
+                                        bottomStart = if (isLast) 20.dp else 0.dp,
+                                        bottomEnd = if (isLast) 20.dp else 0.dp
+                                    ),
+                                    color = MaterialTheme.colorScheme.surface,
+                                    tonalElevation = 1.dp
+                                ) {
+                                    Column {
+                                        if (!isFirst) {
+                                            HorizontalDivider(
+                                                color = MaterialTheme.colorScheme.onSurface.copy(
+                                                    alpha = 0.08f
+                                                ),
+                                                thickness = 1.dp,
+                                                modifier = Modifier.padding(horizontal = 16.dp)
+                                            )
+                                        }
+                                        HistoryCallRow(item = item)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    item(key = "history_bottom_spacer") {
+                        Spacer(modifier = Modifier.height(40.dp))
+                    }
+                }
+            }
+
+            if (selectedTab == 1) {
+                LazyListVerticalScrollbar(
+                    listState = listState,
+                    modifier = Modifier
+                        .align(Alignment.CenterEnd)
+                        .fillMaxHeight()
+                        .zIndex(5f)
+                )
+            }
+
+            var showEditContactDialog by remember { mutableStateOf(false) }
+            var showDeleteConfirmDialog by remember { mutableStateOf(false) }
+            var showShareFormatDialog by remember { mutableStateOf(false) }
+            var showShareTextSelectionDialog by remember { mutableStateOf(false) }
+
+            // TOP FLOATING TOOLBAR OVER PHOTO (Back Button & Three Dots Menu)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(100.dp)
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.6f),
+                                Color.Transparent
+                            )
+                        )
+                    )
+                    .padding(start = 12.dp, end = 12.dp, top = 38.dp, bottom = 8.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .align(Alignment.Center),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Back Button
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(Color.Black.copy(alpha = 0.35f))
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.cd_back),
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    // Three Dots Menu
+                    Box {
+                        var topMenuExpanded by remember { mutableStateOf(false) }
+
+                        IconButton(
+                            onClick = { topMenuExpanded = true },
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.35f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MoreVert,
+                                contentDescription = stringResource(R.string.cd_more),
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+
+                        OneUiPopupMenu(
+                            expanded = topMenuExpanded,
+                            onDismissRequest = { topMenuExpanded = false },
+                            alignEnd = true
+                        ) {
+                            OneUiPopupMenuItem(
+                                icon = Icons.Default.Share,
+                                label = stringResource(R.string.action_share),
+                                onClick = {
+                                    topMenuExpanded = false
+                                    showShareFormatDialog = true
+                                }
+                            )
+                            OneUiPopupMenuItem(
+                                icon = Icons.Default.Edit,
+                                label = stringResource(R.string.action_edit),
+                                onClick = {
+                                    topMenuExpanded = false
+                                    showEditContactDialog = true
+                                }
+                            )
+                            OneUiPopupMenuDivider()
+                            OneUiPopupMenuItem(
+                                icon = Icons.Default.Delete,
+                                label = stringResource(R.string.action_delete),
+                                destructive = true,
+                                onClick = {
+                                    topMenuExpanded = false
+                                    showDeleteConfirmDialog = true
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (showDeleteConfirmDialog) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteConfirmDialog = false },
+                    title = {
+                        Text(
+                            text = stringResource(R.string.contact_delete_title),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp
+                        )
+                    },
+                    text = {
+                        Text(
+                            text = stringResource(R.string.contact_delete_message, contact.name),
+                            fontSize = 15.sp
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showDeleteConfirmDialog = false
+                                onDeleteContact(contact)
+                            }
+                        ) {
+                            Text(
+                                text = stringResource(R.string.action_delete),
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                            Text(stringResource(R.string.action_cancel))
+                        }
+                    }
+                )
+            }
+
+            if (showEditContactDialog) {
+                EditContactDialog(
+                    contact = contact,
+                    phoneNumbersList = phoneNumbersList,
+                    emailsList = emailsList,
+                    birthdayInfo = birthdayInfo,
+                    importantDatesList = importantDatesList,
+                    messengerAccountsList = messengerAccountsList,
+                    avatarBitmap = avatarBitmap,
+                    context = context,
+                    onSave = { newName, newPhones, newEmails, newBirthday, newImportantDates, updatedMessengers, hiddenSet, newBitmap ->
+                        val updatedContact = contact.copy(
+                            name = newName,
+                            number = newPhones.firstOrNull()?.number ?: contact.number
+                        )
+                        phoneNumbersList = newPhones
+                        emailsList = newEmails
+                        birthdayInfo = newBirthday
+                        importantDatesList = newImportantDates
+                        messengerAccountsList = updatedMessengers
+                        if (newBitmap != null) {
+                            avatarBitmap = newBitmap
+                        }
+                        saveHiddenMessengers(context, getContactCustomKey(contact), hiddenSet)
+                        saveCustomMessengerLinks(
+                            context,
+                            getContactCustomKey(updatedContact),
+                            updatedMessengers
+                        )
+                        saveImportantDates(
+                            context,
+                            getContactCustomKey(updatedContact),
+                            updatedContact.number,
+                            newImportantDates
+                        )
+                        onSaveEditedContact(
+                            contact,
+                            updatedContact,
+                            newPhones.map {
+                                ContactsWriteRepository.PhoneEntry(it.number, it.label)
+                            },
+                            newEmails.map {
+                                ContactsWriteRepository.EmailEntry(it.email, it.label)
+                            },
+                            newBirthday?.dateString,
+                            newBitmap?.asAndroidBitmap()
+                        )
+                        showEditContactDialog = false
+                    },
+                    onDismiss = { showEditContactDialog = false }
+                )
+            }
+
+            if (showShareFormatDialog) {
+                ShareFormatChoiceDialog(
+                    onShareVCard = {
+                        showShareFormatDialog = false
+                        shareContactAsVCard(
+                            context = context,
+                            contact = contact,
+                            phoneNumbers = phoneNumbersList,
+                            emails = emailsList,
+                            birthday = birthdayInfo?.dateString
+                        )
+                    },
+                    onShareText = {
+                        showShareFormatDialog = false
+                        showShareTextSelectionDialog = true
+                    },
+                    onDismiss = { showShareFormatDialog = false }
+                )
+            }
+
+            if (showShareTextSelectionDialog) {
+                ShareTextSelectionDialog(
+                    contact = contact,
+                    phoneNumbers = phoneNumbersList,
+                    emails = emailsList,
+                    birthday = birthdayInfo,
+                    importantDates = importantDatesList,
+                    messengers = messengerAccountsList,
+                    onSend = { selectedText ->
+                        showShareTextSelectionDialog = false
+                        shareContactText(context, selectedText)
+                    },
+                    onDismiss = { showShareTextSelectionDialog = false }
+                )
+            }
+
+            if (showCallFilterDialog) {
+                CallFilterDialog(
+                    initialTypeFilter = callTypeFilter,
+                    initialSimFilter = simFilter,
+                    activeSimCount = activeSimCount,
+                    onApply = { type, sim ->
+                        callTypeFilter = type
+                        simFilter = sim
+                    },
+                    onDismiss = { showCallFilterDialog = false }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingTabBar(
+    selectedTab: Int,
+    onTabSelected: (Int) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            val tabs = listOf(
+                Triple(0, stringResource(R.string.contact_tab_contact), Icons.Default.Person),
+                Triple(1, stringResource(R.string.contact_tab_history), Icons.Default.History),
+                Triple(2, stringResource(R.string.contact_tab_settings), Icons.Default.Settings)
+            )
+
+            tabs.forEach { (index, title, icon) ->
+                val isSelected = selectedTab == index
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(20.dp))
+                        .clickable { onTabSelected(index) },
+                    shape = RoundedCornerShape(20.dp),
+                    color = if (isSelected) SamsungGreen else Color.Transparent
+                ) {
+                    Row(
+                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = title,
+                            tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = title,
+                            fontSize = 13.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ContactTabContent(
+    phoneNumbersList: List<ContactPhoneNumber>,
+    messengerAccountsList: List<MessengerAccount>,
+    onUpdateMessengerAccounts: (List<MessengerAccount>) -> Unit = {},
+    onUpdatePhoneNumbers: (List<ContactPhoneNumber>) -> Unit = {},
+    onUpdateEmails: (List<ContactEmail>) -> Unit = {},
+    emailsList: List<ContactEmail>,
+    birthdayInfo: ContactBirthday?,
+    importantDatesList: List<ContactImportantDate> = emptyList(),
+    activeSimCount: Int,
+    contact: FavoriteContact,
+    context: Context,
+    onCall: (String, Int?) -> Unit,
+    onSms: (String) -> Unit,
+    onDismiss: () -> Unit,
+    onRemoveFavorite: (FavoriteContact) -> Unit
+) {
+    var editablePhoneList by remember(phoneNumbersList) { mutableStateOf(phoneNumbersList) }
+    var draggingPhoneIndex by remember { mutableStateOf<Int?>(null) }
+    var phoneDragOffsetY by remember { mutableFloatStateOf(0f) }
+
+    var editableMessengerList by remember(messengerAccountsList) {
+        mutableStateOf(
+            messengerAccountsList
+        )
+    }
+    var draggingMessengerIndex by remember { mutableStateOf<Int?>(null) }
+    var messengerDragOffsetY by remember { mutableFloatStateOf(0f) }
+
+    var editableEmailList by remember(emailsList) { mutableStateOf(emailsList) }
+    var draggingEmailIndex by remember { mutableStateOf<Int?>(null) }
+    var emailDragOffsetY by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(messengerAccountsList) {
+        editableMessengerList = messengerAccountsList
+    }
+    LaunchedEffect(phoneNumbersList) {
+        editablePhoneList = phoneNumbersList
+    }
+    LaunchedEffect(emailsList) {
+        editableEmailList = emailsList
+    }
+
+    var showAddCustomLinkDialog by remember { mutableStateOf(false) }
+
+    val density = LocalDensity.current
+    val haptic = LocalHapticFeedback.current
+
+    val primaryNumber = editablePhoneList.firstOrNull()?.number ?: contact.number
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // ALL PHONE NUMBERS CARD
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp
+        ) {
+            Column {
+                editablePhoneList.forEachIndexed { index, phoneItem ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            thickness = 1.dp,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+
+                    val isPhoneDragging = draggingPhoneIndex == index
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                if (isPhoneDragging) {
+                                    translationY = phoneDragOffsetY
+                                    shadowElevation = 12f
+                                    scaleX = 1.02f
+                                    scaleY = 1.02f
+                                }
+                            }
+                            .zIndex(if (isPhoneDragging) 10f else 1f)
+                            .pointerInput(index, editablePhoneList.size) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        draggingPhoneIndex = index
+                                        phoneDragOffsetY = 0f
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        phoneDragOffsetY += dragAmount.y
+                                        val currentList = editablePhoneList.toMutableList()
+                                        val currentIndex = draggingPhoneIndex ?: index
+                                        val rowHeightPx = with(density) { 62.dp.toPx() }
+                                        val shift = (phoneDragOffsetY / rowHeightPx).roundToInt()
+                                        val targetIndex =
+                                            (currentIndex + shift).coerceIn(0, currentList.size - 1)
+
+                                        if (targetIndex != currentIndex) {
+                                            val item = currentList.removeAt(currentIndex)
+                                            currentList.add(targetIndex, item)
+                                            editablePhoneList = currentList
+                                            onUpdatePhoneNumbers(currentList)
+                                            savePhoneNumbersOrder(
+                                                context,
+                                                getContactCustomKey(contact),
+                                                currentList
+                                            )
+                                            phoneDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
+                                            draggingPhoneIndex = targetIndex
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        draggingPhoneIndex = null
+                                        phoneDragOffsetY = 0f
+                                    },
+                                    onDragCancel = {
+                                        draggingPhoneIndex = null
+                                        phoneDragOffsetY = 0f
+                                    }
+                                )
+                            }
+                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    copyToClipboard(context, "Phone Number", phoneItem.number)
+                                }
+                        ) {
+                            Text(
+                                text = phoneItem.label,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = PhoneNumberHelper.format(phoneItem.number),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            if (activeSimCount > 1) {
+                                // SIM 1 Call Button
+                                IconButton(
+                                    onClick = {
+                                        onDismiss()
+                                        onCall(phoneItem.number, 1)
+                                    },
+                                    modifier = Modifier
+                                        .size(37.6.dp)
+                                        .clip(CircleShape)
+                                        .background(SamsungSmsBlue.copy(alpha = 0.12f))
+                                ) {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Phone,
+                                            contentDescription = stringResource(R.string.contact_call_sim1),
+                                            tint = SamsungSmsBlue,
+                                            modifier = Modifier
+                                                .size(26.dp)
+                                                .align(Alignment.Center)
+                                                .offset(x = (-1).dp, y = 2.dp)
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(top = 7.dp, end = 7.dp)
+                                        ) {
+                                            SimIcon(simNumber = 1, size = 11.dp)
+                                        }
+                                    }
+                                }
+
+                                // SIM 2 Call Button
+                                IconButton(
+                                    onClick = {
+                                        onDismiss()
+                                        onCall(phoneItem.number, 2)
+                                    },
+                                    modifier = Modifier
+                                        .size(37.6.dp)
+                                        .clip(CircleShape)
+                                        .background(SamsungGreen.copy(alpha = 0.12f))
+                                ) {
+                                    Box(
+                                        modifier = Modifier.fillMaxSize()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Phone,
+                                            contentDescription = stringResource(R.string.contact_call_sim2),
+                                            tint = SamsungGreen,
+                                            modifier = Modifier
+                                                .size(26.dp)
+                                                .align(Alignment.Center)
+                                                .offset(x = (-1).dp, y = 2.dp)
+                                        )
+                                        Box(
+                                            modifier = Modifier
+                                                .align(Alignment.TopEnd)
+                                                .padding(top = 7.dp, end = 7.dp)
+                                        ) {
+                                            SimIcon(simNumber = 2, size = 11.dp)
+                                        }
+                                    }
+                                }
+                            } else {
+                                // Single Call Button
+                                IconButton(
+                                    onClick = {
+                                        onDismiss()
+                                        onCall(phoneItem.number, null)
+                                    },
+                                    modifier = Modifier
+                                        .size(37.6.dp)
+                                        .clip(CircleShape)
+                                        .background(SamsungGreen.copy(alpha = 0.12f))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Phone,
+                                        contentDescription = stringResource(R.string.contact_call),
+                                        tint = SamsungGreen,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+
+                            // SMS Button
+                            IconButton(
+                                onClick = {
+                                    onDismiss()
+                                    onSms(phoneItem.number)
+                                },
+                                modifier = Modifier
+                                    .size(37.6.dp)
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.Message,
+                                    contentDescription = "SMS",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(17.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // MESSENGER ACCOUNTS CARD
+        val hiddenSet = remember(messengerAccountsList) {
+            getHiddenMessengers(
+                context,
+                getContactCustomKey(contact)
+            )
+        }
+        val visibleMessengerList = editableMessengerList.filter { messenger ->
+            val key = if (messenger.isCustomLink) messenger.id else messenger.packageName
+            !hiddenSet.contains(key)
+        }
+
+        if (visibleMessengerList.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
+            ) {
+                Column {
+                    visibleMessengerList.forEachIndexed { index, messenger ->
+                        if (index > 0) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                thickness = 1.dp,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+
+                        val isMessengerDragging = draggingMessengerIndex == index
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer {
+                                    if (isMessengerDragging) {
+                                        translationY = messengerDragOffsetY
+                                        shadowElevation = 12f
+                                        scaleX = 1.02f
+                                        scaleY = 1.02f
+                                    }
+                                }
+                                .zIndex(if (isMessengerDragging) 10f else 1f)
+                                .pointerInput(index, editableMessengerList.size) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            draggingMessengerIndex = index
+                                            messengerDragOffsetY = 0f
+                                        },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            messengerDragOffsetY += dragAmount.y
+                                            val currentList = editableMessengerList.toMutableList()
+                                            val currentIndex = draggingMessengerIndex ?: index
+                                            val rowHeightPx = with(density) { 62.dp.toPx() }
+                                            val shift =
+                                                (messengerDragOffsetY / rowHeightPx).roundToInt()
+                                            val targetIndex = (currentIndex + shift).coerceIn(
+                                                0,
+                                                currentList.size - 1
+                                            )
+
+                                            if (targetIndex != currentIndex) {
+                                                val item = currentList.removeAt(currentIndex)
+                                                currentList.add(targetIndex, item)
+                                                editableMessengerList = currentList
+                                                onUpdateMessengerAccounts(currentList)
+                                                saveMessengerAccountsOrder(
+                                                    context,
+                                                    getContactCustomKey(contact),
+                                                    currentList
+                                                )
+                                                messengerDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
+                                                draggingMessengerIndex = targetIndex
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            draggingMessengerIndex = null
+                                            messengerDragOffsetY = 0f
+                                        },
+                                        onDragCancel = {
+                                            draggingMessengerIndex = null
+                                            messengerDragOffsetY = 0f
+                                        }
+                                    )
+                                }
+                                .padding(horizontal = 18.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        copyToClipboard(
+                                            context,
+                                            "Messenger Account",
+                                            messenger.accountDetail
+                                        )
+                                    }
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    MessengerBrandBadge(
+                                        item = InstalledMessengerItem(
+                                            packageName = messenger.packageName,
+                                            messengerName = messenger.messengerName,
+                                            brandColor = messenger.brandColor
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = messenger.messengerName,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = messenger.brandColor
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = if (messenger.isCustomLink) messenger.accountDetail else PhoneNumberHelper.format(
+                                        messenger.accountDetail
+                                    ),
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                // 1. Chat
+                                if (messenger.chatIntent != null) {
+                                    IconButton(
+                                        onClick = {
+                                            try {
+                                                context.startActivity(messenger.chatIntent)
+                                            } catch (_: Exception) {
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(
+                                                        R.string.error_open_messenger_link,
+                                                        messenger.messengerName
+                                                    ),
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .size(37.6.dp)
+                                            .clip(CircleShape)
+                                            .background(messenger.brandColor.copy(alpha = 0.15f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.Message,
+                                            contentDescription = stringResource(R.string.contact_messenger_chat),
+                                            tint = messenger.brandColor,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                // 2. Audio Call
+                                if (!messenger.isCustomLink && messenger.audioCallIntent != null) {
+                                    IconButton(
+                                        onClick = {
+                                            try {
+                                                context.startActivity(messenger.audioCallIntent)
+                                            } catch (_: Exception) {
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(
+                                                        R.string.error_messenger_call,
+                                                        messenger.messengerName
+                                                    ),
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .size(37.6.dp)
+                                            .clip(CircleShape)
+                                            .background(messenger.brandColor.copy(alpha = 0.15f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Phone,
+                                            contentDescription = stringResource(R.string.swipe_label_call),
+                                            tint = messenger.brandColor,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+
+                                // 3. Video Call
+                                if (!messenger.isCustomLink && messenger.videoCallIntent != null) {
+                                    IconButton(
+                                        onClick = {
+                                            try {
+                                                context.startActivity(messenger.videoCallIntent)
+                                            } catch (_: Exception) {
+                                                Toast.makeText(
+                                                    context,
+                                                    context.getString(
+                                                        R.string.error_messenger_video,
+                                                        messenger.messengerName
+                                                    ),
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        },
+                                        modifier = Modifier
+                                            .size(37.6.dp)
+                                            .clip(CircleShape)
+                                            .background(messenger.brandColor.copy(alpha = 0.15f))
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Videocam,
+                                            contentDescription = stringResource(R.string.swipe_label_video_call),
+                                            tint = messenger.brandColor,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Bottom "+" Button inside Messenger Card
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 6.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        IconButton(
+                            onClick = { showAddCustomLinkDialog = true },
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(SamsungGreen.copy(alpha = 0.12f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = stringResource(R.string.add_link),
+                                tint = SamsungGreen,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // E-MAIL CARD
+        if (editableEmailList.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
+            ) {
+                Column {
+                    editableEmailList.forEachIndexed { index, emailItem ->
+                        if (index > 0) {
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                thickness = 1.dp,
+                                modifier = Modifier.padding(horizontal = 16.dp)
+                            )
+                        }
+
+                        val isEmailDragging = draggingEmailIndex == index
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer {
+                                    if (isEmailDragging) {
+                                        translationY = emailDragOffsetY
+                                        shadowElevation = 12f
+                                        scaleX = 1.02f
+                                        scaleY = 1.02f
+                                    }
+                                }
+                                .zIndex(if (isEmailDragging) 10f else 1f)
+                                .pointerInput(index, editableEmailList.size) {
+                                    detectDragGesturesAfterLongPress(
+                                        onDragStart = {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            draggingEmailIndex = index
+                                            emailDragOffsetY = 0f
+                                        },
+                                        onDrag = { change, dragAmount ->
+                                            change.consume()
+                                            emailDragOffsetY += dragAmount.y
+                                            val currentList = editableEmailList.toMutableList()
+                                            val currentIndex = draggingEmailIndex ?: index
+                                            val rowHeightPx = with(density) { 62.dp.toPx() }
+                                            val shift =
+                                                (emailDragOffsetY / rowHeightPx).roundToInt()
+                                            val targetIndex = (currentIndex + shift).coerceIn(
+                                                0,
+                                                currentList.size - 1
+                                            )
+
+                                            if (targetIndex != currentIndex) {
+                                                val item = currentList.removeAt(currentIndex)
+                                                currentList.add(targetIndex, item)
+                                                editableEmailList = currentList
+                                                onUpdateEmails(currentList)
+                                                saveEmailOrder(
+                                                    context,
+                                                    getContactCustomKey(contact),
+                                                    currentList
+                                                )
+                                                emailDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
+                                                draggingEmailIndex = targetIndex
+                                            }
+                                        },
+                                        onDragEnd = {
+                                            draggingEmailIndex = null
+                                            emailDragOffsetY = 0f
+                                        },
+                                        onDragCancel = {
+                                            draggingEmailIndex = null
+                                            emailDragOffsetY = 0f
+                                        }
+                                    )
+                                }
+                                .padding(horizontal = 18.dp, vertical = 14.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clickable {
+                                        copyToClipboard(context, "Email", emailItem.email)
+                                    }
+                            ) {
+                                Text(
+                                    text = emailItem.label,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = emailItem.email,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Spacer(modifier = Modifier.width(12.dp))
+
+                            // Yellow Email Action Button
+                            IconButton(
+                                onClick = {
+                                    try {
+                                        val intent = Intent(
+                                            Intent.ACTION_SENDTO,
+                                            "mailto:${emailItem.email}".toUri()
+                                        )
+                                        context.startActivity(intent)
+                                    } catch (_: Exception) {
+                                        Toast.makeText(
+                                            context,
+                                            context.getString(R.string.error_open_email),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
+                                },
+                                modifier = Modifier
+                                    .size(37.6.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFFFFB300).copy(alpha = 0.15f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Email,
+                                    contentDescription = stringResource(R.string.contact_write_email_cd),
+                                    tint = Color(0xFFFFB300),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // BIRTHDAY CARD
+        if (birthdayInfo != null) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.contact_birthday),
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = birthdayInfo.formattedDate,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    if (!birthdayInfo.ageText.isNullOrBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = birthdayInfo.ageText,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        // CUSTOM IMPORTANT DATES CARDS (STYLED LIKE BIRTHDAY CARD)
+        importantDatesList.forEach { dateItem ->
+            val parsedDate =
+                remember(dateItem.dateString) {
+                    parseBirthdayString(context, dateItem.dateString)
+                }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = dateItem.label,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = parsedDate.formattedDate,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    if (!parsedDate.ageText.isNullOrBlank()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
+                        ) {
+                            Text(
+                                text = parsedDate.ageText,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Additional Options Card: Скопировать данные контакта
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp
+        ) {
+            Column {
+                OptionRow(
+                    icon = Icons.Default.ContentCopy,
+                    label = stringResource(R.string.contact_copy_data),
+                    onClick = {
+                        val contactFullText = buildContactShareText(
+                            context = context,
+                            contact = contact,
+                            phoneNumbers = editablePhoneList,
+                            emails = editableEmailList,
+                            birthday = birthdayInfo,
+                            importantDates = importantDatesList,
+                            messengers = visibleMessengerList
+                        )
+                        val clipboard =
+                            context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clip = ClipData.newPlainText("Contact Data", contactFullText)
+                        clipboard.setPrimaryClip(clip)
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.toast_contact_data_copied),
+                            Toast.LENGTH_SHORT
+                        )
+                            .show()
+                    }
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(28.dp))
+
+        // Quick Action Buttons Row (Call, Swipe Left Action / SMS, Info) placed at the bottom
+        val contactKey = remember(contact) { getContactCustomKey(contact) }
+        val swipeLeftAction = remember(contactKey, primaryNumber) {
+            getCustomSwipeAction(
+                context,
+                contactKey,
+                isRight = false,
+                fallbackNumber = primaryNumber
+            )
+        }
+        val leftVisuals = remember(swipeLeftAction) {
+            getSwipeBackgroundVisuals(swipeLeftAction, defaultIsRight = false, context = context)
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            ActionButtonItem(
+                icon = Icons.Default.Phone,
+                label = stringResource(R.string.contact_call),
+                containerColor = SamsungGreen,
+                contentColor = Color.White,
+                onClick = {
+                    onDismiss()
+                    onCall(primaryNumber, null)
+                }
+            )
+
+            ActionButtonItem(
+                icon = leftVisuals.icon,
+                label = leftVisuals.label,
+                containerColor = leftVisuals.backgroundColor,
+                contentColor = Color.White,
+                onClick = {
+                    onDismiss()
+                    if (swipeLeftAction != null) {
+                        executeCustomSwipeAction(
+                            context = context,
+                            action = swipeLeftAction,
+                            onCall = { num, sim -> onCall(num, sim) },
+                            onSms = { num -> onSms(num) }
+                        )
+                    } else {
+                        onSms(primaryNumber)
+                    }
+                }
+            )
+
+            ActionButtonItem(
+                icon = Icons.Default.Person,
+                label = stringResource(R.string.incall_action_info),
+                containerColor = MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                onClick = {
+                    openSystemContact(context, primaryNumber)
+                }
+            )
+        }
+    }
+
+    if (showAddCustomLinkDialog) {
+        AddCustomMessengerLinkDialog(
+            context = context,
+            onAddCustomLink = { newAccount ->
+                val updatedList = editableMessengerList + newAccount
+                editableMessengerList = updatedList
+                onUpdateMessengerAccounts(updatedList)
+                saveCustomMessengerLinks(context, getContactCustomKey(contact), updatedList)
+            },
+            onDismiss = { showAddCustomLinkDialog = false }
+        )
+    }
+}
+
+@Composable
+private fun HistoryCallRow(item: CallLogItem) {
+    val context = LocalContext.current
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.weight(1f)
+        ) {
+            val (icon, color, descRes) = when (item.type) {
+                CallType.INCOMING -> Triple(
+                    Icons.AutoMirrored.Filled.CallReceived,
+                    IncomingGreen,
+                    R.string.call_type_incoming
+                )
+
+                CallType.OUTGOING -> Triple(
+                    Icons.AutoMirrored.Filled.CallMade,
+                    OutgoingBlue,
+                    R.string.call_type_outgoing
+                )
+
+                CallType.MISSED -> Triple(
+                    Icons.AutoMirrored.Filled.CallMissed,
+                    MissedRed,
+                    R.string.call_type_missed
+                )
+
+                CallType.REJECTED -> Triple(
+                    Icons.Default.CallEnd,
+                    MissedRed,
+                    R.string.call_type_rejected
+                )
+
+                CallType.BLOCKED -> Triple(
+                    Icons.Default.Block,
+                    BlockedRed,
+                    R.string.call_type_blocked
+                )
+            }
+            val desc = stringResource(descRes)
+
+            Icon(
+                imageVector = icon,
+                contentDescription = desc,
+                tint = color,
+                modifier = Modifier.size(20.dp)
+            )
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            Column {
+                Text(
+                    text = formatTimeOnly(item.timestamp),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = if (item.type == CallType.MISSED || item.type == CallType.REJECTED || item.type == CallType.BLOCKED) {
+                        BlockedRed
+                    } else {
+                        MaterialTheme.colorScheme.onSurface
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(3.dp))
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    SimIcon(simNumber = item.simNumber, size = 12.dp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = PhoneNumberHelper.format(item.number),
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.width(12.dp))
+
+        Text(
+            text = formatCallDuration(context, item.duration),
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+            textAlign = TextAlign.End
+        )
+    }
+}
+
+@Composable
+private fun SettingsTabContent(
+    contact: FavoriteContact,
+    isFavoriteInitial: Boolean,
+    phoneNumbersList: List<ContactPhoneNumber>,
+    messengerAccountsList: List<MessengerAccount>,
+    onUpdateMessengerAccounts: (List<MessengerAccount>) -> Unit = {},
+    emailsList: List<ContactEmail>,
+    activeSimCount: Int,
+    context: Context,
+    tabs: List<FavoriteTab>,
+    avatarBitmap: ImageBitmap?,
+    onDismiss: () -> Unit,
+    onRemoveFavorite: (FavoriteContact) -> Unit,
+    onToggleFavorite: (FavoriteContact, Boolean) -> Unit,
+    onUpdateContact: (FavoriteContact) -> Unit,
+    onAddTab: (String) -> FavoriteTab
+) {
+    var isFavorite by remember(contact.id, contact.number, isFavoriteInitial) {
+        mutableStateOf(isFavoriteInitial)
+    }
+    var selectedTabId by remember(contact.tabId) { mutableStateOf(contact.tabId) }
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        // Card 1: Favorite Toggle & Tab Choice
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Star,
+                            contentDescription = stringResource(R.string.recents_favorites_header),
+                            tint = Color(0xFFFFB300),
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Text(
+                            text = stringResource(R.string.favorites_in_list),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Switch(
+                        checked = isFavorite,
+                        onCheckedChange = { checked ->
+                            isFavorite = checked
+                            onToggleFavorite(contact, checked)
+                        },
+                        colors = SwitchDefaults.colors(
+                            checkedThumbColor = Color.White,
+                            checkedTrackColor = SamsungGreen
+                        )
+                    )
+                }
+
+                if (isFavorite) {
+                    HorizontalDivider(
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                        thickness = 1.dp,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+
+                    var dropdownExpanded by remember { mutableStateOf(false) }
+                    var showCreateTabDialog by remember { mutableStateOf(false) }
+                    var newTabNameInput by remember { mutableStateOf("") }
+
+                    val currentTabName = tabs.find { it.id == selectedTabId }?.name
+                        ?: stringResource(R.string.favorites_default_tab_name)
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { dropdownExpanded = true }
+                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.FolderSpecial,
+                                contentDescription = stringResource(R.string.contact_tab_label),
+                                tint = SamsungGreen,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(14.dp))
+                            Text(
+                                text = stringResource(R.string.contact_tab_label),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+
+                        Box {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = currentTabName,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = SamsungGreen
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.ArrowDropDown,
+                                    contentDescription = stringResource(R.string.action_select),
+                                    tint = SamsungGreen,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+
+                            DropdownMenu(
+                                expanded = dropdownExpanded,
+                                onDismissRequest = { dropdownExpanded = false }
+                            ) {
+                                tabs.forEach { tab ->
+                                    DropdownMenuItem(
+                                        text = {
+                                            Text(
+                                                text = tab.name,
+                                                fontWeight = if (tab.id == selectedTabId) FontWeight.Bold else FontWeight.Normal
+                                            )
+                                        },
+                                        onClick = {
+                                            dropdownExpanded = false
+                                            selectedTabId = tab.id
+                                            onUpdateContact(contact.copy(tabId = tab.id))
+                                        }
+                                    )
+                                }
+
+                                HorizontalDivider()
+
+                                DropdownMenuItem(
+                                    text = {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                imageVector = Icons.Default.Add,
+                                                contentDescription = stringResource(R.string.action_create),
+                                                tint = SamsungGreen,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Text(
+                                                text = stringResource(R.string.contact_tab_create_new),
+                                                fontWeight = FontWeight.Bold,
+                                                color = SamsungGreen
+                                            )
+                                        }
+                                    },
+                                    onClick = {
+                                        dropdownExpanded = false
+                                        newTabNameInput = ""
+                                        showCreateTabDialog = true
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    if (showCreateTabDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showCreateTabDialog = false },
+                            title = {
+                                Text(
+                                    stringResource(R.string.contact_favorite_new_tab_title),
+                                    fontWeight = FontWeight.Bold
+                                )
+                            },
+                            text = {
+                                OutlinedTextField(
+                                    value = newTabNameInput,
+                                    onValueChange = { newTabNameInput = it },
+                                    label = { Text(stringResource(R.string.onboarding_tab_name_label)) },
+                                    singleLine = true,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                            },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        if (newTabNameInput.isNotBlank()) {
+                                            val createdTab = onAddTab(newTabNameInput.trim())
+                                            selectedTabId = createdTab.id
+                                            onUpdateContact(contact.copy(tabId = createdTab.id))
+                                            showCreateTabDialog = false
+                                        }
+                                    }
+                                ) {
+                                    Text(
+                                        stringResource(R.string.action_create),
+                                        color = SamsungGreen,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showCreateTabDialog = false }) {
+                                    Text(stringResource(R.string.action_cancel))
+                                }
+                            }
+                        )
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Card 1.5: Настройка свайпов
+        var showPickerForRight by remember { mutableStateOf(false) }
+        var showPickerForLeft by remember { mutableStateOf(false) }
+
+        val contactKey = remember(contact) { getContactCustomKey(contact) }
+        var swipeRightAction by remember(contact) {
+            mutableStateOf(
+                getCustomSwipeAction(
+                    context,
+                    contactKey,
+                    isRight = true
+                )
+            )
+        }
+        var swipeLeftAction by remember(contact) {
+            mutableStateOf(
+                getCustomSwipeAction(
+                    context,
+                    contactKey,
+                    isRight = false
+                )
+            )
+        }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp
+        ) {
+            Column {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(R.string.contact_swipe_settings),
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                // Row 1: Свайп вправо
+                val rightVisuals = remember(swipeRightAction) {
+                    getActionVisuals(
+                        swipeRightAction,
+                        defaultIsRight = true
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = stringResource(R.string.contact_swipe_right),
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.contact_swipe_right),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = swipeRightAction?.label
+                                    ?: stringResource(R.string.contact_swipe_default_call),
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { showPickerForRight = true },
+                        modifier = Modifier
+                            .size(37.6.dp)
+                            .clip(CircleShape)
+                            .background(rightVisuals.color.copy(alpha = 0.15f))
+                    ) {
+                        if (rightVisuals.simNumber != null) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    imageVector = rightVisuals.icon,
+                                    contentDescription = stringResource(R.string.change_swipe_right),
+                                    tint = rightVisuals.color,
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .align(Alignment.Center)
+                                        .offset(x = (-1).dp, y = 2.dp)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 7.dp, end = 7.dp)
+                                ) {
+                                    SimIcon(simNumber = rightVisuals.simNumber, size = 11.dp)
+                                }
+                            }
+                        } else {
+                            Icon(
+                                imageVector = rightVisuals.icon,
+                                contentDescription = stringResource(R.string.change_swipe_right),
+                                tint = rightVisuals.color,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                // Row 2: Свайп влево
+                val leftVisuals = remember(swipeLeftAction) {
+                    getActionVisuals(
+                        swipeLeftAction,
+                        defaultIsRight = false
+                    )
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        modifier = Modifier.weight(1f),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.contact_swipe_left),
+                            tint = SamsungSmsBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.contact_swipe_left),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = swipeLeftAction?.label
+                                    ?: stringResource(R.string.contact_swipe_default_sms),
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                            )
+                        }
+                    }
+
+                    IconButton(
+                        onClick = { showPickerForLeft = true },
+                        modifier = Modifier
+                            .size(37.6.dp)
+                            .clip(CircleShape)
+                            .background(leftVisuals.color.copy(alpha = 0.15f))
+                    ) {
+                        if (leftVisuals.simNumber != null) {
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                Icon(
+                                    imageVector = leftVisuals.icon,
+                                    contentDescription = stringResource(R.string.change_swipe_left),
+                                    tint = leftVisuals.color,
+                                    modifier = Modifier
+                                        .size(26.dp)
+                                        .align(Alignment.Center)
+                                        .offset(x = (-1).dp, y = 2.dp)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .align(Alignment.TopEnd)
+                                        .padding(top = 7.dp, end = 7.dp)
+                                ) {
+                                    SimIcon(simNumber = leftVisuals.simNumber, size = 11.dp)
+                                }
+                            }
+                        } else {
+                            Icon(
+                                imageVector = leftVisuals.icon,
+                                contentDescription = stringResource(R.string.change_swipe_left),
+                                tint = leftVisuals.color,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showPickerForRight) {
+            SwipeActionPickerDialog(
+                contact = contact,
+                phoneNumbersList = phoneNumbersList,
+                messengerAccountsList = messengerAccountsList,
+                onUpdateMessengerAccounts = onUpdateMessengerAccounts,
+                emailsList = emailsList,
+                activeSimCount = activeSimCount,
+                context = context,
+                onActionSelected = { action ->
+                    swipeRightAction = action
+                    saveCustomSwipeAction(
+                        context = context,
+                        contactKey = contactKey,
+                        contactNumber = contact.number,
+                        contactName = contact.name,
+                        allPhoneNumbers = phoneNumbersList.map { it.number },
+                        isRight = true,
+                        action = action
+                    )
+                    showPickerForRight = false
+                },
+                onDismiss = { showPickerForRight = false }
+            )
+        }
+
+        if (showPickerForLeft) {
+            SwipeActionPickerDialog(
+                contact = contact,
+                phoneNumbersList = phoneNumbersList,
+                messengerAccountsList = messengerAccountsList,
+                onUpdateMessengerAccounts = onUpdateMessengerAccounts,
+                emailsList = emailsList,
+                activeSimCount = activeSimCount,
+                context = context,
+                onActionSelected = { action ->
+                    swipeLeftAction = action
+                    saveCustomSwipeAction(
+                        context = context,
+                        contactKey = contactKey,
+                        contactNumber = contact.number,
+                        contactName = contact.name,
+                        allPhoneNumbers = phoneNumbersList.map { it.number },
+                        isRight = false,
+                        action = action
+                    )
+                    showPickerForLeft = false
+                },
+                onDismiss = { showPickerForLeft = false }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Card 2: Contact Options
+        val ringtoneData = remember(contactKey) {
+            ContactRingtoneManager.getContactRingtone(context, contactKey)
+        }
+        var customRingtoneUri by remember(contactKey) { mutableStateOf(ringtoneData.first) }
+        var ringtoneTitle by remember(customRingtoneUri, contactKey) {
+            mutableStateOf(
+                ContactRingtoneManager.getRingtoneTitle(context, customRingtoneUri)
+            )
+        }
+        var showRingtonePickerDialog by remember { mutableStateOf(false) }
+
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp
+        ) {
+            Column {
+                OptionRow(
+                    icon = Icons.Default.MusicNote,
+                    label = stringResource(R.string.contact_ringtone),
+                    value = ringtoneTitle,
+                    onClick = {
+                        showRingtonePickerDialog = true
+                    }
+                )
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                OptionRow(
+                    icon = Icons.Default.AddHome,
+                    label = stringResource(R.string.contact_add_to_home),
+                    onClick = {
+                        addContactShortcutToHomeScreen(
+                            context,
+                            contact,
+                            avatarBitmap?.asAndroidBitmap()
+                        )
+                    }
+                )
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                var isContactBlocked by remember(contact.number) {
+                    mutableStateOf(isNumberBlockedInSystem(context, contact.number))
+                }
+
+                OptionRow(
+                    icon = Icons.Default.Block,
+                    label = stringResource(
+                        if (isContactBlocked) R.string.contact_blocked else R.string.contact_block
+                    ),
+                    labelColor = if (isContactBlocked) SamsungGreen else MaterialTheme.colorScheme.error,
+                    iconTint = if (isContactBlocked) SamsungGreen else MaterialTheme.colorScheme.error,
+                    onClick = {
+                        if (!isContactBlocked) {
+                            val ok = blockContactNumber(context, contact.number)
+                            if (ok) {
+                                isContactBlocked = true
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.toast_contact_blocked),
+                                    Toast.LENGTH_SHORT
+                                )
+                                    .show()
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.toast_block_number_failed),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        } else {
+                            val ok = unblockContactNumber(context, contact.number)
+                            if (ok) {
+                                isContactBlocked = false
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.toast_contact_unblocked),
+                                    Toast.LENGTH_SHORT
+                                )
+                                    .show()
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.toast_unblock_failed),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                    }
+                )
+            }
+        }
+
+        if (showRingtonePickerDialog) {
+            OneUiRingtonePickerDialog(
+                context = context,
+                currentUri = customRingtoneUri,
+                onRingtoneSelected = { uri, title ->
+                    customRingtoneUri = uri
+                    ringtoneTitle = title
+                    ContactRingtoneManager.setContactRingtone(
+                        context,
+                        contactKey,
+                        uri,
+                        title
+                    )
+                    showRingtonePickerDialog = false
+                },
+                onDismiss = { showRingtonePickerDialog = false }
+            )
+        }
+    }
+}
+
+@Composable
+private fun ActionButtonItem(
+    icon: ImageVector,
+    label: String,
+    containerColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.clickable { onClick() }
+    ) {
+        Surface(
+            modifier = Modifier.size(60.dp),
+            shape = CircleShape,
+            color = containerColor
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = label,
+                    tint = contentColor,
+                    modifier = Modifier.size(28.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            fontWeight = FontWeight.Medium,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+    }
+}
+
+@Composable
+private fun OptionRow(
+    icon: ImageVector,
+    label: String,
+    value: String? = null,
+    labelColor: Color = MaterialTheme.colorScheme.onSurface,
+    iconTint: Color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() }
+            .padding(horizontal = 18.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = if (value.isNullOrBlank()) Modifier.weight(1f) else Modifier.weight(1f)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = iconTint,
+                modifier = Modifier.size(22.dp)
+            )
+
+            Spacer(modifier = Modifier.width(14.dp))
+
+            Text(
+                text = label,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+                color = labelColor,
+                maxLines = 1,
+                softWrap = false
+            )
+        }
+
+        if (!value.isNullOrBlank()) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(
+                text = value,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Normal,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.End,
+                modifier = Modifier.widthIn(max = 110.dp)
+            )
+        }
+    }
+}
+
+private suspend fun loadContactPhoneNumbers(
+    context: Context,
+    contact: FavoriteContact
+): List<ContactPhoneNumber> = withContext(Dispatchers.IO) {
+    val numbersList = mutableListOf<ContactPhoneNumber>()
+    val addedCleanNumbers = mutableSetOf<String>()
+
+    try {
+        var contactId: String? = ContactsWriteRepository(context)
+            .resolveContactId(contact)?.toString()
+
+        if (contactId == null && contact.number.isNotBlank()) {
+            try {
+                val lookupUri = Uri.withAppendedPath(
+                    ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                    Uri.encode(contact.number)
+                )
+                context.contentResolver.query(
+                    lookupUri,
+                    arrayOf(ContactsContract.PhoneLookup._ID),
+                    null, null, null
+                )?.use { c ->
+                    if (c.moveToFirst()) {
+                        val idIdx = c.getColumnIndex(ContactsContract.PhoneLookup._ID)
+                        if (idIdx != -1) contactId = c.getString(idIdx)
+                    }
+                }
+            } catch (_: Exception) {
+                // ignore
+            }
+        }
+
+        val cursor = if (contactId != null) {
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.NUMBER,
+                    ContactsContract.CommonDataKinds.Phone.TYPE,
+                    ContactsContract.CommonDataKinds.Phone.LABEL
+                ),
+                "${ContactsContract.CommonDataKinds.Phone.CONTACT_ID} = ?",
+                arrayOf(contactId),
+                "${ContactsContract.CommonDataKinds.Phone.IS_PRIMARY} DESC"
+            )
+        } else {
+            context.contentResolver.query(
+                ContactsContract.CommonDataKinds.Phone.CONTENT_URI,
+                arrayOf(
+                    ContactsContract.CommonDataKinds.Phone.NUMBER,
+                    ContactsContract.CommonDataKinds.Phone.TYPE,
+                    ContactsContract.CommonDataKinds.Phone.LABEL
+                ),
+                "${ContactsContract.CommonDataKinds.Phone.DISPLAY_NAME} = ?",
+                arrayOf(contact.name),
+                "${ContactsContract.CommonDataKinds.Phone.IS_PRIMARY} DESC"
+            )
+        }
+
+        cursor?.use { c ->
+            val numberIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.NUMBER)
+            val typeIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.TYPE)
+            val labelIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Phone.LABEL)
+
+            while (c.moveToNext()) {
+                val num = if (numberIdx != -1) c.getString(numberIdx) else ""
+                val type =
+                    if (typeIdx != -1) c.getInt(typeIdx) else ContactsContract.CommonDataKinds.Phone.TYPE_OTHER
+                val customLabel = if (labelIdx != -1) c.getString(labelIdx) else null
+
+                val cleanNum = num.filter { it.isDigit() || it == '+' }
+                if (cleanNum.isNotBlank() && !addedCleanNumbers.contains(cleanNum)) {
+                    addedCleanNumbers.add(cleanNum)
+                    val labelStr = ContactLabelHelper.phoneTypeLabel(context, type, customLabel)
+                    numbersList.add(ContactPhoneNumber(number = num, label = labelStr))
+                }
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+
+    val cleanMain = contact.number.filter { it.isDigit() || it == '+' }
+    if (cleanMain.isNotBlank() && !addedCleanNumbers.contains(cleanMain)) {
+        numbersList.add(
+            0,
+            ContactPhoneNumber(
+                number = contact.number,
+                label = ContactLabelHelper.defaultMobileLabel(context)
+            )
+        )
+    } else if (numbersList.isEmpty() && contact.number.isNotBlank()) {
+        numbersList.add(
+            ContactPhoneNumber(
+                number = contact.number,
+                label = ContactLabelHelper.defaultMobileLabel(context)
+            )
+        )
+    }
+
+    val contactKey = getContactCustomKey(contact)
+    val savedOrder = getSavedPhoneNumbersOrder(context, contactKey)
+    if (savedOrder.isNotEmpty()) {
+        val cleanSaved = savedOrder.map { it.filter { ch -> ch.isDigit() || ch == '+' } }
+        numbersList.sortBy { item ->
+            val clean = item.number.filter { it.isDigit() || it == '+' }
+            val idx = cleanSaved.indexOf(clean)
+            if (idx != -1) idx else 999
+        }
+    }
+
+    numbersList
+}
+
+private fun openSystemContact(context: Context, contactNumber: String) {
+    try {
+        val uri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(contactNumber)
+        )
+        val intent = Intent(Intent.ACTION_VIEW, uri)
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        try {
+            val intent = Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_APP_CONTACTS)
+            }
+            context.startActivity(intent)
+        } catch (_: Exception) {
+            Toast.makeText(context, context.getString(R.string.error_open_contact_info), Toast.LENGTH_SHORT)
+                .show()
+        }
+    }
+}
+
+private fun formatTimeOnly(timestamp: Long): String {
+    if (timestamp == 0L) return ""
+    return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))
+}
+
+private fun getHighResContactPhotoUri(context: Context, contactNumber: String): String? {
+    if (contactNumber.isBlank()) return null
+    return try {
+        val uri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(contactNumber)
+        )
+        val projection = arrayOf(
+            ContactsContract.PhoneLookup.PHOTO_URI,
+            ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI
+        )
+        val cursor = context.contentResolver.query(uri, projection, null, null, null)
+        var photoUri: String? = null
+        cursor?.use { c ->
+            if (c.moveToFirst()) {
+                val fullIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
+                val thumbIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI)
+                photoUri = if (fullIndex != -1) c.getString(fullIndex) else null
+                if (photoUri.isNullOrEmpty() && thumbIndex != -1) {
+                    photoUri = c.getString(thumbIndex)
+                }
+            }
+        }
+        photoUri
+    } catch (_: Exception) {
+        null
+    }
+}
+
+private fun formatCallDuration(context: Context, seconds: Long): String =
+    ContactLabelHelper.formatCallDuration(context, seconds)
+
+private fun copyToClipboard(context: Context, label: String, textToCopy: String) {
+    try {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText(label, textToCopy)
+        clipboard.setPrimaryClip(clip)
+        Toast.makeText(context, context.getString(R.string.toast_copied), Toast.LENGTH_SHORT).show()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private data class MessengerAccount(
+    val id: String,
+    val packageName: String,
+    val messengerName: String,
+    val accountDetail: String,
+    val brandColor: Color,
+    val chatIntent: Intent?,
+    val audioCallIntent: Intent? = null,
+    val videoCallIntent: Intent? = null,
+    val isCustomLink: Boolean = false
+)
+
+private fun isPackageInstalled(context: Context, packageName: String): Boolean {
+    return try {
+        context.packageManager.getPackageInfo(packageName, 0)
+        true
+    } catch (_: Exception) {
+        try {
+            val launchIntent = context.packageManager.getLaunchIntentForPackage(packageName)
+            launchIntent != null
+        } catch (_: Exception) {
+            false
+        }
+    }
+}
+
+private fun loadMessengerAccounts(
+    context: Context,
+    contact: FavoriteContact
+): List<MessengerAccount> {
+    val repository = ContactsRepository(context)
+    val list = repository.getMessengerActions(contact)
+        .map { action ->
+            MessengerAccount(
+                id = action.id,
+                packageName = action.packageName,
+                messengerName = action.messengerName,
+                accountDetail = action.accountDetail,
+                brandColor = action.brandColor,
+                chatIntent = action.chatIntent,
+                audioCallIntent = action.audioCallIntent,
+                videoCallIntent = action.videoCallIntent
+            )
+        }
+        .toMutableList()
+
+    val contactKey = getContactCustomKey(contact)
+    val customSavedLinks = getSavedCustomMessengerLinks(context, contactKey)
+    if (customSavedLinks.isNotEmpty()) {
+        list.addAll(customSavedLinks)
+    }
+
+    val savedOrder = getSavedMessengerAccountsOrder(context, contactKey)
+    if (savedOrder.isNotEmpty()) {
+        list.sortBy { messenger ->
+            val idx = savedOrder.indexOf(messenger.id)
+            if (idx != -1) idx else 999
+        }
+    }
+
+    return list
+}
+
+data class ContactImportantDate(
+    val id: String = "date_${System.currentTimeMillis()}",
+    val label: String,
+    val dateString: String
+)
+
+private fun saveImportantDates(
+    context: Context,
+    contactKey: String,
+    contactNumber: String,
+    dates: List<ContactImportantDate>
+) {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val cleanNum = contactNumber.replace(Regex("[^0-9+]"), "")
+
+        val array = JSONArray()
+        dates.filter { it.label.isNotBlank() || it.dateString.isNotBlank() }.forEach { item ->
+            val obj = JSONObject().apply {
+                put("id", item.id)
+                put("label", item.label)
+                put("dateString", item.dateString)
+            }
+            array.put(obj)
+        }
+
+        prefs.edit {
+            putString("important_dates_$contactKey", array.toString())
+            if (cleanNum.isNotBlank()) {
+                putString("important_dates_$cleanNum", array.toString())
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private fun getImportantDates(
+    context: Context,
+    contactKey: String,
+    fallbackNumber: String? = null
+): List<ContactImportantDate> {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+
+        // 1. Try with contactKey
+        var jsonString = prefs.getString("important_dates_$contactKey", null)
+
+        // 2. Try with clean fallbackNumber
+        if (jsonString.isNullOrEmpty() && !fallbackNumber.isNullOrBlank()) {
+            val cleanNum = fallbackNumber.replace(Regex("[^0-9+]"), "")
+            if (cleanNum.isNotBlank()) {
+                jsonString = prefs.getString("important_dates_$cleanNum", null)
+            }
+        }
+
+        // 3. Fallback: match by last 7 digits across all saved keys
+        if (jsonString.isNullOrEmpty()) {
+            val searchNum =
+                (if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey).replace(
+                    Regex("[^0-9]"), ""
+                )
+            if (searchNum.length >= 7) {
+                val last7 = searchNum.takeLast(7)
+                val allKeys = prefs.all.keys.filter { it.startsWith("important_dates_") }
+                for (k in allKeys) {
+                    val cleanKeyDigits = k.replace(Regex("[^0-9]"), "")
+                    if (cleanKeyDigits.length >= 7 && cleanKeyDigits.takeLast(7) == last7) {
+                        jsonString = prefs.getString(k, null)
+                        if (!jsonString.isNullOrEmpty()) break
+                    }
+                }
+            }
+        }
+
+        if (jsonString.isNullOrEmpty()) return emptyList()
+
+        val array = JSONArray(jsonString)
+        val list = mutableListOf<ContactImportantDate>()
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            list.add(
+                ContactImportantDate(
+                    id = if (obj.has("id")) obj.getString("id") else "date_$i",
+                    label = obj.getString("label"),
+                    dateString = obj.getString("dateString")
+                )
+            )
+        }
+        return list
+    } catch (_: Exception) {
+        return emptyList()
+    }
+}
+
+private fun saveHiddenMessengers(context: Context, contactKey: String, hiddenIds: Set<String>) {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val array = JSONArray()
+        hiddenIds.forEach { array.put(it) }
+        prefs.edit { putString("hidden_messengers_$contactKey", array.toString()) }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private fun getHiddenMessengers(context: Context, contactKey: String): Set<String> {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val jsonString = prefs.getString("hidden_messengers_$contactKey", null) ?: return emptySet()
+        val array = JSONArray(jsonString)
+        val set = mutableSetOf<String>()
+        for (i in 0 until array.length()) {
+            set.add(array.getString(i))
+        }
+        return set
+    } catch (_: Exception) {
+        return emptySet()
+    }
+}
+
+private fun saveCustomMessengerLinks(
+    context: Context,
+    contactKey: String,
+    links: List<MessengerAccount>
+) {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val array = JSONArray()
+        links.filter { it.isCustomLink }.forEach { item ->
+            val obj = JSONObject().apply {
+                put("id", item.id)
+                put("packageName", item.packageName)
+                put("messengerName", item.messengerName)
+                put("accountDetail", item.accountDetail)
+            }
+            array.put(obj)
+        }
+        prefs.edit { putString("custom_msg_links_$contactKey", array.toString()) }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private fun getSavedCustomMessengerLinks(
+    context: Context,
+    contactKey: String
+): List<MessengerAccount> {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val jsonString = prefs.getString("custom_msg_links_$contactKey", null) ?: return emptyList()
+        val array = JSONArray(jsonString)
+        val list = mutableListOf<MessengerAccount>()
+        for (i in 0 until array.length()) {
+            val obj = array.getJSONObject(i)
+            val pkg = obj.getString("packageName")
+            val name = obj.getString("messengerName")
+            val detail = obj.getString("accountDetail")
+            val color = getMessengerBrandColor(name)
+
+            list.add(
+                MessengerAccount(
+                    id = obj.getString("id"),
+                    packageName = pkg,
+                    messengerName = name,
+                    accountDetail = detail,
+                    brandColor = color,
+                    chatIntent = Intent(Intent.ACTION_VIEW, Uri.parse(detail)),
+                    isCustomLink = true
+                )
+            )
+        }
+        return list
+    } catch (_: Exception) {
+        return emptyList()
+    }
+}
+
+private fun getMessengerBrandColor(messengerName: String): Color {
+    return when {
+        messengerName.contains("WhatsApp", true) -> Color(0xFF25D366)
+        messengerName.contains("Telegram", true) -> Color(0xFF24A1DE)
+        messengerName.contains("Viber", true) -> Color(0xFF7360F2)
+        messengerName.contains("Signal", true) -> Color(0xFF3A76F0)
+        messengerName.contains("Skype", true) -> Color(0xFF00AFF0)
+        messengerName.contains("MAX", true) -> Color(0xFF2A5885)
+        messengerName.contains("VK", true) -> Color(0xFF0077FF)
+        messengerName.contains("Messenger", true) -> Color(0xFF0084FF)
+        messengerName.contains("Snapchat", true) -> Color(0xFFE5C100)
+        messengerName.contains("WeChat", true) -> Color(0xFF07C160)
+        else -> SamsungGreen
+    }
+}
+
+fun getApplicationIconBitmap(context: Context, packageName: String): ImageBitmap? {
+    return try {
+        val drawable = context.packageManager.getApplicationIcon(packageName)
+        val bitmap = if (drawable is android.graphics.drawable.BitmapDrawable) {
+            drawable.bitmap
+        } else {
+            val bmp = createBitmap(
+                drawable.intrinsicWidth.coerceAtLeast(1),
+                drawable.intrinsicHeight.coerceAtLeast(1)
+            )
+            val canvas = android.graphics.Canvas(bmp)
+            drawable.setBounds(0, 0, canvas.width, canvas.height)
+            drawable.draw(canvas)
+            bmp
+        }
+        bitmap.asImageBitmap()
+    } catch (_: Exception) {
+        null
+    }
+}
+
+@Composable
+private fun MessengerBrandBadge(item: InstalledMessengerItem) {
+    val context = LocalContext.current
+    val appIcon = remember(item.packageName) {
+        getApplicationIconBitmap(context, item.packageName)
+    }
+
+    if (appIcon != null) {
+        Image(
+            bitmap = appIcon,
+            contentDescription = item.messengerName,
+            modifier = Modifier.size(24.dp),
+            contentScale = ContentScale.Fit
+        )
+    } else {
+        Box(
+            modifier = Modifier
+                .size(24.dp)
+                .clip(CircleShape)
+                .background(item.brandColor),
+            contentAlignment = Alignment.Center
+        ) {
+            val badgeText = when {
+                item.messengerName.contains("VK", true) -> "VK"
+                item.messengerName.contains("WhatsApp", true) -> "WA"
+                item.messengerName.contains("Telegram", true) -> "TG"
+                item.messengerName.contains("MAX", true) -> "MAX"
+                item.messengerName.contains("Viber", true) -> "V"
+                item.messengerName.contains("Signal", true) -> "S"
+                item.messengerName.contains("Skype", true) -> "Sk"
+                item.messengerName.contains("Snapchat", true) -> "Sn"
+                else -> item.messengerName.take(1).uppercase()
+            }
+            Text(
+                text = badgeText,
+                color = Color.White,
+                fontSize = if (badgeText.length > 2) 8.sp else 10.sp,
+                fontWeight = FontWeight.Black
+            )
+        }
+    }
+}
+
+private data class InstalledMessengerItem(
+    val packageName: String,
+    val messengerName: String,
+    val brandColor: Color
+)
+
+private fun getInstalledMessengersList(context: Context): List<InstalledMessengerItem> {
+    val candidates = listOf(
+        InstalledMessengerItem("org.telegram.messenger", "Telegram", Color(0xFF24A1DE)),
+        InstalledMessengerItem("com.whatsapp", "WhatsApp", Color(0xFF25D366)),
+        InstalledMessengerItem("ru.oneme.app", "MAX", Color(0xFF2A5885)),
+        InstalledMessengerItem("com.viber.voip", "Viber", Color(0xFF7360F2)),
+        InstalledMessengerItem("com.vk.im", "VK Messenger", Color(0xFF0077FF)),
+        InstalledMessengerItem("org.thoughtcrime.securesms", "Signal", Color(0xFF3A76F0)),
+        InstalledMessengerItem("com.skype.raider", "Skype", Color(0xFF00AFF0)),
+        InstalledMessengerItem("com.facebook.orca", "Messenger", Color(0xFF0084FF)),
+        InstalledMessengerItem("com.snapchat.android", "Snapchat", Color(0xFFE5C100)),
+        InstalledMessengerItem("com.tencent.mm", "WeChat", Color(0xFF07C160))
+    )
+
+    val installed = candidates.filter { item ->
+        when (item.messengerName) {
+            "Telegram" -> isPackageInstalled(context, "org.telegram.messenger")
+            "WhatsApp" -> isPackageInstalled(context, "com.whatsapp") || isPackageInstalled(
+                context,
+                "com.whatsapp.w4b"
+            )
+
+            "MAX" -> isPackageInstalled(context, "ru.oneme.app") || isPackageInstalled(
+                context,
+                "ru.max.messenger"
+            ) || isPackageInstalled(context, "com.max.app") || isPackageInstalled(
+                context,
+                "ru.vk.max"
+            )
+
+            "Viber" -> isPackageInstalled(context, "com.viber.voip")
+            "VK Messenger" -> isPackageInstalled(
+                context,
+                "com.vk.im"
+            ) || isPackageInstalled(context, "com.vkontakte.android")
+
+            "Signal" -> isPackageInstalled(context, "org.thoughtcrime.securesms")
+            "Skype" -> isPackageInstalled(
+                context,
+                "com.skype.raider"
+            ) || isPackageInstalled(context, "com.skype.android")
+
+            "Messenger" -> isPackageInstalled(context, "com.facebook.orca")
+            "Snapchat" -> isPackageInstalled(context, "com.snapchat.android")
+            "WeChat" -> isPackageInstalled(context, "com.tencent.mm")
+            else -> isPackageInstalled(context, item.packageName)
+        }
+    }
+
+    return installed.ifEmpty {
+        listOf(
+            InstalledMessengerItem("org.telegram.messenger", "Telegram", Color(0xFF24A1DE)),
+            InstalledMessengerItem("com.whatsapp", "WhatsApp", Color(0xFF25D366)),
+            InstalledMessengerItem("ru.oneme.app", "MAX", Color(0xFF2A5885))
+        )
+    }
+}
+
+private fun getContactCustomKey(contact: FavoriteContact): String {
+    return contact.id.ifBlank { contact.number.replace(Regex("[^0-9+]"), "") }
+}
+
+private fun savePhoneNumbersOrder(
+    context: Context,
+    contactKey: String,
+    numbers: List<ContactPhoneNumber>
+) {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val array = JSONArray()
+        numbers.forEach { array.put(it.number) }
+        prefs.edit { putString("phones_order_$contactKey", array.toString()) }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private fun getSavedPhoneNumbersOrder(context: Context, contactKey: String): List<String> {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val jsonString = prefs.getString("phones_order_$contactKey", null) ?: return emptyList()
+        val array = JSONArray(jsonString)
+        val list = mutableListOf<String>()
+        for (i in 0 until array.length()) {
+            list.add(array.getString(i))
+        }
+        return list
+    } catch (_: Exception) {
+        return emptyList()
+    }
+}
+
+private fun saveMessengerAccountsOrder(
+    context: Context,
+    contactKey: String,
+    messengers: List<MessengerAccount>
+) {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val array = JSONArray()
+        messengers.forEach { array.put(it.id) }
+        prefs.edit { putString("messengers_order_$contactKey", array.toString()) }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private fun getSavedMessengerAccountsOrder(context: Context, contactKey: String): List<String> {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val jsonString = prefs.getString("messengers_order_$contactKey", null) ?: return emptyList()
+        val array = JSONArray(jsonString)
+        val list = mutableListOf<String>()
+        for (i in 0 until array.length()) {
+            list.add(array.getString(i))
+        }
+        return list
+    } catch (_: Exception) {
+        return emptyList()
+    }
+}
+
+private data class ContactEmail(
+    val email: String,
+    val label: String
+)
+
+private data class ContactBirthday(
+    val dateString: String,
+    val formattedDate: String,
+    val ageText: String?
+)
+
+private fun saveEmailOrder(context: Context, contactKey: String, emails: List<ContactEmail>) {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val array = JSONArray()
+        emails.forEach { array.put(it.email) }
+        prefs.edit { putString("emails_order_$contactKey", array.toString()) }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+private fun getSavedEmailOrder(context: Context, contactKey: String): List<String> {
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val jsonString = prefs.getString("emails_order_$contactKey", null) ?: return emptyList()
+        val array = JSONArray(jsonString)
+        val list = mutableListOf<String>()
+        for (i in 0 until array.length()) {
+            list.add(array.getString(i))
+        }
+        return list
+    } catch (_: Exception) {
+        return emptyList()
+    }
+}
+
+private suspend fun loadContactEmails(
+    context: Context,
+    contact: FavoriteContact
+): List<ContactEmail> = withContext(Dispatchers.IO) {
+    val list = mutableListOf<ContactEmail>()
+    val addedAddresses = mutableSetOf<String>()
+
+    try {
+        var contactId: String? = null
+        if (contact.number.isNotBlank()) {
+            try {
+                val lookupUri = Uri.withAppendedPath(
+                    ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                    Uri.encode(contact.number)
+                )
+                val lookupCursor = context.contentResolver.query(
+                    lookupUri,
+                    arrayOf(ContactsContract.PhoneLookup._ID),
+                    null, null, null
+                )
+                lookupCursor?.use { c ->
+                    if (c.moveToFirst()) {
+                        val idIdx = c.getColumnIndex(ContactsContract.PhoneLookup._ID)
+                        if (idIdx != -1) contactId = c.getString(idIdx)
+                    }
+                }
+            } catch (_: Exception) {
+                // ignore
+            }
+        }
+
+        val selection: String
+        val selectionArgs: Array<String>
+        if (!contactId.isNullOrBlank()) {
+            selection =
+                "${ContactsContract.CommonDataKinds.Email.CONTACT_ID} = ? OR ${ContactsContract.CommonDataKinds.Email.DISPLAY_NAME} = ?"
+            selectionArgs = arrayOf(contactId!!, contact.name)
+        } else {
+            selection = "${ContactsContract.CommonDataKinds.Email.DISPLAY_NAME} = ?"
+            selectionArgs = arrayOf(contact.name)
+        }
+
+        val cursor = context.contentResolver.query(
+            ContactsContract.CommonDataKinds.Email.CONTENT_URI,
+            arrayOf(
+                ContactsContract.CommonDataKinds.Email.ADDRESS,
+                ContactsContract.CommonDataKinds.Email.TYPE,
+                ContactsContract.CommonDataKinds.Email.LABEL
+            ),
+            selection,
+            selectionArgs,
+            null
+        )
+        cursor?.use { c ->
+            val addrIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Email.ADDRESS)
+            val typeIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Email.TYPE)
+            val labelIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Email.LABEL)
+            while (c.moveToNext()) {
+                val email = if (addrIdx != -1) c.getString(addrIdx) else ""
+                val type =
+                    if (typeIdx != -1) c.getInt(typeIdx) else ContactsContract.CommonDataKinds.Email.TYPE_OTHER
+                val customLabel = if (labelIdx != -1) c.getString(labelIdx) else null
+
+                val cleanEmail = email.trim().lowercase()
+                if (cleanEmail.isNotBlank() && !addedAddresses.contains(cleanEmail)) {
+                    addedAddresses.add(cleanEmail)
+                    val labelStr = ContactLabelHelper.emailTypeLabel(context, type, customLabel)
+                    list.add(ContactEmail(email.trim(), labelStr))
+                }
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+
+    val contactKey = getContactCustomKey(contact)
+    val savedOrder = getSavedEmailOrder(context, contactKey)
+    if (savedOrder.isNotEmpty()) {
+        val cleanSaved = savedOrder.map { it.trim().lowercase() }
+        list.sortBy { item ->
+            val idx = cleanSaved.indexOf(item.email.trim().lowercase())
+            if (idx != -1) idx else 999
+        }
+    }
+
+    list
+}
+
+private fun parseBirthdayString(context: Context, rawDate: String): ContactBirthday {
+    val cleanDate = rawDate.trim()
+    if (cleanDate.isBlank()) return ContactBirthday("", "", null)
+
+    try {
+        val currentYear = Calendar.getInstance().get(Calendar.YEAR)
+        val currentMonth = Calendar.getInstance().get(Calendar.MONTH) + 1
+        val currentDay = Calendar.getInstance().get(Calendar.DAY_OF_MONTH)
+
+        val monthNames = DateHeaderFormatter.monthGenitiveNames(context)
+
+        if (cleanDate.startsWith("--") || cleanDate.length == 5) {
+            val mm = cleanDate.takeLast(5).substring(0, 2).toIntOrNull() ?: 1
+            val dd = cleanDate.takeLast(2).toIntOrNull() ?: 1
+            val mName = if (mm in 1..12) monthNames[mm - 1] else ""
+            return ContactBirthday(
+                cleanDate,
+                context.getString(R.string.contact_birthday_day_month_format, dd, mName),
+                null
+            )
+        }
+
+        // Search for 4-digit year e.g. 1990 or 2005
+        val yearMatch = Regex("\\b(19\\d{2}|20\\d{2})\\b").find(cleanDate)
+        var birthYear: Int? = yearMatch?.value?.toIntOrNull()
+
+        var birthDay: Int? = null
+        var birthMonth: Int? = null
+
+        val lowerDate = cleanDate.lowercase()
+        for (i in monthNames.indices) {
+            if (lowerDate.contains(monthNames[i])) {
+                birthMonth = i + 1
+                break
+            }
+        }
+
+        val numbers =
+            Regex("\\d+").findAll(cleanDate).mapNotNull { it.value.toIntOrNull() }.toList()
+
+        if (birthYear != null) {
+            val nonYearNumbers = numbers.filter { it != birthYear }
+            if (birthMonth == null && nonYearNumbers.size >= 2) {
+                if (nonYearNumbers[0] in 1..31 && nonYearNumbers[1] in 1..12) {
+                    birthDay = nonYearNumbers[0]
+                    birthMonth = nonYearNumbers[1]
+                } else if (nonYearNumbers[0] in 1..12 && nonYearNumbers[1] in 1..31) {
+                    birthMonth = nonYearNumbers[0]
+                    birthDay = nonYearNumbers[1]
+                }
+            } else if (nonYearNumbers.isNotEmpty()) {
+                birthDay = nonYearNumbers.firstOrNull { it in 1..31 }
+            }
+        } else if (numbers.size >= 3) {
+            val digits = cleanDate.replace(Regex("[^0-9]"), "")
+            if (digits.length >= 8) {
+                birthYear = digits.substring(0, 4).toIntOrNull()
+                birthMonth = digits.substring(4, 6).toIntOrNull()
+                birthDay = digits.substring(6, 8).toIntOrNull()
+            }
+        }
+
+        if (birthYear != null && birthYear in 1900..currentYear) {
+            var age = currentYear - birthYear
+            if (birthMonth != null && birthDay != null) {
+                if (currentMonth < birthMonth || (currentMonth == birthMonth && currentDay < birthDay)) {
+                    age--
+                }
+            }
+            val ageText = if (age in 0..120) ContactLabelHelper.formatAge(context, age) else null
+
+            val formatted = if (birthDay != null && birthMonth != null && birthMonth in 1..12) {
+                context.getString(
+                    R.string.contact_birthday_full_format,
+                    birthDay,
+                    monthNames[birthMonth - 1],
+                    birthYear
+                )
+            } else cleanDate
+
+            return ContactBirthday(cleanDate, formatted, ageText)
+        }
+
+        return ContactBirthday(cleanDate, cleanDate, null)
+    } catch (_: Exception) {
+        return ContactBirthday(cleanDate, cleanDate, null)
+    }
+}
+
+private suspend fun loadContactBirthday(
+    context: Context,
+    contact: FavoriteContact
+): ContactBirthday? = withContext(Dispatchers.IO) {
+    try {
+        var contactId: String? = null
+        if (contact.number.isNotBlank()) {
+            try {
+                val lookupUri = Uri.withAppendedPath(
+                    ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                    Uri.encode(contact.number)
+                )
+                val lookupCursor = context.contentResolver.query(
+                    lookupUri,
+                    arrayOf(ContactsContract.PhoneLookup._ID),
+                    null, null, null
+                )
+                lookupCursor?.use { c ->
+                    if (c.moveToFirst()) {
+                        val idIdx = c.getColumnIndex(ContactsContract.PhoneLookup._ID)
+                        if (idIdx != -1) contactId = c.getString(idIdx)
+                    }
+                }
+            } catch (_: Exception) {
+                // ignore
+            }
+        }
+
+        val selection: String
+        val selectionArgs: Array<String>
+        if (!contactId.isNullOrBlank()) {
+            selection =
+                "(${ContactsContract.Data.CONTACT_ID} = ? OR ${ContactsContract.Data.DISPLAY_NAME} = ?) AND ${ContactsContract.Data.MIMETYPE} = ? AND ${ContactsContract.CommonDataKinds.Event.TYPE} = ?"
+            selectionArgs = arrayOf(
+                contactId!!,
+                contact.name,
+                ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
+                ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY.toString()
+            )
+        } else {
+            selection =
+                "${ContactsContract.Data.DISPLAY_NAME} = ? AND ${ContactsContract.Data.MIMETYPE} = ? AND ${ContactsContract.CommonDataKinds.Event.TYPE} = ?"
+            selectionArgs = arrayOf(
+                contact.name,
+                ContactsContract.CommonDataKinds.Event.CONTENT_ITEM_TYPE,
+                ContactsContract.CommonDataKinds.Event.TYPE_BIRTHDAY.toString()
+            )
+        }
+
+        val cursor = context.contentResolver.query(
+            ContactsContract.Data.CONTENT_URI,
+            arrayOf(
+                ContactsContract.CommonDataKinds.Event.START_DATE
+            ),
+            selection,
+            selectionArgs,
+            null
+        )
+        cursor?.use { c ->
+            val dateIdx = c.getColumnIndex(ContactsContract.CommonDataKinds.Event.START_DATE)
+            if (c.moveToFirst()) {
+                val rawDate = if (dateIdx != -1) c.getString(dateIdx) else null
+                if (!rawDate.isNullOrBlank()) {
+                    return@withContext parseBirthdayString(context, rawDate)
+                }
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+    null
+}
+
+data class CustomSwipeAction(
+    val actionType: String,
+    val targetValue: String,
+    val label: String,
+    val messengerName: String? = null,
+    val messengerColorHex: String? = null
+)
+
+private fun saveCustomSwipeAction(
+    context: Context,
+    contactKey: String,
+    contactNumber: String,
+    contactName: String? = null,
+    allPhoneNumbers: List<String> = emptyList(),
+    isRight: Boolean,
+    action: CustomSwipeAction?
+) {
+    try {
+        SwipeActionCache.clear()
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+        val keySuffix = if (isRight) "swipe_right_" else "swipe_left_"
+
+        val keysToUpdate = mutableSetOf<String>()
+        if (contactKey.isNotBlank()) keysToUpdate.add(keySuffix + contactKey)
+        if (!contactName.isNullOrBlank()) keysToUpdate.add(keySuffix + contactName.trim())
+
+        val numbers = (allPhoneNumbers + contactNumber).filter { it.isNotBlank() }.distinct()
+        for (num in numbers) {
+            keysToUpdate.add(keySuffix + num.trim())
+            val withPlus = digitsOnlyPhoneFast(num, keepPlus = true)
+            val noPlus = digitsOnlyPhoneFast(num, keepPlus = false)
+            if (withPlus.isNotBlank()) keysToUpdate.add(keySuffix + withPlus)
+            if (noPlus.isNotBlank()) keysToUpdate.add(keySuffix + noPlus)
+            if (noPlus.length >= 10) keysToUpdate.add(keySuffix + noPlus.takeLast(10))
+            if (noPlus.length >= 7) keysToUpdate.add(keySuffix + noPlus.takeLast(7))
+        }
+
+        if (action == null) {
+            prefs.edit {
+                keysToUpdate.forEach { remove(it) }
+            }
+            SwipeActionCache.clear()
+            return
+        }
+
+        val obj = JSONObject().apply {
+            put("actionType", action.actionType)
+            put("targetValue", action.targetValue)
+            put("label", action.label)
+            put("messengerName", action.messengerName ?: JSONObject.NULL)
+            put("messengerColorHex", action.messengerColorHex ?: JSONObject.NULL)
+        }
+
+        prefs.edit {
+            keysToUpdate.forEach { putString(it, obj.toString()) }
+        }
+        SwipeActionCache.clear()
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+
+internal object SwipeActionCache {
+    private val map = object : LinkedHashMap<String, CustomSwipeAction?>(64, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, CustomSwipeAction?>?): Boolean =
+            size > 256
+    }
+
+    val lastChangedAt = MutableStateFlow(Date())
+
+    @Synchronized
+    fun get(key: String): CustomSwipeAction? = if (map.containsKey(key)) map[key] else null
+
+    @Synchronized
+    fun contains(key: String): Boolean = map.containsKey(key)
+
+    @Synchronized
+    fun put(key: String, value: CustomSwipeAction?) {
+        map[key] = value
+    }
+
+    @Synchronized
+    fun clear() {
+        map.clear()
+        lastChangedAt.value = Date()
+    }
+}
+
+private fun digitsOnlyPhoneFast(number: String, keepPlus: Boolean = true): String {
+    val sb = StringBuilder(number.length)
+    for (c in number) {
+        if (c.isDigit() || (keepPlus && c == '+')) sb.append(c)
+    }
+    return sb.toString()
+}
+
+private fun lookupSystemContactId(context: Context, phoneNumber: String): String? {
+    if (phoneNumber.isBlank()) return null
+    try {
+        val uri = Uri.withAppendedPath(
+            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+            Uri.encode(phoneNumber)
+        )
+        context.contentResolver.query(
+            uri,
+            arrayOf(ContactsContract.PhoneLookup._ID),
+            null,
+            null,
+            null
+        )?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val idIndex = cursor.getColumnIndex(ContactsContract.PhoneLookup._ID)
+                if (idIndex != -1) return cursor.getString(idIndex)
+            }
+        }
+    } catch (_: Exception) {
+        // ignore
+    }
+    return null
+}
+
+fun getCustomSwipeAction(
+    context: Context,
+    contactKey: String,
+    isRight: Boolean,
+    fallbackNumber: String? = null,
+    contactName: String? = null
+): CustomSwipeAction? {
+    val keySuffix = if (isRight) "swipe_right_" else "swipe_left_"
+    val cacheKey = "$keySuffix|$contactKey|${fallbackNumber.orEmpty()}|${contactName.orEmpty()}"
+    if (SwipeActionCache.contains(cacheKey)) {
+        return SwipeActionCache.get(cacheKey)
+    }
+
+    try {
+        val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
+
+        // 1. Direct match candidates
+        val candidates = mutableListOf<String>()
+        if (contactKey.isNotBlank()) candidates.add(contactKey.trim())
+        if (!contactName.isNullOrBlank()) candidates.add(contactName.trim())
+
+        val numbersToProcess = listOfNotNull(fallbackNumber, contactKey).filter { it.isNotBlank() }
+        for (num in numbersToProcess) {
+            candidates.add(num.trim())
+            val withPlus = digitsOnlyPhoneFast(num, keepPlus = true)
+            val noPlus = digitsOnlyPhoneFast(num, keepPlus = false)
+            if (withPlus.isNotBlank()) candidates.add(withPlus)
+            if (noPlus.isNotBlank()) candidates.add(noPlus)
+            if (noPlus.length >= 10) candidates.add(noPlus.takeLast(10))
+            if (noPlus.length >= 7) candidates.add(noPlus.takeLast(7))
+            if (noPlus.length == 11 && (noPlus.startsWith("7") || noPlus.startsWith("8"))) {
+                candidates.add(noPlus.substring(1))
+            }
+        }
+
+        var jsonString: String? = null
+        for (cand in candidates.distinct()) {
+            jsonString = prefs.getString(keySuffix + cand, null)
+            if (!jsonString.isNullOrEmpty()) break
+        }
+
+        // 2. Lookup by system Contact ID
+        if (jsonString.isNullOrEmpty()) {
+            val phoneForLookup = fallbackNumber?.takeIf { it.isNotBlank() }
+                ?: contactKey.takeIf { it.any { c -> c.isDigit() } }
+            if (!phoneForLookup.isNullOrBlank()) {
+                val systemContactId = lookupSystemContactId(context, phoneForLookup)
+                if (!systemContactId.isNullOrBlank()) {
+                    jsonString = prefs.getString(keySuffix + systemContactId, null)
+                }
+            }
+        }
+
+        // 3. Fallback: match across all keys by last 7 digits
+        if (jsonString.isNullOrEmpty()) {
+            val searchNum = digitsOnlyPhoneFast(
+                if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey,
+                keepPlus = false
+            )
+            if (searchNum.length >= 7) {
+                val last7 = searchNum.takeLast(7)
+                val allKeys = prefs.all.keys.filter { it.startsWith(keySuffix) }
+                for (k in allKeys) {
+                    val cleanKeyDigits = digitsOnlyPhoneFast(k, keepPlus = false)
+                    if (cleanKeyDigits.length >= 7 && cleanKeyDigits.takeLast(7) == last7) {
+                        jsonString = prefs.getString(k, null)
+                        if (!jsonString.isNullOrEmpty()) break
+                    }
+                }
+            }
+        }
+
+        // 4. Deep Match: search inside all saved actions by targetValue phone number or contact name
+        if (jsonString.isNullOrEmpty()) {
+            val searchNum = digitsOnlyPhoneFast(
+                if (!fallbackNumber.isNullOrBlank()) fallbackNumber else contactKey,
+                keepPlus = false
+            )
+            val searchLast7 = if (searchNum.length >= 7) searchNum.takeLast(7) else ""
+            val searchName = contactName?.trim()?.lowercase().orEmpty()
+
+            val allEntries = prefs.all
+            for ((key, value) in allEntries) {
+                if (!key.startsWith(keySuffix)) continue
+                val str = value as? String ?: continue
+                try {
+                    val obj = JSONObject(str)
+                    val targetValue = obj.optString("targetValue")
+                    val cleanTarget = digitsOnlyPhoneFast(targetValue, keepPlus = false)
+                    if (searchLast7.isNotBlank() && cleanTarget.length >= 7 && cleanTarget.takeLast(
+                            7
+                        ) == searchLast7
+                    ) {
+                        jsonString = str
+                        break
+                    }
+                    val keyWithoutPrefix = key.removePrefix(keySuffix).trim().lowercase()
+                    if (searchName.isNotBlank() && keyWithoutPrefix == searchName) {
+                        jsonString = str
+                        break
+                    }
+                } catch (_: Exception) {
+                    // ignore
+                }
+            }
+        }
+
+        if (jsonString.isNullOrEmpty()) {
+            SwipeActionCache.put(cacheKey, null)
+            return null
+        }
+
+        val obj = JSONObject(jsonString)
+        val action = CustomSwipeAction(
+            actionType = obj.getString("actionType"),
+            targetValue = obj.getString("targetValue"),
+            label = obj.getString("label"),
+            messengerName = if (obj.has("messengerName") && !obj.isNull("messengerName")) obj.getString(
+                "messengerName"
+            ) else null,
+            messengerColorHex = if (obj.has("messengerColorHex") && !obj.isNull("messengerColorHex")) obj.getString(
+                "messengerColorHex"
+            ) else null
+        )
+        SwipeActionCache.put(cacheKey, action)
+        return action
+    } catch (_: Exception) {
+        SwipeActionCache.put(cacheKey, null)
+        return null
+    }
+}
+
+fun executeCustomSwipeAction(
+    context: Context,
+    action: CustomSwipeAction,
+    onCall: (String, Int?) -> Unit,
+    onSms: (String) -> Unit
+) {
+    try {
+        when (action.actionType) {
+            "call_sim1" -> onCall(action.targetValue, 1)
+            "call_sim2" -> onCall(action.targetValue, 2)
+            "call_single" -> onCall(action.targetValue, null)
+            "sms" -> onSms(action.targetValue)
+            "email" -> {
+                val intent = Intent(Intent.ACTION_SENDTO, "mailto:${action.targetValue}".toUri()).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            }
+
+            "messenger_chat", "messenger_audio", "messenger_video" -> {
+                val uri = action.targetValue.toUri()
+                val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                context.startActivity(intent)
+            }
+
+            else -> onCall(action.targetValue, null)
+        }
+    } catch (_: Exception) {
+        Toast.makeText(context, context.getString(R.string.error_swipe_action), Toast.LENGTH_SHORT).show()
+    }
+}
+
+data class SwipeBackgroundVisuals(
+    val icon: ImageVector,
+    val backgroundColor: Color,
+    val label: String,
+    val iconBitmap: ImageBitmap? = null
+)
+
+private fun swipeActionLabel(context: Context?, @androidx.annotation.StringRes resId: Int, fallback: String): String =
+    context?.getString(resId) ?: fallback
+
+fun getSwipeBackgroundVisuals(
+    customAction: CustomSwipeAction?,
+    defaultIsRight: Boolean,
+    context: Context? = null
+): SwipeBackgroundVisuals {
+    val callLabel = swipeActionLabel(context, R.string.contact_call, "Call")
+    val messageLabel = swipeActionLabel(context, R.string.swipe_label_message, "Message")
+    val videoLabel = swipeActionLabel(context, R.string.swipe_label_video_call, "Video call")
+
+    if (customAction == null) {
+        return if (defaultIsRight) {
+            SwipeBackgroundVisuals(
+                icon = Icons.Default.Phone,
+                backgroundColor = SamsungGreen,
+                label = callLabel
+            )
+        } else {
+            SwipeBackgroundVisuals(
+                icon = Icons.AutoMirrored.Filled.Message,
+                backgroundColor = SamsungSmsBlue,
+                label = messageLabel
+            )
+        }
+    }
+
+    return when (customAction.actionType) {
+        "call_sim1", "call_sim2", "call_single" -> {
+            val messenger = customAction.messengerName
+            SwipeBackgroundVisuals(
+                icon = Icons.Default.Phone,
+                backgroundColor = SamsungGreen,
+                label = if (!messenger.isNullOrBlank()) messenger else callLabel
+            )
+        }
+
+        "sms" -> {
+            val messenger = customAction.messengerName
+            SwipeBackgroundVisuals(
+                icon = Icons.AutoMirrored.Filled.Message,
+                backgroundColor = SamsungSmsBlue,
+                label = if (!messenger.isNullOrBlank()) messenger else messageLabel
+            )
+        }
+
+        "messenger_chat" -> {
+            val messenger = customAction.messengerName ?: messageLabel
+            val appIcon = if (context != null) {
+                val candidate =
+                    "${customAction.messengerName} ${customAction.targetValue} ${customAction.label}".lowercase(
+                        Locale.getDefault()
+                    )
+                val pkg = when {
+                    candidate.contains("telegram") || candidate.contains("tg") -> "org.telegram.messenger"
+                    candidate.contains("whatsapp") || candidate.contains("wa") -> "com.whatsapp"
+                    candidate.contains("viber") -> "com.viber.voip"
+                    candidate.contains("max") -> "ru.oneme.app"
+                    candidate.contains("vk") || candidate.contains("вконтакте") -> "com.vk.im"
+                    candidate.contains("skype") -> "com.skype.raider"
+                    candidate.contains("signal") -> "org.thoughtcrime.securesms"
+                    candidate.contains("snapchat") -> "com.snapchat.android"
+                    candidate.contains("wechat") -> "com.tencent.mm"
+                    else -> null
+                }
+                pkg?.let { getApplicationIconBitmap(context, it) }
+            } else null
+            SwipeBackgroundVisuals(
+                icon = Icons.AutoMirrored.Filled.Message,
+                backgroundColor = SamsungSmsBlue,
+                label = messenger,
+                iconBitmap = appIcon
+            )
+        }
+
+        "messenger_audio" -> {
+            val messenger = customAction.messengerName ?: callLabel
+            SwipeBackgroundVisuals(
+                icon = Icons.Default.Phone,
+                backgroundColor = SamsungGreen,
+                label = messenger
+            )
+        }
+
+        "messenger_video" -> {
+            val messenger = customAction.messengerName ?: videoLabel
+            SwipeBackgroundVisuals(
+                icon = Icons.Default.Videocam,
+                backgroundColor = Color(0xFF7360F2),
+                label = messenger
+            )
+        }
+
+        "email" -> {
+            SwipeBackgroundVisuals(
+                icon = Icons.Default.Email,
+                backgroundColor = Color(0xFFFFB300),
+                label = "E-mail"
+            )
+        }
+
+        else -> {
+            if (defaultIsRight) {
+                SwipeBackgroundVisuals(Icons.Default.Phone, SamsungGreen, callLabel)
+            } else {
+                SwipeBackgroundVisuals(Icons.AutoMirrored.Filled.Message, SamsungSmsBlue, messageLabel)
+            }
+        }
+    }
+}
+
+private data class ActionVisuals(
+    val icon: ImageVector,
+    val color: Color,
+    val simNumber: Int? = null
+)
+
+private fun getActionVisuals(action: CustomSwipeAction?, defaultIsRight: Boolean): ActionVisuals {
+    if (action == null) {
+        return if (defaultIsRight) {
+            ActionVisuals(Icons.Default.Phone, SamsungGreen)
+        } else {
+            ActionVisuals(Icons.AutoMirrored.Filled.Message, SamsungSmsBlue)
+        }
+    }
+
+    val brandColor = if (!action.messengerName.isNullOrBlank()) {
+        getMessengerBrandColor(action.messengerName)
+    } else null
+
+    return when (action.actionType) {
+        "call_sim1" -> ActionVisuals(Icons.Default.Phone, SamsungSmsBlue, simNumber = 1)
+        "call_sim2" -> ActionVisuals(Icons.Default.Phone, SamsungGreen, simNumber = 2)
+        "call_single" -> ActionVisuals(Icons.Default.Phone, brandColor ?: SamsungGreen)
+        "sms" -> ActionVisuals(Icons.AutoMirrored.Filled.Message, brandColor ?: SamsungSmsBlue)
+        "email" -> ActionVisuals(Icons.Default.Email, Color(0xFFFFB300))
+        "messenger_chat" -> ActionVisuals(
+            Icons.AutoMirrored.Filled.Message,
+            brandColor ?: SamsungGreen
+        )
+
+        "messenger_audio" -> ActionVisuals(Icons.Default.Phone, brandColor ?: SamsungGreen)
+        "messenger_video" -> ActionVisuals(Icons.Default.Videocam, brandColor ?: SamsungGreen)
+        else -> if (defaultIsRight) ActionVisuals(
+            Icons.Default.Phone,
+            SamsungGreen
+        ) else ActionVisuals(Icons.AutoMirrored.Filled.Message, SamsungSmsBlue)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SwipeActionPickerDialog(
+    contact: FavoriteContact,
+    phoneNumbersList: List<ContactPhoneNumber>,
+    messengerAccountsList: List<MessengerAccount>,
+    onUpdateMessengerAccounts: (List<MessengerAccount>) -> Unit = {},
+    emailsList: List<ContactEmail>,
+    activeSimCount: Int,
+    context: Context,
+    onActionSelected: (CustomSwipeAction) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var pickerMessengerList by remember(messengerAccountsList) {
+        mutableStateOf(
+            messengerAccountsList
+        )
+    }
+    var showAddCustomLinkDialogInPicker by remember { mutableStateOf(false) }
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.background,
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Header(
+                stringResource(R.string.contact_swipe_picker_title),
+                Modifier.padding(bottom = 16.dp)
+            )
+
+            // Section 1: Телефоны
+            if (phoneNumbersList.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.contact_section_phones),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp
+                ) {
+                    Column {
+                        phoneNumbersList.forEachIndexed { index, phoneItem ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                    thickness = 1.dp,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = phoneItem.label,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = PhoneNumberHelper.format(phoneItem.number),
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    if (activeSimCount > 1) {
+                                        // SIM 1 Call Button
+                                        IconButton(
+                                            onClick = {
+                                                onActionSelected(
+                                                    CustomSwipeAction(
+                                                        actionType = "call_sim1",
+                                                        targetValue = phoneItem.number,
+                                                        label = context.getString(
+                                                            R.string.contact_call_sim1_label,
+                                                            PhoneNumberHelper.format(phoneItem.number)
+                                                        )
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .size(37.6.dp)
+                                                .clip(CircleShape)
+                                                .background(SamsungSmsBlue.copy(alpha = 0.12f))
+                                        ) {
+                                            Box(modifier = Modifier.fillMaxSize()) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Phone,
+                                                    contentDescription = stringResource(R.string.contact_call_sim1),
+                                                    tint = SamsungSmsBlue,
+                                                    modifier = Modifier
+                                                        .size(26.dp)
+                                                        .align(Alignment.Center)
+                                                        .offset(x = (-1).dp, y = 2.dp)
+                                                )
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .padding(top = 7.dp, end = 7.dp)
+                                                ) {
+                                                    SimIcon(simNumber = 1, size = 11.dp)
+                                                }
+                                            }
+                                        }
+
+                                        // SIM 2 Call Button
+                                        IconButton(
+                                            onClick = {
+                                                onActionSelected(
+                                                    CustomSwipeAction(
+                                                        actionType = "call_sim2",
+                                                        targetValue = phoneItem.number,
+                                                        label = context.getString(
+                                                            R.string.contact_call_sim2_label,
+                                                            PhoneNumberHelper.format(phoneItem.number)
+                                                        )
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .size(37.6.dp)
+                                                .clip(CircleShape)
+                                                .background(SamsungGreen.copy(alpha = 0.12f))
+                                        ) {
+                                            Box(modifier = Modifier.fillMaxSize()) {
+                                                Icon(
+                                                    imageVector = Icons.Default.Phone,
+                                                    contentDescription = stringResource(R.string.contact_call_sim2),
+                                                    tint = SamsungGreen,
+                                                    modifier = Modifier
+                                                        .size(26.dp)
+                                                        .align(Alignment.Center)
+                                                        .offset(x = (-1).dp, y = 2.dp)
+                                                )
+                                                Box(
+                                                    modifier = Modifier
+                                                        .align(Alignment.TopEnd)
+                                                        .padding(top = 7.dp, end = 7.dp)
+                                                ) {
+                                                    SimIcon(simNumber = 2, size = 11.dp)
+                                                }
+                                            }
+                                        }
+                                    } else {
+                                        // Single Call Button
+                                        IconButton(
+                                            onClick = {
+                                                onActionSelected(
+                                                    CustomSwipeAction(
+                                                        actionType = "call_single",
+                                                        targetValue = phoneItem.number,
+                                                        label = context.getString(
+                                                            R.string.contact_call_single_label,
+                                                            PhoneNumberHelper.format(phoneItem.number)
+                                                        )
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .size(37.6.dp)
+                                                .clip(CircleShape)
+                                                .background(SamsungGreen.copy(alpha = 0.12f))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Phone,
+                                                contentDescription = stringResource(R.string.contact_call),
+                                                tint = SamsungGreen,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // SMS Button
+                                    IconButton(
+                                        onClick = {
+                                            onActionSelected(
+                                                CustomSwipeAction(
+                                                    actionType = "sms",
+                                                    targetValue = phoneItem.number,
+                                                    label = "SMS (${
+                                                        PhoneNumberHelper.format(
+                                                            phoneItem.number
+                                                        )
+                                                    })"
+                                                )
+                                            )
+                                        },
+                                        modifier = Modifier
+                                            .size(37.6.dp)
+                                            .clip(CircleShape)
+                                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.Message,
+                                            contentDescription = "SMS",
+                                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            modifier = Modifier.size(17.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // Section 2: Мессенджеры
+            val hiddenSetInPicker = remember(pickerMessengerList) {
+                getHiddenMessengers(
+                    context,
+                    getContactCustomKey(contact)
+                )
+            }
+            val visiblePickerMessengers = pickerMessengerList.filter { messenger ->
+                val key = if (messenger.isCustomLink) messenger.id else messenger.packageName
+                !hiddenSetInPicker.contains(key)
+            }
+
+            if (visiblePickerMessengers.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.contact_section_messengers),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp
+                ) {
+                    Column {
+                        visiblePickerMessengers.forEachIndexed { index, messenger ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                    thickness = 1.dp,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        MessengerBrandBadge(
+                                            item = InstalledMessengerItem(
+                                                packageName = messenger.packageName,
+                                                messengerName = messenger.messengerName,
+                                                brandColor = messenger.brandColor
+                                            )
+                                        )
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Text(
+                                            text = messenger.messengerName,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = messenger.brandColor
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (messenger.isCustomLink) messenger.accountDetail else PhoneNumberHelper.format(
+                                            messenger.accountDetail
+                                        ),
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    // 1. Chat Icon
+                                    if (messenger.chatIntent != null) {
+                                        IconButton(
+                                            onClick = {
+                                                onActionSelected(
+                                                    CustomSwipeAction(
+                                                        actionType = "messenger_chat",
+                                                        targetValue = messenger.chatIntent.dataString
+                                                            ?: "",
+                                                        label = context.getString(
+                                                            R.string.contact_messenger_chat_suffix,
+                                                            messenger.messengerName
+                                                        ),
+                                                        messengerName = messenger.messengerName
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .size(37.6.dp)
+                                                .clip(CircleShape)
+                                                .background(messenger.brandColor.copy(alpha = 0.15f))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.AutoMirrored.Filled.Message,
+                                                contentDescription = stringResource(R.string.contact_messenger_chat),
+                                                tint = messenger.brandColor,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // 2. Audio Call Icon
+                                    if (!messenger.isCustomLink && messenger.audioCallIntent != null) {
+                                        IconButton(
+                                            onClick = {
+                                                onActionSelected(
+                                                    CustomSwipeAction(
+                                                        actionType = "messenger_audio",
+                                                        targetValue = messenger.audioCallIntent.dataString
+                                                            ?: "",
+                                                        label = context.getString(
+                                                            R.string.contact_messenger_audio_suffix,
+                                                            messenger.messengerName
+                                                        ),
+                                                        messengerName = messenger.messengerName
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .size(37.6.dp)
+                                                .clip(CircleShape)
+                                                .background(messenger.brandColor.copy(alpha = 0.15f))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Phone,
+                                                contentDescription = stringResource(R.string.swipe_label_call),
+                                                tint = messenger.brandColor,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+
+                                    // 3. Video Call Icon
+                                    if (!messenger.isCustomLink && messenger.videoCallIntent != null) {
+                                        IconButton(
+                                            onClick = {
+                                                onActionSelected(
+                                                    CustomSwipeAction(
+                                                        actionType = "messenger_video",
+                                                        targetValue = messenger.videoCallIntent.dataString
+                                                            ?: "",
+                                                        label = context.getString(
+                                                            R.string.contact_messenger_video_suffix,
+                                                            messenger.messengerName
+                                                        ),
+                                                        messengerName = messenger.messengerName
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier
+                                                .size(37.6.dp)
+                                                .clip(CircleShape)
+                                                .background(messenger.brandColor.copy(alpha = 0.15f))
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Videocam,
+                                                contentDescription = stringResource(R.string.swipe_label_video_call),
+                                                tint = messenger.brandColor,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // Bottom "+" Button inside Messenger Card in Swipe Action Picker Dialog
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            thickness = 1.dp,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 6.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            IconButton(
+                                onClick = { showAddCustomLinkDialogInPicker = true },
+                                modifier = Modifier
+                                    .size(36.dp)
+                                    .clip(CircleShape)
+                                    .background(SamsungGreen.copy(alpha = 0.12f))
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Add,
+                                    contentDescription = stringResource(R.string.add_link),
+                                    tint = SamsungGreen,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+            }
+
+            // Section 3: E-mail
+            if (emailsList.isNotEmpty()) {
+                Text(
+                    text = "E-mail",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp
+                ) {
+                    Column {
+                        emailsList.forEachIndexed { index, emailItem ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                                    thickness = 1.dp,
+                                    modifier = Modifier.padding(horizontal = 16.dp)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 18.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = emailItem.label,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = emailItem.email,
+                                        fontSize = 15.sp,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+
+                                Spacer(modifier = Modifier.width(12.dp))
+
+                                IconButton(
+                                    onClick = {
+                                        onActionSelected(
+                                            CustomSwipeAction(
+                                                actionType = "email",
+                                                targetValue = emailItem.email,
+                                                label = "Email (${emailItem.email})"
+                                            )
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .size(37.6.dp)
+                                        .clip(CircleShape)
+                                        .background(Color(0xFFFFB300).copy(alpha = 0.15f))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Email,
+                                        contentDescription = stringResource(R.string.cd_email),
+                                        tint = Color(0xFFFFB300),
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        if (showAddCustomLinkDialogInPicker) {
+            AddCustomMessengerLinkDialog(
+                context = context,
+                onAddCustomLink = { newAccount ->
+                    val updatedList = pickerMessengerList + newAccount
+                    pickerMessengerList = updatedList
+                    onUpdateMessengerAccounts(updatedList)
+                    saveCustomMessengerLinks(context, getContactCustomKey(contact), updatedList)
+                },
+                onDismiss = { showAddCustomLinkDialogInPicker = false }
+            )
+        }
+    }
+}
+
+@Composable
+private fun AddCustomMessengerLinkDialog(
+    context: Context,
+    onAddCustomLink: (MessengerAccount) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var selectedMessengerIndex by remember { mutableIntStateOf(0) }
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    var customLinkInput by remember { mutableStateOf("") }
+    var showQrScannerDialog by remember { mutableStateOf(false) }
+
+    val installedMessengers = remember { getInstalledMessengersList(context) }
+    val activeMessenger =
+        installedMessengers.getOrNull(selectedMessengerIndex) ?: installedMessengers.firstOrNull()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = stringResource(R.string.contact_add_messenger_link),
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = stringResource(R.string.contact_pick_messenger),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                // Messenger Dropdown
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { dropdownExpanded = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (activeMessenger != null) {
+                                    MessengerBrandBadge(item = activeMessenger)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                }
+                                Text(
+                                    text = activeMessenger?.messengerName
+                                        ?: stringResource(R.string.contact_messenger_generic),
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = stringResource(R.string.action_select),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false }
+                    ) {
+                        installedMessengers.forEachIndexed { idx, item ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        MessengerBrandBadge(item = item)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = item.messengerName,
+                                            fontWeight = if (idx == selectedMessengerIndex) FontWeight.Bold else FontWeight.Normal,
+                                            color = Color.Black
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    selectedMessengerIndex = idx
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = customLinkInput,
+                    onValueChange = { customLinkInput = it },
+                    label = { Text(stringResource(R.string.contact_paste_link)) },
+                    placeholder = { Text("https://t.me/username") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
+
+                // QR Code Button
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(SamsungGreen.copy(alpha = 0.12f))
+                        .clickable { showQrScannerDialog = true }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.QrCodeScanner,
+                        contentDescription = stringResource(R.string.cd_scan_qr),
+                        tint = SamsungGreen,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.contact_add_via_qr),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SamsungGreen
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val inputUrl = customLinkInput.trim()
+                    if (inputUrl.isNotBlank() && activeMessenger != null) {
+                        val formattedUrl =
+                            if (!inputUrl.startsWith("http://") && !inputUrl.startsWith("https://") && !inputUrl.startsWith(
+                                    "viber://"
+                                ) && !inputUrl.startsWith("skype:")
+                            ) {
+                                "https://$inputUrl"
+                            } else inputUrl
+
+                        val newAccount = MessengerAccount(
+                            id = "custom_${System.currentTimeMillis()}",
+                            packageName = activeMessenger.packageName,
+                            messengerName = activeMessenger.messengerName,
+                            accountDetail = formattedUrl,
+                            brandColor = activeMessenger.brandColor,
+                            chatIntent = Intent(Intent.ACTION_VIEW, formattedUrl.toUri()),
+                            isCustomLink = true
+                        )
+
+                        onAddCustomLink(newAccount)
+                        onDismiss()
+                    }
+                }
+            ) {
+                Text(stringResource(R.string.action_add), color = SamsungGreen, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
+
+    if (showQrScannerDialog) {
+        var qrInputText by remember { mutableStateOf("") }
+        var hasCameraPermission by remember {
+            mutableStateOf(
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.CAMERA
+                ) == PackageManager.PERMISSION_GRANTED
+            )
+        }
+
+        val permissionLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestPermission()
+        ) { isGranted ->
+            hasCameraPermission = isGranted
+        }
+
+        val galleryLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.GetContent()
+        ) { uri: Uri? ->
+            if (uri != null) {
+                try {
+                    val image = InputImage.fromFilePath(context, uri)
+                    val scanner = BarcodeScanning.getClient()
+                    scanner.process(image)
+                        .addOnSuccessListener { barcodes ->
+                            val qrUrl = barcodes.firstOrNull()?.rawValue
+                            if (!qrUrl.isNullOrBlank()) {
+                                val formatted =
+                                    if (!qrUrl.startsWith("http://") && !qrUrl.startsWith("https://") && !qrUrl.startsWith(
+                                            "viber://"
+                                        ) && !qrUrl.startsWith("skype:")
+                                    ) {
+                                        "https://$qrUrl"
+                                    } else qrUrl
+                                customLinkInput = formatted
+                                showQrScannerDialog = false
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.qr_toast_scanned_gallery),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            } else {
+                                Toast.makeText(
+                                    context,
+                                    context.getString(R.string.qr_toast_no_qr_in_image),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+                        }
+                        .addOnFailureListener {
+                            Toast.makeText(
+                                context,
+                                context.getString(R.string.qr_toast_image_analysis_failed),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                } catch (_: Exception) {
+                    Toast.makeText(
+                        context,
+                        context.getString(R.string.qr_toast_gallery_load_failed),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+
+        AlertDialog(
+            onDismissRequest = { showQrScannerDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.QrCodeScanner,
+                        contentDescription = stringResource(R.string.cd_qr_code),
+                        tint = SamsungGreen,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.contact_qr_scan_title),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 18.sp
+                    )
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    // Camera Scanner Frame
+                    Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = Color.Black,
+                        modifier = Modifier
+                            .size(190.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .padding(vertical = 4.dp)
+                    ) {
+                        Box(
+                            contentAlignment = Alignment.Center,
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            if (hasCameraPermission) {
+                                CameraQrScannerView { scannedUrl ->
+                                    val formatted =
+                                        if (!scannedUrl.startsWith("http://") && !scannedUrl.startsWith(
+                                                "https://"
+                                            ) && !scannedUrl.startsWith("viber://") && !scannedUrl.startsWith(
+                                                "skype:"
+                                            )
+                                        ) {
+                                            "https://$scannedUrl"
+                                        } else scannedUrl
+                                    customLinkInput = formatted
+                                    showQrScannerDialog = false
+                                    Toast.makeText(
+                                        context,
+                                        context.getString(R.string.qr_toast_scanned),
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                            } else {
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.padding(12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.QrCodeScanner,
+                                        contentDescription = stringResource(R.string.cd_camera),
+                                        tint = SamsungGreen,
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    TextButton(
+                                        onClick = {
+                                            permissionLauncher.launch(Manifest.permission.CAMERA)
+                                        }
+                                    ) {
+                                        Text(
+                                            context.getString(R.string.contact_allow_camera),
+                                            color = SamsungGreen,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 13.sp
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = stringResource(R.string.contact_qr_scan_hint),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                        textAlign = TextAlign.Center
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedTextField(
+                        value = qrInputText,
+                        onValueChange = { qrInputText = it },
+                        label = { Text(stringResource(R.string.contact_qr_link_label)) },
+                        placeholder = { Text("https://t.me/username") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Button: Выбрать в галерее
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { galleryLauncher.launch("image/*") }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoLibrary,
+                            contentDescription = stringResource(R.string.contact_pick_from_gallery),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = stringResource(R.string.contact_pick_from_gallery),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (qrInputText.isNotBlank()) {
+                            customLinkInput = qrInputText.trim()
+                            showQrScannerDialog = false
+                        }
+                    }
+                ) {
+                    Text(stringResource(R.string.action_use), color = SamsungGreen, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showQrScannerDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun CameraQrScannerView(
+    onQrCodeScanned: (String) -> Unit
+) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var isScanned by remember { mutableStateOf(false) }
+
+    AndroidView(
+        factory = { ctx ->
+            val previewView = PreviewView(ctx)
+            val cameraProviderFuture = ProcessCameraProvider.getInstance(ctx)
+
+            cameraProviderFuture.addListener({
+                val cameraProvider = cameraProviderFuture.get()
+                val preview = Preview.Builder().build().also {
+                    it.surfaceProvider = previewView.surfaceProvider
+                }
+
+                val barcodeScanner = BarcodeScanning.getClient()
+                val imageAnalysis = ImageAnalysis.Builder()
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .build()
+
+                imageAnalysis.setAnalyzer(ContextCompat.getMainExecutor(ctx)) { imageProxy ->
+                    @Suppress("UnsafeOptInUsageError")
+                    val mediaImage = imageProxy.image
+                    if (mediaImage != null && !isScanned) {
+                        val image = InputImage.fromMediaImage(
+                            mediaImage,
+                            imageProxy.imageInfo.rotationDegrees
+                        )
+                        barcodeScanner.process(image)
+                            .addOnSuccessListener { barcodes ->
+                                val qrUrl = barcodes.firstOrNull()?.rawValue
+                                if (!qrUrl.isNullOrBlank() && !isScanned) {
+                                    isScanned = true
+                                    onQrCodeScanned(qrUrl)
+                                }
+                            }
+                            .addOnCompleteListener {
+                                imageProxy.close()
+                            }
+                    } else {
+                        imageProxy.close()
+                    }
+                }
+
+                val cameraSelector = CameraSelector.DEFAULT_BACK_CAMERA
+                try {
+                    cameraProvider.unbindAll()
+                    cameraProvider.bindToLifecycle(
+                        lifecycleOwner,
+                        cameraSelector,
+                        preview,
+                        imageAnalysis
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }, ContextCompat.getMainExecutor(ctx))
+
+            previewView
+        },
+        modifier = Modifier.fillMaxSize()
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+private fun showCalendarDatePicker(
+    context: Context,
+    initialDateString: String,
+    onDateSelected: (formattedDate: String) -> Unit
+) {
+    val cal = Calendar.getInstance()
+    val numbers =
+        Regex("\\d+").findAll(initialDateString).mapNotNull { it.value.toIntOrNull() }.toList()
+    if (numbers.size >= 3) {
+        val y = numbers.firstOrNull { it in 1900..2100 } ?: cal.get(Calendar.YEAR)
+        val nonYears = numbers.filter { it != y }
+        val m =
+            if (nonYears.size >= 2 && nonYears[1] in 1..12) nonYears[1] - 1 else cal.get(Calendar.MONTH)
+        val d =
+            if (nonYears.isNotEmpty() && nonYears[0] in 1..31) nonYears[0] else cal.get(Calendar.DAY_OF_MONTH)
+        cal.set(y, m, d)
+    }
+
+    val picker = android.app.DatePickerDialog(
+        context,
+        { _, year, month, dayOfMonth ->
+            val monthNames = DateHeaderFormatter.monthGenitiveNames(context)
+            val mName = monthNames.getOrElse(month) { "" }
+            val formatted = context.getString(
+                R.string.contact_birthday_full_format,
+                dayOfMonth,
+                mName,
+                year
+            )
+            onDateSelected(formatted)
+        },
+        cal.get(Calendar.YEAR),
+        cal.get(Calendar.MONTH),
+        cal.get(Calendar.DAY_OF_MONTH)
+    )
+    picker.show()
+}
+
+@Composable
+fun UnsavedNumberChoiceDialog(
+    phoneNumber: String,
+    onCreateNew: () -> Unit,
+    onAddToExisting: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = stringResource(R.string.contact_add_flow_title),
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = phoneNumber,
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 12.dp),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Button(
+                    onClick = onCreateNew,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = SamsungGreen)
+                ) {
+                    Text(stringResource(R.string.contact_create_new), fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+                OutlinedButton(
+                    onClick = onAddToExisting,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(stringResource(R.string.contact_add_to_existing), fontWeight = FontWeight.SemiBold)
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
+}
+
+@Composable
+fun CallLogAddContactDialog(
+    phoneNumber: String,
+    onSave: (
+        displayName: String,
+        phones: List<ContactsWriteRepository.PhoneEntry>,
+        emails: List<ContactsWriteRepository.EmailEntry>,
+        birthdayDateString: String?,
+        photoBitmap: Bitmap?
+    ) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    val contact = remember(phoneNumber) {
+        FavoriteContact(
+            id = "new_${phoneNumber.filter { it.isDigit() || it == '+' }}",
+            name = "",
+            number = phoneNumber
+        )
+    }
+    EditContactDialog(
+        contact = contact,
+        phoneNumbersList = listOf(ContactPhoneNumber(number = phoneNumber, label = ContactLabelHelper.defaultMobileLabel(context))),
+        emailsList = emptyList(),
+        birthdayInfo = null,
+        importantDatesList = emptyList(),
+        messengerAccountsList = emptyList(),
+        avatarBitmap = null,
+        context = context,
+        isNewContact = true,
+        onSave = { newName, newPhones, newEmails, newBirthday, _, _, _, newBitmap ->
+            onSave(
+                newName,
+                newPhones.map { ContactsWriteRepository.PhoneEntry(it.number, it.label) },
+                newEmails.map { ContactsWriteRepository.EmailEntry(it.email, it.label) },
+                newBirthday?.dateString,
+                newBitmap?.asAndroidBitmap()
+            )
+        },
+        onDismiss = onDismiss
+    )
+}
+
+@Composable
+fun CallLogAddToExistingContactDialog(
+    contact: FavoriteContact,
+    phoneNumberToAdd: String,
+    onSave: (
+        original: FavoriteContact,
+        updated: FavoriteContact,
+        phones: List<ContactsWriteRepository.PhoneEntry>,
+        emails: List<ContactsWriteRepository.EmailEntry>,
+        birthdayDateString: String?,
+        photoBitmap: Bitmap?
+    ) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    var phoneNumbersList by remember(contact, phoneNumberToAdd) {
+        mutableStateOf<List<ContactPhoneNumber>?>(null)
+    }
+    var emailsList by remember(contact) { mutableStateOf<List<ContactEmail>>(emptyList()) }
+    var birthdayInfo by remember(contact) { mutableStateOf<ContactBirthday?>(null) }
+    var importantDatesList by remember(contact) {
+        mutableStateOf<List<ContactImportantDate>>(emptyList())
+    }
+    var messengerAccountsList by remember(contact) {
+        mutableStateOf<List<MessengerAccount>>(emptyList())
+    }
+    var avatarBitmap by remember(contact.photoUri) { mutableStateOf<ImageBitmap?>(null) }
+    var isLoading by remember(contact, phoneNumberToAdd) { mutableStateOf(true) }
+
+    LaunchedEffect(contact, phoneNumberToAdd) {
+        isLoading = true
+        withContext(Dispatchers.IO) {
+            val highResPhotoUri =
+                getHighResContactPhotoUri(context, contact.number) ?: contact.photoUri
+            if (!highResPhotoUri.isNullOrEmpty()) {
+                try {
+                    val uri = highResPhotoUri.toUri()
+                    context.contentResolver.openInputStream(uri)?.use { stream ->
+                        val bitmap = BitmapFactory.decodeStream(stream)
+                        avatarBitmap = bitmap?.asImageBitmap()
+                    }
+                } catch (_: Exception) {
+                    avatarBitmap = null
+                }
+            } else {
+                avatarBitmap = null
+            }
+
+            val loadedNumbers = loadContactPhoneNumbers(context, contact).toMutableList()
+            val cleanNew = phoneNumberToAdd.filter { it.isDigit() || it == '+' }
+            val alreadyHas = loadedNumbers.any {
+                it.number.filter { ch -> ch.isDigit() || ch == '+' } == cleanNew
+            }
+            if (!alreadyHas && phoneNumberToAdd.isNotBlank()) {
+                loadedNumbers.add(
+                    ContactPhoneNumber(number = phoneNumberToAdd, label = ContactLabelHelper.defaultMobileLabel(context))
+                )
+            }
+            phoneNumbersList = loadedNumbers
+            emailsList = loadContactEmails(context, contact)
+            birthdayInfo = loadContactBirthday(context, contact)
+            importantDatesList =
+                getImportantDates(context, getContactCustomKey(contact), contact.number)
+            messengerAccountsList = loadMessengerAccounts(context, contact)
+        }
+        isLoading = false
+    }
+
+    if (isLoading || phoneNumbersList == null) {
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = {
+                Text(
+                    text = stringResource(R.string.contact_edit_title),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 20.sp
+                )
+            },
+            text = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 24.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = SamsungGreen)
+                }
+            },
+            confirmButton = {}
+        )
+        return
+    }
+
+    EditContactDialog(
+        contact = contact,
+        phoneNumbersList = phoneNumbersList!!,
+        emailsList = emailsList,
+        birthdayInfo = birthdayInfo,
+        importantDatesList = importantDatesList,
+        messengerAccountsList = messengerAccountsList,
+        avatarBitmap = avatarBitmap,
+        context = context,
+        onSave = { newName, newPhones, newEmails, newBirthday, newImportantDates, updatedMessengers, hiddenSet, newBitmap ->
+            val updatedContact = contact.copy(
+                name = newName,
+                number = newPhones.firstOrNull()?.number ?: contact.number
+            )
+            saveHiddenMessengers(context, getContactCustomKey(contact), hiddenSet)
+            saveCustomMessengerLinks(
+                context,
+                getContactCustomKey(updatedContact),
+                updatedMessengers
+            )
+            saveImportantDates(
+                context,
+                getContactCustomKey(updatedContact),
+                updatedContact.number,
+                newImportantDates
+            )
+            onSave(
+                contact,
+                updatedContact,
+                newPhones.map { ContactsWriteRepository.PhoneEntry(it.number, it.label) },
+                newEmails.map { ContactsWriteRepository.EmailEntry(it.email, it.label) },
+                newBirthday?.dateString,
+                newBitmap?.asAndroidBitmap()
+            )
+        },
+        onDismiss = onDismiss
+    )
+}
+
+@Composable
+private fun EditContactDialog(
+    contact: FavoriteContact,
+    phoneNumbersList: List<ContactPhoneNumber>,
+    emailsList: List<ContactEmail>,
+    birthdayInfo: ContactBirthday?,
+    importantDatesList: List<ContactImportantDate> = emptyList(),
+    messengerAccountsList: List<MessengerAccount>,
+    avatarBitmap: ImageBitmap?,
+    context: Context,
+    isNewContact: Boolean = false,
+    onSave: (
+        newName: String,
+        newPhones: List<ContactPhoneNumber>,
+        newEmails: List<ContactEmail>,
+        newBirthday: ContactBirthday?,
+        newImportantDates: List<ContactImportantDate>,
+        updatedMessengers: List<MessengerAccount>,
+        hiddenSet: Set<String>,
+        newAvatarBitmap: ImageBitmap?
+    ) -> Unit,
+    onDismiss: () -> Unit
+) {
+    var nameInput by remember { mutableStateOf(contact.name) }
+    var editablePhones by remember { mutableStateOf(phoneNumbersList.toMutableList()) }
+    var editableEmails by remember { mutableStateOf(emailsList.toMutableList()) }
+    var editableBirthday by remember { mutableStateOf(birthdayInfo) }
+    var birthdayInput by remember { mutableStateOf(birthdayInfo?.formattedDate ?: "") }
+    var isEditingBirthday by remember { mutableStateOf(birthdayInfo != null) }
+
+    var customImportantDates by remember { mutableStateOf(importantDatesList.toMutableList()) }
+    var currentAvatarBitmap by remember { mutableStateOf(avatarBitmap) }
+
+    var editableMessengers by remember { mutableStateOf(messengerAccountsList.toMutableList()) }
+
+    val contactKey = remember(contact) { getContactCustomKey(contact) }
+    var hiddenSet by remember {
+        mutableStateOf(
+            getHiddenMessengers(
+                context,
+                contactKey
+            ).toMutableSet()
+        )
+    }
+
+    var showAddMessengerDialogInEdit by remember { mutableStateOf(false) }
+    var customLinkToEditIndex by remember { mutableStateOf<Int?>(null) }
+
+    val galleryAvatarLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.openInputStream(uri)?.use { stream ->
+                    val bitmap = BitmapFactory.decodeStream(stream)
+                    if (bitmap != null) {
+                        currentAvatarBitmap = bitmap.asImageBitmap()
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.toast_contact_photo_updated),
+                            Toast.LENGTH_SHORT
+                        )
+                            .show()
+                    }
+                }
+            } catch (_: Exception) {
+                Toast.makeText(context, context.getString(R.string.error_load_photo), Toast.LENGTH_SHORT)
+                    .show()
+            }
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = stringResource(
+                    if (isNewContact) R.string.contact_create_title else R.string.contact_edit_title
+                ),
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // 1. ROUND AVATAR WITH CAMERA BADGE
+                Box(
+                    modifier = Modifier
+                        .size(86.dp)
+                        .clip(CircleShape)
+                        .clickable { galleryAvatarLauncher.launch("image/*") }
+                ) {
+                    val bitmap = currentAvatarBitmap
+                    if (bitmap != null) {
+                        Image(
+                            bitmap = bitmap,
+                            contentDescription = stringResource(R.string.contact_photo_cd),
+                            modifier = Modifier.fillMaxSize(),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        val avatarBgColor = remember(contact.name) {
+                            val colors = listOf(
+                                Color(0xFFE57373), Color(0xFFF06292), Color(0xFFBA68C8),
+                                Color(0xFF9575CD), Color(0xFF7986CB), Color(0xFF64B5F6)
+                            )
+                            val index = (contact.name.hashCode() and Int.MAX_VALUE) % colors.size
+                            colors[index]
+                        }
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(avatarBgColor),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = contact.name.trim().firstOrNull()?.uppercaseChar()
+                                    ?.toString() ?: "?",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 36.sp
+                            )
+                        }
+                    }
+
+                    // Camera Badge Overlay
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .align(Alignment.BottomEnd)
+                            .clip(CircleShape)
+                            .background(SamsungGreen),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoCamera,
+                            contentDescription = stringResource(R.string.contact_change_photo_cd),
+                            tint = Color.White,
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Name Field
+                Text(
+                    text = stringResource(R.string.contact_name),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                OutlinedTextField(
+                    value = nameInput,
+                    onValueChange = { nameInput = it },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 2. PHONE NUMBERS SECTION
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        stringResource(R.string.contact_section_phones),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    IconButton(
+                        onClick = {
+                            editablePhones = (
+                                editablePhones + ContactPhoneNumber(
+                                    "",
+                                    ContactLabelHelper.defaultMobileLabel(context)
+                                )
+                            ).toMutableList()
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = stringResource(R.string.contact_add_phone_cd),
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+
+                editablePhones.forEachIndexed { index, phoneItem ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = phoneItem.number,
+                            onValueChange = { newNum ->
+                                val updated = editablePhones.toMutableList()
+                                updated[index] = phoneItem.copy(number = newNum)
+                                editablePhones = updated
+                            },
+                            label = { Text(phoneItem.label) },
+                            singleLine = true,
+                            modifier = Modifier.weight(1f)
+                        )
+                        if (editablePhones.size > 1) {
+                            IconButton(
+                                onClick = {
+                                    val updated = editablePhones.toMutableList()
+                                    updated.removeAt(index)
+                                    editablePhones = updated
+                                }
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.contact_delete_phone_cd),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 3. MESSENGERS SECTION
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        stringResource(R.string.contact_messengers_visibility),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    IconButton(
+                        onClick = { showAddMessengerDialogInEdit = true },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = stringResource(R.string.contact_add_messenger_link),
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Column(modifier = Modifier.padding(10.dp)) {
+                        editableMessengers.forEachIndexed { index, messenger ->
+                            val messengerKey =
+                                if (messenger.isCustomLink) messenger.id else messenger.packageName
+                            val isHidden = hiddenSet.contains(messengerKey)
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    modifier = Modifier.weight(1f),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    MessengerBrandBadge(
+                                        item = InstalledMessengerItem(
+                                            packageName = messenger.packageName,
+                                            messengerName = messenger.messengerName,
+                                            brandColor = messenger.brandColor
+                                        )
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Column {
+                                        Text(
+                                            text = messenger.messengerName,
+                                            fontSize = 13.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isHidden) Color.Gray else messenger.brandColor
+                                        )
+                                        Text(
+                                            text = if (messenger.isCustomLink) messenger.accountDetail else PhoneNumberHelper.format(
+                                                messenger.accountDetail
+                                            ),
+                                            fontSize = 11.sp,
+                                            color = if (isHidden) Color.Gray.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onSurface.copy(
+                                                alpha = 0.6f
+                                            ),
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
+                                }
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    if (messenger.isCustomLink) {
+                                        // Edit Custom Link Button
+                                        IconButton(
+                                            onClick = { customLinkToEditIndex = index },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Edit,
+                                                contentDescription = stringResource(R.string.contact_edit_messenger_link_cd),
+                                                tint = SamsungGreen,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+
+                                        // Delete Custom Link Button
+                                        IconButton(
+                                            onClick = {
+                                                val updated = editableMessengers.toMutableList()
+                                                updated.removeAt(index)
+                                                editableMessengers = updated
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Delete,
+                                                contentDescription = stringResource(R.string.contact_delete_messenger_link_cd),
+                                                tint = MaterialTheme.colorScheme.error,
+                                                modifier = Modifier.size(18.dp)
+                                            )
+                                        }
+                                    } else {
+                                        // Visibility Toggle Button for Standard Messengers
+                                        IconButton(
+                                            onClick = {
+                                                val newSet = hiddenSet.toMutableSet()
+                                                if (isHidden) newSet.remove(messengerKey) else newSet.add(
+                                                    messengerKey
+                                                )
+                                                hiddenSet = newSet
+                                            },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = if (isHidden) Icons.Default.VisibilityOff else Icons.Default.Visibility,
+                                                contentDescription = stringResource(
+                                                    if (isHidden) R.string.cd_show else R.string.cd_hide
+                                                ),
+                                                tint = if (isHidden) Color.Gray else SamsungGreen,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 4. E-MAIL SECTION
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        stringResource(R.string.contact_emails_section),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                    IconButton(
+                        onClick = {
+                            editableEmails =
+                                (
+                                    editableEmails + ContactEmail(
+                                        "",
+                                        context.getString(R.string.email_type_personal)
+                                    )
+                                ).toMutableList()
+                        },
+                        modifier = Modifier.size(28.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Add,
+                            contentDescription = stringResource(R.string.contact_add_email_cd),
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(6.dp))
+
+                if (editableEmails.isEmpty()) {
+                    Text(
+                        stringResource(R.string.contact_emails_not_set),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    editableEmails.forEachIndexed { index, emailItem ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            OutlinedTextField(
+                                value = emailItem.email,
+                                onValueChange = { newEmail ->
+                                    val updated = editableEmails.toMutableList()
+                                    updated[index] = emailItem.copy(email = newEmail)
+                                    editableEmails = updated
+                                },
+                                label = { Text(emailItem.label) },
+                                placeholder = { Text("example@mail.ru") },
+                                singleLine = true,
+                                modifier = Modifier.weight(1f)
+                            )
+                            IconButton(
+                                onClick = {
+                                    val updated = editableEmails.toMutableList()
+                                    updated.removeAt(index)
+                                    editableEmails = updated
+                                }
+                            ) {
+                                Icon(
+                                    Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.contact_delete_email_cd),
+                                    tint = MaterialTheme.colorScheme.error
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 5. BIRTHDAY & IMPORTANT DATES SECTION
+                Text(
+                    stringResource(R.string.contact_important_date),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                if (isEditingBirthday) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = birthdayInput,
+                            onValueChange = { birthdayInput = it },
+                            label = { Text(stringResource(R.string.contact_birthday)) },
+                            placeholder = { Text(stringResource(R.string.contact_birthday_placeholder)) },
+                            singleLine = true,
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        showCalendarDatePicker(context, birthdayInput) { newDate ->
+                                            birthdayInput = newDate
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Default.Event,
+                                        contentDescription = stringResource(R.string.calendar),
+                                        tint = SamsungGreen
+                                    )
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(
+                            onClick = {
+                                isEditingBirthday = false
+                                birthdayInput = ""
+                                editableBirthday = null
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = stringResource(R.string.contact_delete_birthday_cd),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                } else {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                            .clickable {
+                                isEditingBirthday = true
+                                birthdayInput = context.getString(R.string.contact_birthday_placeholder)
+                            }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Default.Cake,
+                            contentDescription = stringResource(R.string.contact_birthday),
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            stringResource(R.string.contact_add_birthday),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SamsungGreen
+                        )
+                    }
+                }
+
+                // Custom Important Dates
+                customImportantDates.forEachIndexed { index, dateItem ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        OutlinedTextField(
+                            value = dateItem.label,
+                            onValueChange = { newLabel ->
+                                val updated = customImportantDates.toMutableList()
+                                updated[index] = dateItem.copy(label = newLabel)
+                                customImportantDates = updated
+                            },
+                            label = { Text(stringResource(R.string.contact_custom_date_label)) },
+                            placeholder = { Text(stringResource(R.string.contact_custom_date_placeholder)) },
+                            singleLine = true,
+                            modifier = Modifier.weight(0.45f)
+                        )
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        OutlinedTextField(
+                            value = dateItem.dateString,
+                            onValueChange = { newDate ->
+                                val updated = customImportantDates.toMutableList()
+                                updated[index] = dateItem.copy(dateString = newDate)
+                                customImportantDates = updated
+                            },
+                            label = { Text(stringResource(R.string.contact_date_label)) },
+                            placeholder = { Text(stringResource(R.string.contact_date_example_placeholder)) },
+                            singleLine = true,
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        showCalendarDatePicker(
+                                            context,
+                                            dateItem.dateString
+                                        ) { newDate ->
+                                            val updated = customImportantDates.toMutableList()
+                                            updated[index] = dateItem.copy(dateString = newDate)
+                                            customImportantDates = updated
+                                        }
+                                    }
+                                ) {
+                                    Icon(
+                                        Icons.Default.Event,
+                                        contentDescription = stringResource(R.string.calendar),
+                                        tint = SamsungGreen
+                                    )
+                                }
+                            },
+                            modifier = Modifier.weight(0.55f)
+                        )
+
+                        IconButton(
+                            onClick = {
+                                val updated = customImportantDates.toMutableList()
+                                updated.removeAt(index)
+                                customImportantDates = updated
+                            }
+                        ) {
+                            Icon(
+                                Icons.Default.Delete,
+                                contentDescription = stringResource(R.string.contact_delete_date_cd),
+                                tint = MaterialTheme.colorScheme.error
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f))
+                        .clickable {
+                            val labels = listOf(
+                                context.getString(R.string.contact_important_preset_anniversary),
+                                context.getString(R.string.contact_important_preset_jubilee),
+                                context.getString(R.string.contact_important_preset_name_day),
+                                context.getString(R.string.contact_important_preset_memorable),
+                                context.getString(R.string.contact_important_preset_wedding)
+                            )
+                            val nextLabel = labels.getOrElse(customImportantDates.size % labels.size) {
+                                context.getString(R.string.contact_important_date)
+                            }
+                            customImportantDates = (customImportantDates + ContactImportantDate(
+                                label = nextLabel,
+                                dateString = ""
+                            )).toMutableList()
+                        }
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.Event,
+                        contentDescription = stringResource(R.string.contact_important_date),
+                        tint = SamsungGreen,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        stringResource(R.string.contact_add_important_date),
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SamsungGreen
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val trimmedName = nameInput.trim()
+                    if (isNewContact && trimmedName.isEmpty()) {
+                        Toast.makeText(
+                            context,
+                            context.getString(R.string.error_contact_name_required),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                        return@TextButton
+                    }
+
+                    val cleanPhones = editablePhones.filter { it.number.isNotBlank() }
+                    val cleanEmails = editableEmails.filter { it.email.isNotBlank() }
+                    val newBday = if (isEditingBirthday && birthdayInput.isNotBlank()) {
+                        parseBirthdayString(context, birthdayInput.trim())
+                    } else null
+
+                    onSave(
+                        trimmedName,
+                        cleanPhones.ifEmpty { phoneNumbersList },
+                        cleanEmails,
+                        newBday,
+                        customImportantDates,
+                        editableMessengers,
+                        hiddenSet,
+                        currentAvatarBitmap
+                    )
+                }
+            ) {
+                Text(stringResource(R.string.action_save), color = SamsungGreen, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
+
+    if (showAddMessengerDialogInEdit) {
+        AddCustomMessengerLinkDialog(
+            context = context,
+            onAddCustomLink = { newAccount ->
+                editableMessengers = (editableMessengers + newAccount).toMutableList()
+            },
+            onDismiss = { showAddMessengerDialogInEdit = false }
+        )
+    }
+
+    val editingIndex = customLinkToEditIndex
+    if (editingIndex != null && editingIndex in editableMessengers.indices) {
+        val targetMessenger = editableMessengers[editingIndex]
+        EditCustomMessengerLinkDialog(
+            initialMessenger = targetMessenger,
+            context = context,
+            onSaveCustomLink = { updatedMessenger ->
+                val updated = editableMessengers.toMutableList()
+                updated[editingIndex] = updatedMessenger
+                editableMessengers = updated
+                customLinkToEditIndex = null
+            },
+            onDismiss = { customLinkToEditIndex = null }
+        )
+    }
+}
+
+@Composable
+private fun EditCustomMessengerLinkDialog(
+    initialMessenger: MessengerAccount,
+    context: Context,
+    onSaveCustomLink: (MessengerAccount) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val installedMessengers = remember { getInstalledMessengersList(context) }
+    var selectedMessengerIndex by remember {
+        mutableIntStateOf(
+            installedMessengers.indexOfFirst {
+                it.messengerName.equals(
+                    initialMessenger.messengerName,
+                    true
+                )
+            }.coerceAtLeast(0)
+        )
+    }
+    var dropdownExpanded by remember { mutableStateOf(false) }
+    var customLinkInput by remember { mutableStateOf(initialMessenger.accountDetail) }
+
+    val activeMessenger =
+        installedMessengers.getOrNull(selectedMessengerIndex) ?: installedMessengers.firstOrNull()
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = stringResource(R.string.contact_edit_link_title),
+                fontWeight = FontWeight.Bold,
+                fontSize = 18.sp
+            )
+        },
+        text = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                Text(
+                    text = stringResource(R.string.contact_pick_messenger),
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+
+                Box(modifier = Modifier.fillMaxWidth()) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { dropdownExpanded = true }
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (activeMessenger != null) {
+                                    MessengerBrandBadge(item = activeMessenger)
+                                    Spacer(modifier = Modifier.width(10.dp))
+                                }
+                                Text(
+                                    text = activeMessenger?.messengerName
+                                        ?: stringResource(R.string.contact_messenger_generic),
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.Black
+                                )
+                            }
+                            Icon(
+                                imageVector = Icons.Default.ArrowDropDown,
+                                contentDescription = stringResource(R.string.action_select),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = dropdownExpanded,
+                        onDismissRequest = { dropdownExpanded = false }
+                    ) {
+                        installedMessengers.forEachIndexed { idx, item ->
+                            DropdownMenuItem(
+                                text = {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        MessengerBrandBadge(item = item)
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Text(
+                                            text = item.messengerName,
+                                            fontWeight = if (idx == selectedMessengerIndex) FontWeight.Bold else FontWeight.Normal,
+                                            color = Color.Black
+                                        )
+                                    }
+                                },
+                                onClick = {
+                                    selectedMessengerIndex = idx
+                                    dropdownExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                OutlinedTextField(
+                    value = customLinkInput,
+                    onValueChange = { customLinkInput = it },
+                    label = { Text(stringResource(R.string.contact_paste_link)) },
+                    placeholder = { Text("https://t.me/username") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    val inputUrl = customLinkInput.trim()
+                    if (inputUrl.isNotBlank() && activeMessenger != null) {
+                        val formattedUrl =
+                            if (!inputUrl.startsWith("http://") && !inputUrl.startsWith("https://") && !inputUrl.startsWith(
+                                    "viber://"
+                                ) && !inputUrl.startsWith("skype:")
+                            ) {
+                                "https://$inputUrl"
+                            } else inputUrl
+
+                        val updatedAccount = initialMessenger.copy(
+                            packageName = activeMessenger.packageName,
+                            messengerName = activeMessenger.messengerName,
+                            accountDetail = formattedUrl,
+                            brandColor = activeMessenger.brandColor,
+                            chatIntent = Intent(Intent.ACTION_VIEW, formattedUrl.toUri())
+                        )
+
+                        onSaveCustomLink(updatedAccount)
+                        onDismiss()
+                    }
+                }
+            ) {
+                Text(stringResource(R.string.action_save), color = SamsungGreen, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel))
+            }
+        }
+    )
+}
+
+/**
+ * Диалог выбора формата отправки контакта (vCard или Текст)
+ */
+@Composable
+private fun ShareFormatChoiceDialog(
+    onShareVCard: () -> Unit,
+    onShareText: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Text(
+                text = stringResource(R.string.contact_share_title),
+                fontWeight = FontWeight.Bold,
+                fontSize = 20.sp,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onShareVCard() },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = null,
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.contact_share_vcard_title),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.contact_share_vcard_subtitle),
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { onShareText() },
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.Message,
+                            contentDescription = null,
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(24.dp)
+                        )
+                        Spacer(modifier = Modifier.width(14.dp))
+                        Column {
+                            Text(
+                                text = stringResource(R.string.contact_share_text_title),
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                            Text(
+                                text = stringResource(R.string.contact_share_text_subtitle),
+                                fontSize = 13.sp,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.action_cancel), color = SamsungGreen)
+            }
+        }
+    )
+}
+
+/**
+ * Окно One UI выбора контактной информации для отправки в виде текста
+ */
+@Composable
+private fun ShareTextSelectionDialog(
+    contact: FavoriteContact,
+    phoneNumbers: List<ContactPhoneNumber>,
+    emails: List<ContactEmail>,
+    birthday: ContactBirthday?,
+    importantDates: List<ContactImportantDate>,
+    messengers: List<MessengerAccount>,
+    onSend: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+    data class ShareFieldItem(
+        val id: String,
+        val title: String,
+        val subtitle: String,
+        val isName: Boolean = false
+    )
+
+    val items = remember(contact, phoneNumbers, emails, birthday, importantDates, messengers, context) {
+        val list = mutableListOf<ShareFieldItem>()
+        // 1. Имя
+        if (contact.name.isNotBlank()) {
+            list.add(
+                ShareFieldItem(
+                    id = "name",
+                    title = context.getString(R.string.contact_name),
+                    subtitle = contact.name,
+                    isName = true
+                )
+            )
+        }
+        // 2. Телефоны
+        phoneNumbers.forEachIndexed { idx, p ->
+            if (p.number.isNotBlank()) {
+                val labelText = if (p.label.isNotBlank()) {
+                    p.label
+                } else {
+                    context.getString(R.string.contact_phone_generic)
+                }
+                list.add(
+                    ShareFieldItem(
+                        id = "phone_$idx",
+                        title = labelText,
+                        subtitle = PhoneNumberHelper.format(p.number)
+                    )
+                )
+            }
+        }
+        // 3. Email
+        emails.forEachIndexed { idx, e ->
+            if (e.email.isNotBlank()) {
+                val labelText = if (e.label.isNotBlank()) e.label else "Email"
+                list.add(
+                    ShareFieldItem(
+                        id = "email_$idx",
+                        title = labelText,
+                        subtitle = e.email
+                    )
+                )
+            }
+        }
+        // 4. День рождения
+        if (birthday != null && birthday.dateString.isNotBlank()) {
+            list.add(
+                ShareFieldItem(
+                    id = "birthday",
+                    title = context.getString(R.string.contact_birthday),
+                    subtitle = birthday.dateString
+                )
+            )
+        }
+        // 5. Памятные даты
+        importantDates.forEachIndexed { idx, d ->
+            if (d.dateString.isNotBlank()) {
+                list.add(
+                    ShareFieldItem(
+                        id = "date_$idx",
+                        title = d.label.ifBlank { context.getString(R.string.contact_date_label) },
+                        subtitle = d.dateString
+                    )
+                )
+            }
+        }
+        // 6. Мессенджеры
+        messengers.forEachIndexed { idx, m ->
+            if (m.accountDetail.isNotBlank()) {
+                list.add(
+                    ShareFieldItem(
+                        id = "messenger_$idx",
+                        title = m.messengerName,
+                        subtitle = m.accountDetail
+                    )
+                )
+            }
+        }
+        list
+    }
+
+    // По умолчанию все поля включены
+    var selectedIds by remember(items) {
+        mutableStateOf(items.map { it.id }.toSet())
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Top One UI Bar: Arrow back + Title
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 8.dp, end = 16.dp, top = 42.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = onDismiss,
+                            modifier = Modifier.size(44.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = stringResource(R.string.cd_back),
+                                tint = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.contact_share_fields_title),
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                // Scrollable List of Contact Fields
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items.forEach { item ->
+                        val isChecked = selectedIds.contains(item.id)
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 1.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    selectedIds = if (isChecked) {
+                                        selectedIds - item.id
+                                    } else {
+                                        selectedIds + item.id
+                                    }
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 12.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Checkbox(
+                                    checked = isChecked,
+                                    onCheckedChange = { checked ->
+                                        selectedIds = if (checked) {
+                                            selectedIds + item.id
+                                        } else {
+                                            selectedIds - item.id
+                                        }
+                                    },
+                                    colors = CheckboxDefaults.colors(
+                                        checkedColor = SamsungGreen,
+                                        checkmarkColor = Color.White
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = item.subtitle,
+                                        fontSize = 16.sp,
+                                        fontWeight = if (item.isName) FontWeight.Bold else FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = item.title,
+                                        fontSize = 13.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(100.dp))
+                }
+            }
+
+            // Floating Bottom Buttons: Отмена и Готово
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 24.dp),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 8.dp,
+                tonalElevation = 4.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = onDismiss,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(R.string.action_cancel),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            val selectedItems = items.filter { selectedIds.contains(it.id) }
+                            val sb = StringBuilder()
+                            val nameItem = selectedItems.find { it.isName }
+                            if (nameItem != null) {
+                                sb.append(nameItem.subtitle).append("\n")
+                            }
+                            selectedItems.filter { !it.isName }.forEach { itm ->
+                                sb.append("${itm.title}: ${itm.subtitle}\n")
+                            }
+                            onSend(sb.toString().trim())
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SamsungGreen,
+                            contentColor = Color.White
+                        ),
+                        enabled = selectedIds.isNotEmpty()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.action_done),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Отправка контакта в формате vCard (.vcf) через системный FileProvider
+ */
+private fun shareContactAsVCard(
+    context: Context,
+    contact: FavoriteContact,
+    phoneNumbers: List<ContactPhoneNumber>,
+    emails: List<ContactEmail>,
+    birthday: String?
+) {
+    try {
+        val vcardBuilder = StringBuilder()
+        vcardBuilder.append("BEGIN:VCARD\n")
+        vcardBuilder.append("VERSION:3.0\n")
+        vcardBuilder.append("FN:${contact.name}\n")
+        vcardBuilder.append("N:;${contact.name};;;\n")
+
+        val validPhones = phoneNumbers.filter { it.number.isNotBlank() }.ifEmpty {
+            listOf(
+                ContactPhoneNumber(
+                    contact.number,
+                    ContactLabelHelper.defaultMobileLabel(context)
+                )
+            )
+        }
+        validPhones.forEach { p ->
+            val vcardType = when (p.label.lowercase(Locale.getDefault())) {
+                "домашний", "home" -> "HOME"
+                "рабочий", "work" -> "WORK"
+                else -> "CELL"
+            }
+            vcardBuilder.append("TEL;TYPE=$vcardType:${p.number}\n")
+        }
+
+        emails.filter { it.email.isNotBlank() }.forEach { e ->
+            val vcardType = when (e.label.lowercase(Locale.getDefault())) {
+                "домашний", "home" -> "HOME"
+                "рабочий", "work" -> "WORK"
+                else -> "INTERNET"
+            }
+            vcardBuilder.append("EMAIL;TYPE=$vcardType:${e.email}\n")
+        }
+
+        if (!birthday.isNullOrBlank()) {
+            vcardBuilder.append("BDAY:$birthday\n")
+        }
+
+        vcardBuilder.append("END:VCARD\n")
+
+        val cacheDir = File(context.cacheDir, "vcards").apply { mkdirs() }
+        val safeName =
+            contact.name.ifBlank { "contact" }.replace(Regex("[^a-zA-Z0-9а-яА-ЯёЁ_\\-]"), "_")
+        val vcardFile = File(cacheDir, "${safeName}.vcf")
+        vcardFile.writeText(vcardBuilder.toString(), Charsets.UTF_8)
+
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            vcardFile
+        )
+
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/x-vcard"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            putExtra(Intent.EXTRA_SUBJECT, contact.name)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+
+        context.startActivity(
+            Intent.createChooser(intent, context.getString(R.string.contact_share_vcard_chooser))
+        )
+    } catch (_: Exception) {
+        Toast.makeText(context, context.getString(R.string.error_create_vcard), Toast.LENGTH_SHORT).show()
+    }
+}
+
+/**
+ * Отправка контакта в виде текста
+ */
+private fun shareContactText(context: Context, text: String) {
+    if (text.isBlank()) return
+    try {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, text)
+        }
+        context.startActivity(
+            Intent.createChooser(intent, context.getString(R.string.contact_share_title))
+        )
+    } catch (_: Exception) {
+        Toast.makeText(context, context.getString(R.string.error_send_contact), Toast.LENGTH_SHORT).show()
+    }
+}
+
+/**
+ * Формирование полного текста со всеми данными контакта (как при отправке текстом)
+ */
+private fun buildContactShareText(
+    context: Context,
+    contact: FavoriteContact,
+    phoneNumbers: List<ContactPhoneNumber>,
+    emails: List<ContactEmail>,
+    birthday: ContactBirthday?,
+    importantDates: List<ContactImportantDate>,
+    messengers: List<MessengerAccount>
+): String {
+    val sb = StringBuilder()
+    if (contact.name.isNotBlank()) {
+        sb.append(contact.name).append("\n")
+    }
+    phoneNumbers.filter { it.number.isNotBlank() }.forEach { p ->
+        val labelText = if (p.label.isNotBlank()) {
+            p.label
+        } else {
+            context.getString(R.string.contact_phone_generic)
+        }
+        sb.append("$labelText: ${PhoneNumberHelper.format(p.number)}\n")
+    }
+    emails.filter { it.email.isNotBlank() }.forEach { e ->
+        val labelText = if (e.label.isNotBlank()) e.label else "Email"
+        sb.append("$labelText: ${e.email}\n")
+    }
+    if (birthday != null && birthday.dateString.isNotBlank()) {
+        sb.append(context.getString(R.string.birthday_share_line, birthday.dateString)).append("\n")
+    }
+    importantDates.filter { it.dateString.isNotBlank() }.forEach { d ->
+        val label = d.label.ifBlank { context.getString(R.string.contact_date_label) }
+        sb.append("$label: ${d.dateString}\n")
+    }
+    messengers.filter { it.accountDetail.isNotBlank() }.forEach { m ->
+        sb.append("${m.messengerName}: ${m.accountDetail}\n")
+    }
+    return sb.toString().trim()
+}
+
+/**
+ * Диалог выбора мелодии звонка в стиле Samsung One UI
+ */
+@Composable
+private fun OneUiRingtonePickerDialog(
+    context: Context,
+    currentUri: String?,
+    onRingtoneSelected: (String?, String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    data class RingtoneEntry(
+        val uri: String?,
+        val title: String,
+        val isUserAdded: Boolean = false
+    )
+
+    fun loadAllRingtones(): List<RingtoneEntry> {
+        val list = mutableListOf<RingtoneEntry>()
+        list.add(RingtoneEntry(null, context.getString(R.string.ringtone_default)))
+
+        // Add user-added custom ringtones at the top
+        val userAdded = ContactRingtoneManager.getSavedCustomRingtones(context)
+        userAdded.forEach { (u, t) ->
+            list.add(RingtoneEntry(u, t, isUserAdded = true))
+        }
+
+        try {
+            val rm = RingtoneManager(context).apply {
+                setType(RingtoneManager.TYPE_RINGTONE)
+            }
+            val cursor = rm.cursor
+            while (cursor != null && cursor.moveToNext()) {
+                val pos = cursor.position
+                val ringtoneUri = rm.getRingtoneUri(pos)
+                val title = cursor.getString(RingtoneManager.TITLE_COLUMN_INDEX)
+                val uriStr = ringtoneUri.toString()
+                if (userAdded.none { it.first == uriStr }) {
+                    list.add(
+                        RingtoneEntry(
+                            uriStr,
+                            title ?: context.getString(R.string.contact_ringtone)
+                        )
+                    )
+                }
+            }
+        } catch (_: Exception) {
+            // ignore
+        }
+        return list
+    }
+
+    var ringtoneList by remember { mutableStateOf(loadAllRingtones()) }
+
+    var selectedEntry by remember(currentUri, ringtoneList) {
+        mutableStateOf(ringtoneList.find { it.uri == currentUri } ?: ringtoneList.first())
+    }
+
+    var previewPlayer by remember { mutableStateOf<Ringtone?>(null) }
+
+    fun playPreview(uriStr: String?) {
+        try {
+            previewPlayer?.stop()
+            val playUri = if (uriStr != null) {
+                uriStr.toUri()
+            } else {
+                RingtoneManager.getActualDefaultRingtoneUri(
+                    context,
+                    RingtoneManager.TYPE_RINGTONE
+                )
+            }
+            val r = RingtoneManager.getRingtone(context, playUri)
+            r?.audioAttributes = AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                .build()
+            r?.play()
+            previewPlayer = r
+        } catch (_: Exception) {
+            // ignore
+        }
+    }
+
+    val audioPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { pickedUri ->
+        if (pickedUri != null) {
+            try {
+                // Take persistable permission if possible
+                try {
+                    val flags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    context.contentResolver.takePersistableUriPermission(pickedUri, flags)
+                } catch (_: Exception) {
+                    // ignore
+                }
+
+                // Resolve display name
+                var displayName = ""
+                try {
+                    val projection = arrayOf(OpenableColumns.DISPLAY_NAME)
+                    context.contentResolver.query(pickedUri, projection, null, null, null)
+                        ?.use { cursor ->
+                            if (cursor.moveToFirst()) {
+                                displayName = cursor.getString(0).orEmpty()
+                            }
+                        }
+                } catch (_: Exception) {
+                    // ignore
+                }
+
+                val title = if (displayName.isNotBlank()) {
+                    displayName.substringBeforeLast(".")
+                } else {
+                    RingtoneManager.getRingtone(context, pickedUri)?.getTitle(context)
+                        ?: context.getString(R.string.ringtone_custom_fallback)
+                }
+
+                val uriString = pickedUri.toString()
+                ContactRingtoneManager.saveCustomRingtone(context, uriString, title)
+
+                // Refresh list and select new ringtone
+                val updated = loadAllRingtones()
+                ringtoneList = updated
+                val newEntry =
+                    updated.find { it.uri == uriString } ?: RingtoneEntry(uriString, title, true)
+                selectedEntry = newEntry
+                playPreview(uriString)
+            } catch (_: Exception) {
+                Toast.makeText(context, context.getString(R.string.error_add_ringtone), Toast.LENGTH_SHORT)
+                    .show()
+            }
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            try {
+                previewPlayer?.stop()
+            } catch (_: Exception) {
+                // ignore
+            }
+            previewPlayer = null
+        }
+    }
+
+    Dialog(
+        onDismissRequest = {
+            try {
+                previewPlayer?.stop()
+            } catch (_: Exception) {
+                // ignore
+            }
+            onDismiss()
+        },
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background)
+        ) {
+            Column(modifier = Modifier.fillMaxSize()) {
+                // Top One UI Bar: Arrow back + Title + Add Button aligned to the right
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 8.dp, end = 12.dp, top = 42.dp, bottom = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            IconButton(
+                                onClick = {
+                                    try {
+                                        previewPlayer?.stop()
+                                    } catch (_: Exception) {
+                                        // ignore
+                                    }
+                                    onDismiss()
+                                },
+                                modifier = Modifier.size(44.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = stringResource(R.string.cd_back),
+                                    tint = MaterialTheme.colorScheme.onBackground
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = stringResource(R.string.contact_ringtone),
+                                fontSize = 20.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onBackground
+                            )
+                        }
+
+                        // Add Custom Ringtone "+" Button
+                        IconButton(
+                            onClick = {
+                                audioPickerLauncher.launch(arrayOf("audio/*"))
+                            },
+                            modifier = Modifier
+                                .size(42.dp)
+                                .clip(CircleShape)
+                                .background(SamsungGreen.copy(alpha = 0.12f))
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Add,
+                                contentDescription = stringResource(R.string.cd_add_ringtone),
+                                tint = SamsungGreen,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                }
+
+                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
+
+                // Ringtone List
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    ringtoneList.forEach { entry ->
+                        val isSelected = (entry.uri == selectedEntry.uri)
+
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = if (isSelected) SamsungGreen.copy(alpha = 0.12f) else MaterialTheme.colorScheme.surface,
+                            tonalElevation = if (isSelected) 2.dp else 1.dp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .clickable {
+                                    selectedEntry = entry
+                                    playPreview(entry.uri)
+                                }
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 14.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text(
+                                    text = entry.title,
+                                    fontSize = 15.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                    color = if (isSelected) SamsungGreen else MaterialTheme.colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+
+                                if (isSelected) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = stringResource(R.string.cd_selected),
+                                        tint = SamsungGreen,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(100.dp))
+                }
+            }
+
+            // Floating Bottom Buttons: Отмена и Сохранить
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 24.dp),
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                shadowElevation = 8.dp,
+                tonalElevation = 4.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = {
+                            try {
+                                previewPlayer?.stop()
+                            } catch (_: Exception) {
+                                // ignore
+                            }
+                            onDismiss()
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        border = BorderStroke(
+                            1.dp,
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(R.string.action_cancel),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+
+                    Button(
+                        onClick = {
+                            try {
+                                previewPlayer?.stop()
+                            } catch (_: Exception) {
+                                // ignore
+                            }
+                            onRingtoneSelected(selectedEntry.uri, selectedEntry.title)
+                        },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = SamsungGreen,
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text(
+                            text = stringResource(R.string.action_save),
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Добавление ярлыка контакта на главный экран устройства (Home Screen Shortcut)
+ */
+private fun addContactShortcutToHomeScreen(
+    context: Context,
+    contact: FavoriteContact,
+    avatarBitmap: Bitmap?
+) {
+    try {
+        if (!ShortcutManagerCompat.isRequestPinShortcutSupported(context)) {
+            Toast.makeText(
+                context,
+                context.getString(R.string.error_shortcut_not_supported),
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
+        val launchIntent = Intent(context, MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_OPEN_CONTACT_NUMBER, contact.number)
+            putExtra(MainActivity.EXTRA_OPEN_CONTACT_NAME, contact.name)
+            if (contact.id.isNotBlank()) {
+                putExtra(MainActivity.EXTRA_OPEN_CONTACT_ID, contact.id)
+            }
+        }
+
+        val iconCompat = if (avatarBitmap != null) {
+            IconCompat.createWithAdaptiveBitmap(avatarBitmap)
+        } else {
+            IconCompat.createWithResource(
+                context,
+                R.drawable.ic_launcher
+            )
+        }
+
+        val shortcutInfo = ShortcutInfoCompat.Builder(
+            context,
+            "contact_shortcut_${
+                contact.id.ifBlank {
+                    contact.number.replace(
+                        Regex("[^0-9+]"),
+                        ""
+                    )
+                }
+            }"
+        )
+            .setShortLabel(contact.name.ifBlank { contact.number })
+            .setLongLabel(contact.name.ifBlank { contact.number })
+            .setIcon(iconCompat)
+            .setIntent(launchIntent)
+            .build()
+
+        ShortcutManagerCompat.requestPinShortcut(context, shortcutInfo, null)
+        Toast.makeText(context, context.getString(R.string.toast_shortcut_requested), Toast.LENGTH_SHORT)
+            .show()
+    } catch (_: Exception) {
+        Toast.makeText(context, context.getString(R.string.error_add_shortcut), Toast.LENGTH_SHORT)
+            .show()
+    }
+}
+
+/**
+ * Проверка, заблокирован ли номер в системной базе данных
+ */
+private fun isNumberBlockedInSystem(context: Context, phoneNumber: String): Boolean {
+    val number = phoneNumber.trim()
+    if (number.isBlank()) return false
+    return try {
+        if (!BlockedNumberContract.canCurrentUserBlockNumbers(context)) {
+            return false
+        }
+        BlockedNumberContract.isBlocked(context, number)
+    } catch (_: Exception) {
+        false
+    }
+}
+
+/**
+ * Блокировка контакта в системной базе
+ */
+private fun blockContactNumber(context: Context, phoneNumber: String): Boolean {
+    val number = phoneNumber.trim()
+    if (number.isBlank()) return false
+    return try {
+        if (!BlockedNumberContract.canCurrentUserBlockNumbers(context)) {
+            return false
+        }
+        val values = ContentValues().apply {
+            put(
+                BlockedNumberContract.BlockedNumbers.COLUMN_ORIGINAL_NUMBER,
+                number
+            )
+        }
+        context.contentResolver.insert(
+            BlockedNumberContract.BlockedNumbers.CONTENT_URI,
+            values
+        ) != null
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false
+    }
+}
+
+/**
+ * Разблокировка контакта в системной базе
+ */
+private fun unblockContactNumber(context: Context, phoneNumber: String): Boolean {
+    val number = phoneNumber.trim()
+    if (number.isBlank()) return false
+    return try {
+        if (!BlockedNumberContract.canCurrentUserBlockNumbers(context)) {
+            return false
+        }
+        BlockedNumberContract.unblock(context, number) > 0
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false
+    }
+}
+
+
+
+

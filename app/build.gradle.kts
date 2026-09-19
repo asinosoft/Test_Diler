@@ -4,7 +4,7 @@ plugins {
 }
 
 android {
-    namespace = "com.asinosoft.dialer"
+    namespace = "com.asinosoft.cdm"
     compileSdk = 37
 
     defaultConfig {
