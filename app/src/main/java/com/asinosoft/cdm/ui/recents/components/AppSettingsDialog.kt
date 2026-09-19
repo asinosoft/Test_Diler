@@ -2,8 +2,8 @@ package com.asinosoft.cdm.ui.recents.components
 
 import android.content.pm.PackageManager
 import android.os.Build
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -11,11 +11,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -44,14 +45,13 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SecondaryScrollableTabRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -87,6 +87,7 @@ import com.asinosoft.cdm.data.model.DialerOpenMode
 import com.asinosoft.cdm.data.model.FavoriteTab
 import com.asinosoft.cdm.data.model.FavoritesViewMode
 import com.asinosoft.cdm.data.repository.QuickRepliesManager
+import com.asinosoft.cdm.ui.components.AdBanner
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.util.AboutSupportHelper
 import kotlinx.coroutines.launch
@@ -98,7 +99,6 @@ private enum class SettingsTab(@androidx.annotation.StringRes val titleRes: Int)
     ABOUT(R.string.settings_tab_about)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppSettingsDialog(
     selectedRowsCount: Int,
@@ -115,7 +115,6 @@ fun AppSettingsDialog(
     onReorderTabs: (List<FavoriteTab>) -> Unit = {},
     onDismiss: () -> Unit
 ) {
-    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var selectedTabIndex by remember { mutableIntStateOf(0) }
 
     var showAddTabDialog by remember { mutableStateOf(false) }
@@ -124,26 +123,30 @@ fun AppSettingsDialog(
     var tabToRename by remember { mutableStateOf<FavoriteTab?>(null) }
     var renameTabInput by remember { mutableStateOf("") }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.background,
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    ) {
+    BackHandler(onBack = onDismiss)
+
+    Scaffold(
+        modifier = Modifier.safeContentPadding(),
+        topBar = {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onDismiss) {
+                    Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+                }
+
+                Text(
+                    text = stringResource(R.string.settings_title),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    ) { innerPadding ->
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 24.dp)
+                .fillMaxSize()
+                .padding(innerPadding)
+                .verticalScroll(rememberScrollState())
         ) {
-            Text(
-                text = stringResource(R.string.settings_title),
-                fontSize = 22.sp,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onBackground,
-                modifier = Modifier.padding(bottom = 8.dp)
-            )
-
             SecondaryScrollableTabRow(
                 selectedTabIndex = selectedTabIndex,
                 containerColor = Color.Transparent,
@@ -181,9 +184,7 @@ fun AppSettingsDialog(
             Spacer(modifier = Modifier.height(16.dp))
 
             Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 280.dp, max = 480.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 when (SettingsTab.entries[selectedTabIndex]) {
                     SettingsTab.PHONE -> PhoneSettingsTab(
@@ -213,6 +214,10 @@ fun AppSettingsDialog(
                     SettingsTab.ABOUT -> AboutSettingsTab()
                 }
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            AdBanner(Modifier.fillMaxWidth().aspectRatio(1f))
         }
     }
 
@@ -456,9 +461,7 @@ internal fun FavoritesSettingsTab(
     }
 
     Surface(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState()),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp
@@ -799,11 +802,7 @@ private fun AboutSettingsTab() {
     val appName = stringResource(R.string.app_name)
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 280.dp)
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 4.dp),
+        modifier = Modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text(
@@ -883,8 +882,6 @@ private fun AboutSettingsTab() {
                 )
             }
         }
-
-        Spacer(modifier = Modifier.height(16.dp))
     }
 
     if (showLicenses) {
@@ -948,90 +945,82 @@ private fun ThirdPartyLicensesDialog(onDismiss: () -> Unit) {
             decorFitsSystemWindows = false
         )
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 4.dp, end = 16.dp, top = 36.dp, bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
+        Scaffold(
+            modifier = Modifier.safeContentPadding(),
+            topBar = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onDismiss) {
                         Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = stringResource(R.string.cd_back),
-                            tint = MaterialTheme.colorScheme.onBackground
+                            imageVector = Icons.AutoMirrored.Default.ArrowBack,
+                            contentDescription = stringResource(R.string.cd_back)
                         )
                     }
+
                     Text(
                         text = stringResource(R.string.about_licenses_title),
                         fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
+                        fontWeight = FontWeight.Bold
                     )
                 }
+            }
+        ) {
+            Column(
+                modifier = Modifier
+                    .padding(it)
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.about_licenses_intro),
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+                )
+                Spacer(modifier = Modifier.height(20.dp))
 
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 20.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = stringResource(R.string.about_licenses_intro),
-                        fontSize = 14.sp,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                    )
-                    Spacer(modifier = Modifier.height(20.dp))
+                LicenseSection(
+                    title = "AndroidX / Jetpack",
+                    components = "Core KTX, Activity, Lifecycle, AppCompat components, " +
+                        "Jetpack Compose UI, Compose Foundation, Compose Material3, " +
+                        "Compose Material Icons",
+                    licenseName = "Apache License 2.0"
+                )
+                LicenseSection(
+                    title = "CameraX",
+                    components = "camera-camera2, camera-lifecycle, camera-view",
+                    licenseName = "Apache License 2.0"
+                )
+                LicenseSection(
+                    title = "Google ML Kit",
+                    components = "Barcode Scanning",
+                    licenseName = stringResource(R.string.about_license_mlkit)
+                )
+                LicenseSection(
+                    title = "libphonenumber",
+                    components = stringResource(R.string.about_license_libphonenumber),
+                    licenseName = "Apache License 2.0"
+                )
+                LicenseSection(
+                    title = "Kotlin",
+                    components = "Kotlin Standard Library, Kotlin Coroutines",
+                    licenseName = "Apache License 2.0"
+                )
 
-                    LicenseSection(
-                        title = "AndroidX / Jetpack",
-                        components = "Core KTX, Activity, Lifecycle, AppCompat components, " +
-                            "Jetpack Compose UI, Compose Foundation, Compose Material3, " +
-                            "Compose Material Icons",
-                        licenseName = "Apache License 2.0"
-                    )
-                    LicenseSection(
-                        title = "CameraX",
-                        components = "camera-camera2, camera-lifecycle, camera-view",
-                        licenseName = "Apache License 2.0"
-                    )
-                    LicenseSection(
-                        title = "Google ML Kit",
-                        components = "Barcode Scanning",
-                        licenseName = stringResource(R.string.about_license_mlkit)
-                    )
-                    LicenseSection(
-                        title = "libphonenumber",
-                        components = stringResource(R.string.about_license_libphonenumber),
-                        licenseName = "Apache License 2.0"
-                    )
-                    LicenseSection(
-                        title = "Kotlin",
-                        components = "Kotlin Standard Library, Kotlin Coroutines",
-                        licenseName = "Apache License 2.0"
-                    )
-
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "Apache License 2.0",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = stringResource(R.string.about_apache_license_notice),
-                        fontSize = 12.sp,
-                        color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
-                        lineHeight = 17.sp
-                    )
-                    Spacer(modifier = Modifier.height(32.dp))
-                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "Apache License 2.0",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.about_apache_license_notice),
+                    fontSize = 12.sp,
+                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
+                    lineHeight = 17.sp
+                )
+                Spacer(modifier = Modifier.height(32.dp))
             }
         }
     }
@@ -1108,198 +1097,152 @@ private fun QuickRepliesEditorDialog(
             decorFitsSystemWindows = false
         )
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
-        ) {
-            Column(modifier = Modifier.fillMaxSize()) {
-                // Top One UI Bar: Arrow back + Title + Add Button
-                Surface(
-                    modifier = Modifier.fillMaxWidth(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    Row(
+        Scaffold(
+            modifier = Modifier.safeContentPadding(),
+            topBar = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+                    }
+
+                    Text(
+                        text = stringResource(R.string.quick_replies_screen_title),
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        ) { innerPadding ->
+            // List of Replies
+            Column(
+                modifier = Modifier
+                    .verticalScroll(rememberScrollState())
+                    .padding(innerPadding),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                replies.forEachIndexed { index, reply ->
+                    val isDragging = draggingIndex == index
+
+                    Surface(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 8.dp, end = 16.dp, top = 42.dp, bottom = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            IconButton(
-                                onClick = onDismiss,
-                                modifier = Modifier.size(44.dp)
-                            ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = stringResource(R.string.cd_back),
-                                    tint = MaterialTheme.colorScheme.onBackground
-                                )
+                            .graphicsLayer {
+                                if (isDragging) {
+                                    translationY = dragOffsetY
+                                    shadowElevation = 12f
+                                    scaleX = 1.02f
+                                    scaleY = 1.02f
+                                }
                             }
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = stringResource(R.string.quick_replies_screen_title),
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
-                            )
-                        }
+                            .zIndex(if (isDragging) 10f else 1f)
+                            .pointerInput(index, replies.size) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        draggingIndex = index
+                                        dragOffsetY = 0f
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        dragOffsetY += dragAmount.y
+                                        val currentList = replies.toMutableList()
+                                        val currentIndex = draggingIndex ?: index
+                                        val rowHeightPx = with(density) { 60.dp.toPx() }
+                                        val shift = (dragOffsetY / rowHeightPx).roundToInt()
+                                        val targetIndex =
+                                            (currentIndex + shift).coerceIn(0, currentList.size - 1)
 
-                        IconButton(
-                            onClick = {
-                                newReplyText = ""
-                                showAddDialog = true
+                                        if (targetIndex != currentIndex) {
+                                            val item = currentList.removeAt(currentIndex)
+                                            currentList.add(targetIndex, item)
+                                            replies = currentList
+                                            QuickRepliesManager.saveQuickReplies(context, currentList)
+                                            dragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
+                                            draggingIndex = targetIndex
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        draggingIndex = null
+                                        dragOffsetY = 0f
+                                    },
+                                    onDragCancel = {
+                                        draggingIndex = null
+                                        dragOffsetY = 0f
+                                    }
+                                )
                             },
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(SamsungGreen.copy(alpha = 0.12f))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = stringResource(R.string.quick_replies_add_cd),
-                                tint = SamsungGreen,
-                                modifier = Modifier.size(22.dp)
-                            )
-                        }
-                    }
-                }
-
-                HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-
-                // List of Replies
-                Column(
-                    modifier = Modifier
-                        .weight(1f)
-                        .verticalScroll(rememberScrollState())
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    replies.forEachIndexed { index, reply ->
-                        val isDragging = draggingIndex == index
-
-                        Surface(
+                        shape = RoundedCornerShape(16.dp),
+                        color = if (isDragging) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+                        tonalElevation = if (isDragging) 4.dp else 1.dp
+                    ) {
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .graphicsLayer {
-                                    if (isDragging) {
-                                        translationY = dragOffsetY
-                                        shadowElevation = 12f
-                                        scaleX = 1.02f
-                                        scaleY = 1.02f
-                                    }
-                                }
-                                .zIndex(if (isDragging) 10f else 1f)
-                                .pointerInput(index, replies.size) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            draggingIndex = index
-                                            dragOffsetY = 0f
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            change.consume()
-                                            dragOffsetY += dragAmount.y
-                                            val currentList = replies.toMutableList()
-                                            val currentIndex = draggingIndex ?: index
-                                            val rowHeightPx = with(density) { 60.dp.toPx() }
-                                            val shift = (dragOffsetY / rowHeightPx).roundToInt()
-                                            val targetIndex =
-                                                (currentIndex + shift).coerceIn(0, currentList.size - 1)
-
-                                            if (targetIndex != currentIndex) {
-                                                val item = currentList.removeAt(currentIndex)
-                                                currentList.add(targetIndex, item)
-                                                replies = currentList
-                                                QuickRepliesManager.saveQuickReplies(context, currentList)
-                                                dragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
-                                                draggingIndex = targetIndex
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            draggingIndex = null
-                                            dragOffsetY = 0f
-                                        },
-                                        onDragCancel = {
-                                            draggingIndex = null
-                                            dragOffsetY = 0f
-                                        }
-                                    )
-                                },
-                            shape = RoundedCornerShape(16.dp),
-                            color = if (isDragging) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
-                            tonalElevation = if (isDragging) 4.dp else 1.dp
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 14.dp, vertical = 12.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween
+                                modifier = Modifier.weight(1f)
                             ) {
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.weight(1f)
+                                Icon(
+                                    imageVector = Icons.Default.DragHandle,
+                                    contentDescription = stringResource(R.string.cd_drag),
+                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(modifier = Modifier.width(12.dp))
+                                Text(
+                                    text = reply,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                IconButton(
+                                    onClick = {
+                                        editingReplyIndex = index
+                                        editingText = reply
+                                        showEditDialog = true
+                                    },
+                                    modifier = Modifier.size(36.dp)
                                 ) {
                                     Icon(
-                                        imageVector = Icons.Default.DragHandle,
-                                        contentDescription = stringResource(R.string.cd_drag),
-                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(
-                                        text = reply,
-                                        fontSize = 15.sp,
-                                        fontWeight = FontWeight.Medium,
-                                        color = MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
+                                        imageVector = Icons.Default.Edit,
+                                        contentDescription = stringResource(R.string.action_edit),
+                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
 
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (replies.size > 1) {
                                     IconButton(
                                         onClick = {
-                                            editingReplyIndex = index
-                                            editingText = reply
-                                            showEditDialog = true
+                                            val updated = replies.toMutableList().apply { removeAt(index) }
+                                            replies = updated
+                                            QuickRepliesManager.saveQuickReplies(context, updated)
                                         },
                                         modifier = Modifier.size(36.dp)
                                     ) {
                                         Icon(
-                                            imageVector = Icons.Default.Edit,
-                                            contentDescription = stringResource(R.string.action_edit),
-                                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = stringResource(R.string.action_delete),
+                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
                                             modifier = Modifier.size(18.dp)
                                         )
-                                    }
-
-                                    if (replies.size > 1) {
-                                        IconButton(
-                                            onClick = {
-                                                val updated = replies.toMutableList().apply { removeAt(index) }
-                                                replies = updated
-                                                QuickRepliesManager.saveQuickReplies(context, updated)
-                                            },
-                                            modifier = Modifier.size(36.dp)
-                                        ) {
-                                            Icon(
-                                                imageVector = Icons.Default.Delete,
-                                                contentDescription = stringResource(R.string.action_delete),
-                                                tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                        }
                                     }
                                 }
                             }
                         }
                     }
-
-                    Spacer(modifier = Modifier.height(24.dp))
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
