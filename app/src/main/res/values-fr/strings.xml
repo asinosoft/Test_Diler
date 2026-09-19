@@ -270,6 +270,7 @@
     <string name="contact_swipe_picker_title">Choisir une icône d\'action de balayage</string>
     <string name="contact_section_phones">Téléphones</string>
     <string name="contact_section_messengers">Messageries</string>
+    <string name="contact_messengers_visibility">Messageries</string>
     <string name="contact_section_emails">E-mails</string>
     <string name="contact_add_messenger_link">Ajouter un lien de messagerie</string>
     <string name="contact_pick_messenger">Choisir une messagerie</string>

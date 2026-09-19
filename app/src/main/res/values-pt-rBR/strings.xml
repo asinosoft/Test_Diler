@@ -270,6 +270,7 @@
     <string name="contact_swipe_picker_title">Escolher ícone da ação de deslize</string>
     <string name="contact_section_phones">Telefones</string>
     <string name="contact_section_messengers">Mensageiros</string>
+    <string name="contact_messengers_visibility">Mensageiros</string>
     <string name="contact_section_emails">E-mails</string>
     <string name="contact_add_messenger_link">Adicionar link do mensageiro</string>
     <string name="contact_pick_messenger">Escolher mensageiro</string>

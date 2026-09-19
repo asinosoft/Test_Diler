@@ -270,6 +270,7 @@
     <string name="contact_swipe_picker_title">स्वाइप क्रिया आइकन चुनें</string>
     <string name="contact_section_phones">फ़ोन</string>
     <string name="contact_section_messengers">मैसेंजर</string>
+    <string name="contact_messengers_visibility">मैसेंजर</string>
     <string name="contact_section_emails">ईमेल</string>
     <string name="contact_add_messenger_link">मैसेंजर लिंक जोड़ें</string>
     <string name="contact_pick_messenger">मैसेंजर चुनें</string>

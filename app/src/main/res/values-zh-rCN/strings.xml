@@ -269,6 +269,7 @@
     <string name="contact_swipe_picker_title">选择滑动操作图标</string>
     <string name="contact_section_phones">电话</string>
     <string name="contact_section_messengers">即时通讯</string>
+    <string name="contact_messengers_visibility">即时通讯</string>
     <string name="contact_section_emails">电子邮件</string>
     <string name="contact_add_messenger_link">添加即时通讯链接</string>
     <string name="contact_pick_messenger">选择即时通讯</string>

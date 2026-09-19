@@ -270,6 +270,7 @@
     <string name="contact_swipe_picker_title">Choose a swipe action icon</string>
     <string name="contact_section_phones">Phones</string>
     <string name="contact_section_messengers">Messengers</string>
+    <string name="contact_messengers_visibility">Messengers</string>
     <string name="contact_section_emails">Emails</string>
     <string name="contact_add_messenger_link">Add messenger link</string>
     <string name="contact_pick_messenger">Choose messenger</string>

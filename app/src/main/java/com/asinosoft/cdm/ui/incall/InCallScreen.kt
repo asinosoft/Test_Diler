@@ -18,6 +18,7 @@ import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
 import android.telephony.SubscriptionManager
 import android.widget.Toast
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -25,6 +26,10 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -50,6 +55,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.automirrored.filled.VolumeOff
 import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.Add
@@ -61,12 +67,14 @@ import androidx.compose.material.icons.filled.CallMerge
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dialpad
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -87,6 +95,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -109,6 +118,7 @@ import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.asinosoft.cdm.MainActivity
 import com.asinosoft.cdm.R
+import com.asinosoft.cdm.data.repository.QuickRepliesManager
 import com.asinosoft.cdm.service.CallManager
 import com.asinosoft.cdm.ui.components.OneUiPopupMenu
 import com.asinosoft.cdm.ui.components.OneUiPopupMenuItem
@@ -298,6 +308,17 @@ fun InCallScreen(
     }
     val leftVisuals = remember(swipeLeftAction) {
         getSwipeBackgroundVisuals(swipeLeftAction, defaultIsRight = false, context = context)
+    }
+
+    val quickReplies = remember {
+        QuickRepliesManager.getQuickReplies(context)
+    }
+    var showQuickRepliesDropdown by remember { mutableStateOf(false) }
+
+    LaunchedEffect(callState) {
+        if (callState != Call.STATE_RINGING) {
+            showQuickRepliesDropdown = false
+        }
     }
 
     val formattedName = contactName ?: if (displayName.isBlank()) {
@@ -499,6 +520,180 @@ fun InCallScreen(
                                     else -> SamsungGreen
                                 }
                             )
+                        }
+                    }
+
+                    // Send message / quick replies — directly under "Incoming call"
+                    if (callState == Call.STATE_RINGING && incomingWaitingCall == null) {
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        Surface(
+                            shape = RoundedCornerShape(22.dp),
+                            color = Color.White.copy(alpha = 0.12f),
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(22.dp))
+                                .clickable { showQuickRepliesDropdown = !showQuickRepliesDropdown }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = stringResource(R.string.incall_send_message),
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = Color.White.copy(alpha = 0.92f)
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.KeyboardArrowDown,
+                                    contentDescription = stringResource(R.string.incall_quick_sms_cd),
+                                    tint = Color.White.copy(alpha = 0.85f),
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .rotate(if (showQuickRepliesDropdown) 180f else 0f)
+                                )
+                            }
+                        }
+
+                        AnimatedVisibility(
+                            visible = showQuickRepliesDropdown,
+                            enter = expandVertically(animationSpec = tween(240)) +
+                                    fadeIn(animationSpec = tween(240)),
+                            exit = shrinkVertically(animationSpec = tween(200)) +
+                                    fadeOut(animationSpec = tween(200))
+                        ) {
+                            Surface(
+                                shape = RoundedCornerShape(18.dp),
+                                color = Color(0xFF282E3C),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 12.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp)
+                                ) {
+                                    quickReplies.forEachIndexed { index, replyText ->
+                                        if (index > 0) {
+                                            HorizontalDivider(
+                                                color = Color.White.copy(alpha = 0.06f),
+                                                modifier = Modifier.padding(horizontal = 14.dp)
+                                            )
+                                        }
+
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .clickable {
+                                                    showQuickRepliesDropdown = false
+                                                    CallManager.rejectWithMessage(replyText)
+                                                }
+                                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = replyText,
+                                                fontSize = 14.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = Color.White.copy(alpha = 0.92f),
+                                                maxLines = 2,
+                                                overflow = TextOverflow.Ellipsis
+                                            )
+                                        }
+                                    }
+
+                                    HorizontalDivider(
+                                        color = Color.White.copy(alpha = 0.1f),
+                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)
+                                    )
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                showQuickRepliesDropdown = false
+                                                CallManager.disconnect()
+                                                startSmsFromInCallScreen(context, rawNumber)
+                                            }
+                                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.AutoMirrored.Filled.Message,
+                                            contentDescription = null,
+                                            tint = SamsungSmsBlue,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = stringResource(R.string.incall_new_sms_title),
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White.copy(alpha = 0.92f)
+                                        )
+                                    }
+
+                                    HorizontalDivider(
+                                        color = Color.White.copy(alpha = 0.06f),
+                                        modifier = Modifier.padding(horizontal = 14.dp)
+                                    )
+
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .clickable {
+                                                showQuickRepliesDropdown = false
+                                                CallManager.disconnect()
+                                                if (swipeLeftAction != null) {
+                                                    executeCustomSwipeAction(
+                                                        context = context,
+                                                        action = swipeLeftAction,
+                                                        onCall = { num, sim ->
+                                                            startCallFromInCallScreen(context, num, sim)
+                                                        },
+                                                        onSms = { num ->
+                                                            startSmsFromInCallScreen(context, num)
+                                                        }
+                                                    )
+                                                } else {
+                                                    startSmsFromInCallScreen(context, rawNumber)
+                                                }
+                                            }
+                                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        if (leftVisuals.iconBitmap != null) {
+                                            Image(
+                                                bitmap = leftVisuals.iconBitmap,
+                                                contentDescription = leftVisuals.label,
+                                                modifier = Modifier
+                                                    .size(22.dp)
+                                                    .clip(CircleShape),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        } else {
+                                            Icon(
+                                                imageVector = leftVisuals.icon,
+                                                contentDescription = null,
+                                                tint = leftVisuals.backgroundColor,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(
+                                            text = stringResource(R.string.incall_write_message),
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = Color.White.copy(alpha = 0.92f)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -711,7 +906,7 @@ fun InCallScreen(
             // Bottom Section: Answer / Decline / End Call Buttons
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.height(if (isCallDisconnected) 0.dp else 76.dp)
+                modifier = Modifier.fillMaxWidth()
             ) {
                 when {
                     isCallDisconnected -> {
@@ -1077,7 +1272,7 @@ private fun SamsungSwipeAnswerDeclineRow(
     val answerOffsetX = remember { Animatable(0f) }
     val declineOffsetX = remember { Animatable(0f) }
 
-    val thresholdPx = with(density) { 80.dp.toPx() }
+    val thresholdPx = with(density) { 72.dp.toPx() }
 
     var hasTriggered by remember { mutableStateOf(false) }
 
@@ -1113,14 +1308,14 @@ private fun SamsungSwipeAnswerDeclineRow(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(3.dp),
-                    modifier = Modifier.padding(start = 78.dp)
+                    modifier = Modifier.padding(start = 68.dp)
                 ) {
                     repeat(3) { i ->
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                             contentDescription = null,
                             tint = SamsungGreen.copy(alpha = (pulseAlpha - i * 0.2f).coerceIn(0.12f, 1f)),
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
@@ -1133,7 +1328,7 @@ private fun SamsungSwipeAnswerDeclineRow(
                     shadowElevation = 8.dp,
                     modifier = Modifier
                         .offset { IntOffset(answerOffsetX.value.roundToInt(), 0) }
-                        .size(74.dp)
+                        .size(64.dp)
                         .pointerInput(Unit) {
                             detectHorizontalDragGestures(
                                 onDragEnd = {
@@ -1177,7 +1372,7 @@ private fun SamsungSwipeAnswerDeclineRow(
                             imageVector = Icons.Default.Call,
                             contentDescription = stringResource(R.string.incall_answer),
                             tint = Color.White,
-                            modifier = Modifier.size(34.dp)
+                            modifier = Modifier.size(30.dp)
                         )
                         if (isBluetoothConnected) {
                             Icon(
@@ -1185,9 +1380,9 @@ private fun SamsungSwipeAnswerDeclineRow(
                                 contentDescription = "Bluetooth",
                                 tint = Color.White,
                                 modifier = Modifier
-                                    .size(20.dp)
+                                    .size(18.dp)
                                     .align(Alignment.Center)
-                                    .offset(x = 11.dp, y = (-11).dp)
+                                    .offset(x = 10.dp, y = (-10).dp)
                             )
                         }
                     }
@@ -1218,14 +1413,14 @@ private fun SamsungSwipeAnswerDeclineRow(
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(3.dp),
-                    modifier = Modifier.padding(end = 78.dp)
+                    modifier = Modifier.padding(end = 68.dp)
                 ) {
                     repeat(3) { i ->
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft,
                             contentDescription = null,
                             tint = MissedRed.copy(alpha = (pulseAlpha - i * 0.2f).coerceIn(0.12f, 1f)),
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(22.dp)
                         )
                     }
                 }
@@ -1237,7 +1432,7 @@ private fun SamsungSwipeAnswerDeclineRow(
                     shadowElevation = 8.dp,
                     modifier = Modifier
                         .offset { IntOffset(declineOffsetX.value.roundToInt(), 0) }
-                        .size(74.dp)
+                        .size(64.dp)
                         .pointerInput(Unit) {
                             detectHorizontalDragGestures(
                                 onDragEnd = {
@@ -1281,7 +1476,7 @@ private fun SamsungSwipeAnswerDeclineRow(
                             imageVector = Icons.Default.CallEnd,
                             contentDescription = stringResource(R.string.incall_decline),
                             tint = Color.White,
-                            modifier = Modifier.size(34.dp)
+                            modifier = Modifier.size(30.dp)
                         )
                     }
                 }

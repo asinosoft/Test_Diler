@@ -416,7 +416,7 @@
     <string name="contact_messenger_generic">Messenger</string>
     <string name="contact_emails_section">Email addresses</string>
     <string name="contact_emails_not_set">No email addresses</string>
-    <string name="contact_messengers_visibility">Messengers (visibility)</string>
+    <string name="contact_messengers_visibility">Messengers</string>
     <string name="contact_add_phone_cd">Add number</string>
     <string name="contact_delete_phone_cd">Delete number</string>
     <string name="contact_add_email_cd">Add email</string>

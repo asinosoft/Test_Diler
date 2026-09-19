@@ -401,7 +401,7 @@
     <string name="contact_messenger_generic">Мессенджер</string>
     <string name="contact_emails_section">E-mail адреса</string>
     <string name="contact_emails_not_set">E-mail адреса не заданы</string>
-    <string name="contact_messengers_visibility">Мессенджеры (видимость)</string>
+    <string name="contact_messengers_visibility">Мессенджеры</string>
     <string name="contact_add_phone_cd">Добавить номер</string>
     <string name="contact_delete_phone_cd">Удалить номер</string>
     <string name="contact_add_email_cd">Добавить email</string>

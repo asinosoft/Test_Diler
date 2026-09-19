@@ -270,6 +270,7 @@
     <string name="contact_swipe_picker_title">Symbol für Wischaktion wählen</string>
     <string name="contact_section_phones">Telefone</string>
     <string name="contact_section_messengers">Messenger</string>
+    <string name="contact_messengers_visibility">Messenger</string>
     <string name="contact_section_emails">E-Mails</string>
     <string name="contact_add_messenger_link">Messenger-Link hinzufügen</string>
     <string name="contact_pick_messenger">Messenger wählen</string>

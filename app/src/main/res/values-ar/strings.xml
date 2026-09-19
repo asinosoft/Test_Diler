@@ -274,6 +274,7 @@
     <string name="contact_swipe_picker_title">اختر أيقونة إجراء السحب</string>
     <string name="contact_section_phones">الهواتف</string>
     <string name="contact_section_messengers">المراسلة</string>
+    <string name="contact_messengers_visibility">المراسلة</string>
     <string name="contact_section_emails">البريد</string>
     <string name="contact_add_messenger_link">إضافة رابط مراسلة</string>
     <string name="contact_pick_messenger">اختر تطبيق مراسلة</string>

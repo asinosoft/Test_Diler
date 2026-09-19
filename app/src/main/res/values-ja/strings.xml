@@ -269,6 +269,7 @@
     <string name="contact_swipe_picker_title">スワイプ操作のアイコンを選択</string>
     <string name="contact_section_phones">電話</string>
     <string name="contact_section_messengers">メッセンジャー</string>
+    <string name="contact_messengers_visibility">メッセンジャー</string>
     <string name="contact_section_emails">メール</string>
     <string name="contact_add_messenger_link">メッセンジャーのリンクを追加</string>
     <string name="contact_pick_messenger">メッセンジャーを選択</string>

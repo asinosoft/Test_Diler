@@ -4803,7 +4803,7 @@ private fun AddCustomMessengerLinkDialog(
                                     text = activeMessenger?.messengerName
                                         ?: stringResource(R.string.contact_messenger_generic),
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.Black
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                             Icon(
@@ -4827,7 +4827,7 @@ private fun AddCustomMessengerLinkDialog(
                                         Text(
                                             text = item.messengerName,
                                             fontWeight = if (idx == selectedMessengerIndex) FontWeight.Bold else FontWeight.Normal,
-                                            color = Color.Black
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                 },
@@ -6262,7 +6262,7 @@ private fun EditCustomMessengerLinkDialog(
                                     text = activeMessenger?.messengerName
                                         ?: stringResource(R.string.contact_messenger_generic),
                                     fontWeight = FontWeight.Bold,
-                                    color = Color.Black
+                                    color = MaterialTheme.colorScheme.onSurface
                                 )
                             }
                             Icon(
@@ -6286,7 +6286,7 @@ private fun EditCustomMessengerLinkDialog(
                                         Text(
                                             text = item.messengerName,
                                             fontWeight = if (idx == selectedMessengerIndex) FontWeight.Bold else FontWeight.Normal,
-                                            color = Color.Black
+                                            color = MaterialTheme.colorScheme.onSurface
                                         )
                                     }
                                 },

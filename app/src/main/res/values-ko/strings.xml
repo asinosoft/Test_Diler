@@ -269,6 +269,7 @@
     <string name="contact_swipe_picker_title">스와이프 동작 아이콘 선택</string>
     <string name="contact_section_phones">전화</string>
     <string name="contact_section_messengers">메신저</string>
+    <string name="contact_messengers_visibility">메신저</string>
     <string name="contact_section_emails">이메일</string>
     <string name="contact_add_messenger_link">메신저 링크 추가</string>
     <string name="contact_pick_messenger">메신저 선택</string>

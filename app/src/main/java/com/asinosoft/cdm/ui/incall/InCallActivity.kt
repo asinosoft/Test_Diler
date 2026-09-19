@@ -10,6 +10,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import com.asinosoft.cdm.ui.theme.DialerTheme
 
 class InCallActivity : ComponentActivity() {
@@ -18,6 +19,11 @@ class InCallActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         enableEdgeToEdge()
+        // In-call UI is always dark — keep status/nav bar icons light.
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            isAppearanceLightStatusBars = false
+            isAppearanceLightNavigationBars = false
+        }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
@@ -39,7 +45,7 @@ class InCallActivity : ComponentActivity() {
         })
 
         setContent {
-            DialerTheme {
+            DialerTheme(darkTheme = true) {
                 BackHandler {
                     // Consume back gesture
                 }
