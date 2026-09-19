@@ -178,6 +178,7 @@ import com.asinosoft.cdm.data.repository.CallLogRepository
 import com.asinosoft.cdm.data.repository.ContactRingtoneManager
 import com.asinosoft.cdm.data.repository.ContactsRepository
 import com.asinosoft.cdm.data.repository.ContactsWriteRepository
+import com.asinosoft.cdm.ui.components.AdBanner
 import com.asinosoft.cdm.ui.components.FloatingStickyDateHeader
 import com.asinosoft.cdm.ui.components.Header
 import com.asinosoft.cdm.ui.components.LazyListVerticalScrollbar
@@ -574,9 +575,7 @@ fun ContactDetailDialog(
                                 onTabSelected = { selectedTab = it }
                             )
 
-                            if (selectedTab != 1 || isLoadingHistory || historyLogs.isEmpty()) {
-                                Spacer(modifier = Modifier.height(24.dp))
-                            }
+                            AdBanner(Modifier.fillMaxWidth().height(120.dp).padding(vertical = 4.dp))
 
                             AnimatedContent(
                                 targetState = selectedTab,
