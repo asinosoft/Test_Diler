@@ -2275,17 +2275,30 @@ private fun SettingsTabContent(
                                 )
                             }
 
-                            DropdownMenu(
+                            OneUiPopupMenu(
                                 expanded = dropdownExpanded,
-                                onDismissRequest = { dropdownExpanded = false }
+                                onDismissRequest = { dropdownExpanded = false },
+                                alignEnd = true
                             ) {
                                 tabs.forEach { tab ->
-                                    DropdownMenuItem(
-                                        text = {
-                                            Text(
-                                                text = tab.name,
-                                                fontWeight = if (tab.id == selectedTabId) FontWeight.Bold else FontWeight.Normal
-                                            )
+                                    val isSelected = tab.id == selectedTabId
+                                    OneUiPopupMenuItem(
+                                        icon = if (isSelected) Icons.Default.Check else Icons.Default.FolderSpecial,
+                                        label = tab.name,
+                                        labelColor = if (isSelected) {
+                                            SamsungGreen
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface
+                                        },
+                                        iconTint = if (isSelected) {
+                                            SamsungGreen
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                                        },
+                                        iconBackground = if (isSelected) {
+                                            SamsungGreen.copy(alpha = 0.12f)
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceVariant
                                         },
                                         onClick = {
                                             dropdownExpanded = false
@@ -2295,25 +2308,14 @@ private fun SettingsTabContent(
                                     )
                                 }
 
-                                HorizontalDivider()
+                                OneUiPopupMenuDivider()
 
-                                DropdownMenuItem(
-                                    text = {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            Icon(
-                                                imageVector = Icons.Default.Add,
-                                                contentDescription = stringResource(R.string.action_create),
-                                                tint = SamsungGreen,
-                                                modifier = Modifier.size(18.dp)
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Text(
-                                                text = stringResource(R.string.contact_tab_create_new),
-                                                fontWeight = FontWeight.Bold,
-                                                color = SamsungGreen
-                                            )
-                                        }
-                                    },
+                                OneUiPopupMenuItem(
+                                    icon = Icons.Default.Add,
+                                    label = stringResource(R.string.contact_tab_create_new),
+                                    labelColor = SamsungGreen,
+                                    iconTint = SamsungGreen,
+                                    iconBackground = SamsungGreen.copy(alpha = 0.12f),
                                     onClick = {
                                         dropdownExpanded = false
                                         newTabNameInput = ""
