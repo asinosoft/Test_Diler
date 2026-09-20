@@ -107,6 +107,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
@@ -145,10 +146,11 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -158,6 +160,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
+import androidx.core.view.WindowCompat
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
@@ -389,6 +393,20 @@ fun ContactDetailDialog(
     ) {
         BackHandler {
             onDismiss()
+        }
+
+        // Photo header is dark — force light (white) status-bar icons while this dialog is open.
+        val dialogView = LocalView.current
+        DisposableEffect(dialogView) {
+            val window = (dialogView.parent as? DialogWindowProvider)?.window
+            val controller = window?.let { WindowCompat.getInsetsController(it, dialogView) }
+            val wasLightStatusBars = controller?.isAppearanceLightStatusBars
+            controller?.isAppearanceLightStatusBars = false
+            onDispose {
+                if (wasLightStatusBars != null) {
+                    controller.isAppearanceLightStatusBars = wasLightStatusBars
+                }
+            }
         }
 
         val avatarBgColor = remember(contact.name) {
@@ -891,6 +909,10 @@ fun ContactDetailDialog(
                     // Back Button
                     IconButton(
                         onClick = onDismiss,
+                        colors = IconButtonDefaults.iconButtonColors(
+                            contentColor = Color.White,
+                            containerColor = Color.Transparent
+                        ),
                         modifier = Modifier
                             .size(42.dp)
                             .clip(CircleShape)
@@ -910,6 +932,10 @@ fun ContactDetailDialog(
 
                         IconButton(
                             onClick = { topMenuExpanded = true },
+                            colors = IconButtonDefaults.iconButtonColors(
+                                contentColor = Color.White,
+                                containerColor = Color.Transparent
+                            ),
                             modifier = Modifier
                                 .size(42.dp)
                                 .clip(CircleShape)
@@ -1437,252 +1463,261 @@ private fun ContactTabContent(
             !hiddenSet.contains(key)
         }
 
-        if (visibleMessengerList.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 1.dp
-            ) {
-                Column {
-                    visibleMessengerList.forEachIndexed { index, messenger ->
-                        if (index > 0) {
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
-                                thickness = 1.dp,
-                                modifier = Modifier.padding(horizontal = 16.dp)
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(20.dp),
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 1.dp
+        ) {
+            Column {
+                visibleMessengerList.forEachIndexed { index, messenger ->
+                    if (index > 0) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                            thickness = 1.dp,
+                            modifier = Modifier.padding(horizontal = 16.dp)
+                        )
+                    }
+
+                    val isMessengerDragging = draggingMessengerIndex == index
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                if (isMessengerDragging) {
+                                    translationY = messengerDragOffsetY
+                                    shadowElevation = 12f
+                                    scaleX = 1.02f
+                                    scaleY = 1.02f
+                                }
+                            }
+                            .zIndex(if (isMessengerDragging) 10f else 1f)
+                            .pointerInput(index, editableMessengerList.size) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                        draggingMessengerIndex = index
+                                        messengerDragOffsetY = 0f
+                                    },
+                                    onDrag = { change, dragAmount ->
+                                        change.consume()
+                                        messengerDragOffsetY += dragAmount.y
+                                        val currentList = editableMessengerList.toMutableList()
+                                        val currentIndex = draggingMessengerIndex ?: index
+                                        val rowHeightPx = with(density) { 62.dp.toPx() }
+                                        val shift =
+                                            (messengerDragOffsetY / rowHeightPx).roundToInt()
+                                        val targetIndex = (currentIndex + shift).coerceIn(
+                                            0,
+                                            currentList.size - 1
+                                        )
+
+                                        if (targetIndex != currentIndex) {
+                                            val item = currentList.removeAt(currentIndex)
+                                            currentList.add(targetIndex, item)
+                                            editableMessengerList = currentList
+                                            onUpdateMessengerAccounts(currentList)
+                                            saveMessengerAccountsOrder(
+                                                context,
+                                                getContactCustomKey(contact),
+                                                currentList
+                                            )
+                                            messengerDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
+                                            draggingMessengerIndex = targetIndex
+                                        }
+                                    },
+                                    onDragEnd = {
+                                        draggingMessengerIndex = null
+                                        messengerDragOffsetY = 0f
+                                    },
+                                    onDragCancel = {
+                                        draggingMessengerIndex = null
+                                        messengerDragOffsetY = 0f
+                                    }
+                                )
+                            }
+                            .padding(horizontal = 18.dp, vertical = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clickable {
+                                    copyToClipboard(
+                                        context,
+                                        "Messenger Account",
+                                        messenger.accountDetail
+                                    )
+                                }
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                MessengerBrandBadge(
+                                    item = InstalledMessengerItem(
+                                        packageName = messenger.packageName,
+                                        messengerName = messenger.messengerName,
+                                        brandColor = messenger.brandColor
+                                    )
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = messenger.messengerName,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = messenger.brandColor
+                                )
+                            }
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (messenger.isCustomLink) messenger.accountDetail else PhoneNumberHelper.format(
+                                    messenger.accountDetail
+                                ),
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
 
-                        val isMessengerDragging = draggingMessengerIndex == index
-
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .graphicsLayer {
-                                    if (isMessengerDragging) {
-                                        translationY = messengerDragOffsetY
-                                        shadowElevation = 12f
-                                        scaleX = 1.02f
-                                        scaleY = 1.02f
-                                    }
-                                }
-                                .zIndex(if (isMessengerDragging) 10f else 1f)
-                                .pointerInput(index, editableMessengerList.size) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = {
-                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                            draggingMessengerIndex = index
-                                            messengerDragOffsetY = 0f
-                                        },
-                                        onDrag = { change, dragAmount ->
-                                            change.consume()
-                                            messengerDragOffsetY += dragAmount.y
-                                            val currentList = editableMessengerList.toMutableList()
-                                            val currentIndex = draggingMessengerIndex ?: index
-                                            val rowHeightPx = with(density) { 62.dp.toPx() }
-                                            val shift =
-                                                (messengerDragOffsetY / rowHeightPx).roundToInt()
-                                            val targetIndex = (currentIndex + shift).coerceIn(
-                                                0,
-                                                currentList.size - 1
-                                            )
-
-                                            if (targetIndex != currentIndex) {
-                                                val item = currentList.removeAt(currentIndex)
-                                                currentList.add(targetIndex, item)
-                                                editableMessengerList = currentList
-                                                onUpdateMessengerAccounts(currentList)
-                                                saveMessengerAccountsOrder(
-                                                    context,
-                                                    getContactCustomKey(contact),
-                                                    currentList
-                                                )
-                                                messengerDragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
-                                                draggingMessengerIndex = targetIndex
-                                            }
-                                        },
-                                        onDragEnd = {
-                                            draggingMessengerIndex = null
-                                            messengerDragOffsetY = 0f
-                                        },
-                                        onDragCancel = {
-                                            draggingMessengerIndex = null
-                                            messengerDragOffsetY = 0f
+                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            // 1. Chat
+                            if (messenger.chatIntent != null) {
+                                IconButton(
+                                    onClick = {
+                                        try {
+                                            context.startActivity(messenger.chatIntent)
+                                        } catch (_: Exception) {
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(
+                                                    R.string.error_open_messenger_link,
+                                                    messenger.messengerName
+                                                ),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
                                         }
+                                    },
+                                    modifier = Modifier
+                                        .size(37.6.dp)
+                                        .clip(CircleShape)
+                                        .background(messenger.brandColor.copy(alpha = 0.15f))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.Message,
+                                        contentDescription = stringResource(R.string.contact_messenger_chat),
+                                        tint = messenger.brandColor,
+                                        modifier = Modifier.size(18.dp)
                                     )
                                 }
-                                .padding(horizontal = 18.dp, vertical = 14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clickable {
-                                        copyToClipboard(
-                                            context,
-                                            "Messenger Account",
-                                            messenger.accountDetail
-                                        )
-                                    }
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    MessengerBrandBadge(
-                                        item = InstalledMessengerItem(
-                                            packageName = messenger.packageName,
-                                            messengerName = messenger.messengerName,
-                                            brandColor = messenger.brandColor
-                                        )
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = messenger.messengerName,
-                                        fontSize = 12.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = messenger.brandColor
-                                    )
-                                }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = if (messenger.isCustomLink) messenger.accountDetail else PhoneNumberHelper.format(
-                                        messenger.accountDetail
-                                    ),
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
                             }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                // 1. Chat
-                                if (messenger.chatIntent != null) {
-                                    IconButton(
-                                        onClick = {
-                                            try {
-                                                context.startActivity(messenger.chatIntent)
-                                            } catch (_: Exception) {
-                                                Toast.makeText(
-                                                    context,
-                                                    context.getString(
-                                                        R.string.error_open_messenger_link,
-                                                        messenger.messengerName
-                                                    ),
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .size(37.6.dp)
-                                            .clip(CircleShape)
-                                            .background(messenger.brandColor.copy(alpha = 0.15f))
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.Message,
-                                            contentDescription = stringResource(R.string.contact_messenger_chat),
-                                            tint = messenger.brandColor,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
+                            // 2. Audio Call
+                            if (!messenger.isCustomLink && messenger.audioCallIntent != null) {
+                                IconButton(
+                                    onClick = {
+                                        try {
+                                            context.startActivity(messenger.audioCallIntent)
+                                        } catch (_: Exception) {
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(
+                                                    R.string.error_messenger_call,
+                                                    messenger.messengerName
+                                                ),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .size(37.6.dp)
+                                        .clip(CircleShape)
+                                        .background(messenger.brandColor.copy(alpha = 0.15f))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Phone,
+                                        contentDescription = stringResource(R.string.swipe_label_call),
+                                        tint = messenger.brandColor,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
+                            }
 
-                                // 2. Audio Call
-                                if (!messenger.isCustomLink && messenger.audioCallIntent != null) {
-                                    IconButton(
-                                        onClick = {
-                                            try {
-                                                context.startActivity(messenger.audioCallIntent)
-                                            } catch (_: Exception) {
-                                                Toast.makeText(
-                                                    context,
-                                                    context.getString(
-                                                        R.string.error_messenger_call,
-                                                        messenger.messengerName
-                                                    ),
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .size(37.6.dp)
-                                            .clip(CircleShape)
-                                            .background(messenger.brandColor.copy(alpha = 0.15f))
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Phone,
-                                            contentDescription = stringResource(R.string.swipe_label_call),
-                                            tint = messenger.brandColor,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
-
-                                // 3. Video Call
-                                if (!messenger.isCustomLink && messenger.videoCallIntent != null) {
-                                    IconButton(
-                                        onClick = {
-                                            try {
-                                                context.startActivity(messenger.videoCallIntent)
-                                            } catch (_: Exception) {
-                                                Toast.makeText(
-                                                    context,
-                                                    context.getString(
-                                                        R.string.error_messenger_video,
-                                                        messenger.messengerName
-                                                    ),
-                                                    Toast.LENGTH_SHORT
-                                                ).show()
-                                            }
-                                        },
-                                        modifier = Modifier
-                                            .size(37.6.dp)
-                                            .clip(CircleShape)
-                                            .background(messenger.brandColor.copy(alpha = 0.15f))
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Videocam,
-                                            contentDescription = stringResource(R.string.swipe_label_video_call),
-                                            tint = messenger.brandColor,
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
+                            // 3. Video Call
+                            if (!messenger.isCustomLink && messenger.videoCallIntent != null) {
+                                IconButton(
+                                    onClick = {
+                                        try {
+                                            context.startActivity(messenger.videoCallIntent)
+                                        } catch (_: Exception) {
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(
+                                                    R.string.error_messenger_video,
+                                                    messenger.messengerName
+                                                ),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                        }
+                                    },
+                                    modifier = Modifier
+                                        .size(37.6.dp)
+                                        .clip(CircleShape)
+                                        .background(messenger.brandColor.copy(alpha = 0.15f))
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Videocam,
+                                        contentDescription = stringResource(R.string.swipe_label_video_call),
+                                        tint = messenger.brandColor,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
                             }
                         }
                     }
+                }
 
-                    // Bottom "+" Button inside Messenger Card
+                // Bottom "+" Button inside Messenger Card
+                if (visibleMessengerList.isNotEmpty()) {
                     HorizontalDivider(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
                         thickness = 1.dp,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     )
+                }
 
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { showAddCustomLinkDialog = true }
+                        .padding(horizontal = 18.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center
+                ) {
                     Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 6.dp),
+                            .size(36.dp)
+                            .clip(CircleShape)
+                            .background(SamsungGreen.copy(alpha = 0.12f)),
                         contentAlignment = Alignment.Center
                     ) {
-                        IconButton(
-                            onClick = { showAddCustomLinkDialog = true },
-                            modifier = Modifier
-                                .size(36.dp)
-                                .clip(CircleShape)
-                                .background(SamsungGreen.copy(alpha = 0.12f))
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Add,
-                                contentDescription = stringResource(R.string.add_link),
-                                tint = SamsungGreen,
-                                modifier = Modifier.size(20.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.Add,
+                            contentDescription = null,
+                            tint = SamsungGreen,
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = stringResource(R.string.contact_messenger_generic),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = SamsungGreen
+                    )
                 }
             }
         }
