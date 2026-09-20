@@ -871,7 +871,7 @@ fun RecentsScreen(
                 .zIndex(10f)
         )
 
-        // App Settings Bottom Sheet Dialog
+        // App Settings fullscreen
         if (isAppSettingsOpen) {
             val favoritesViewMode by viewModel.favoritesViewMode.collectAsState()
             AppSettingsDialog(

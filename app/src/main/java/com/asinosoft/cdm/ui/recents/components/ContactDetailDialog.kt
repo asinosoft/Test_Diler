@@ -404,7 +404,10 @@ fun ContactDetailDialog(
 
         val listState = rememberLazyListState()
         val density = LocalDensity.current
-        val topBarrierPx = with(density) { 86.dp.toPx() }
+        // content_header uses offset(-24.dp); history list nest-offsets by the same amount
+        // so sticky headers still pin under the tab bar at the original 86.dp barrier.
+        val headerNestOffsetPx = with(density) { 24.dp.roundToPx() }
+        val topBarrierPx = with(density) { 86.dp.toPx() + headerNestOffsetPx }
         val haptic = LocalHapticFeedback.current
         var totalHorizontalDrag by remember { mutableFloatStateOf(0f) }
         var swipeConsumed by remember { mutableStateOf(false) }
@@ -575,7 +578,11 @@ fun ContactDetailDialog(
                                 onTabSelected = { selectedTab = it }
                             )
 
-                            AdBanner(Modifier.fillMaxWidth().height(64.dp).padding(vertical = 4.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            AdBanner(Modifier.fillMaxWidth().height(64.dp))
+
+                            Spacer(modifier = Modifier.height(16.dp))
 
                             AnimatedContent(
                                 targetState = selectedTab,
@@ -674,6 +681,17 @@ fun ContactDetailDialog(
                                                     }
                                                     Spacer(modifier = Modifier.height(40.dp))
                                                 }
+
+                                                else -> {
+                                                    ContactHistoryStatistics(
+                                                        historyLogs = filteredHistoryLogs,
+                                                        modifier = Modifier.fillMaxWidth()
+                                                    )
+                                                    // Matches day-group bottom (12) before next date header;
+                                                    // first header keeps topPadding 6 → same 18.dp total as
+                                                    // between day sections. Nest offset cancels header -24.dp.
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                }
                                             }
                                         }
                                     }
@@ -709,15 +727,6 @@ fun ContactDetailDialog(
                 }
 
                 if (selectedTab == 1 && !isLoadingHistory && historyLogs.isNotEmpty()) {
-                    item(key = "history_statistics") {
-                        ContactHistoryStatistics(
-                            historyLogs = filteredHistoryLogs,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 4.dp)
-                        )
-                    }
-
                     groupedHistoryLogs.forEachIndexed { dateIndex, (dateHeader, logsInDay) ->
                         if (dateHeader.isNotEmpty()) {
                             stickyHeader(key = "history_header_$dateHeader") { _ ->
@@ -769,7 +778,12 @@ fun ContactDetailDialog(
                                     modifier = Modifier
                                         .fillMaxWidth()
                                         .zIndex(2f)
-                                        .offset { IntOffset(0, headerOffsetPx.roundToInt()) }
+                                        .offset {
+                                            IntOffset(
+                                                0,
+                                                headerOffsetPx.roundToInt() - headerNestOffsetPx
+                                            )
+                                        }
                                 ) {
                                     FloatingStickyDateHeader(
                                         text = dateHeader,
@@ -779,7 +793,7 @@ fun ContactDetailDialog(
                                         isFilterActive = isFilterActive,
                                         startPadding = 20.dp,
                                         endPadding = 20.dp,
-                                        topPadding = 6.dp
+                                        topPadding = if (dateIndex == 0) 8.dp else 6.dp
                                     )
                                 }
                             }
@@ -796,6 +810,7 @@ fun ContactDetailDialog(
                             Column(
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .offset(y = (-24).dp)
                                     .padding(
                                         start = 20.dp,
                                         end = 20.dp,

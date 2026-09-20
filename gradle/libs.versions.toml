@@ -11,7 +11,7 @@ kotlin = "2.4.20"
 camera = "1.6.2"
 composeBom = "2026.09.00"
 libphonenumber = "9.0.39"
-mobileads = "8.5.0"
+yandexMobileAds = "8.4.0"
 
 [libraries]
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camera" }
@@ -35,7 +35,7 @@ androidx-compose-material3 = { group = "androidx.compose.material3", name = "mat
 androidx-compose-material-icons = { group = "androidx.compose.material", name = "material-icons-extended" }
 androidx-lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycleRuntimeKtx" }
 libphonenumber = { group = "com.googlecode.libphonenumber", name = "libphonenumber", version.ref = "libphonenumber" }
-mobileads = { group = "com.yandex.android", name = "mobileads", version.ref = "mobileads" }
+yandex-mobileads = { module = "com.yandex.android:mobileads", version.ref = "yandexMobileAds" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

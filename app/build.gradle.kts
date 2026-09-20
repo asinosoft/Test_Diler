@@ -12,7 +12,7 @@ android {
         minSdk = 24
         targetSdk = 37
         versionCode = 1
-        versionName = "1.0"
+        versionName = "3.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -53,7 +53,7 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.barcode.scanning)
     implementation(libs.libphonenumber)
-    implementation(libs.mobileads)
+    implementation(libs.yandex.mobileads)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

@@ -6,7 +6,9 @@ import android.os.Build
 import android.view.ViewGroup
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -14,12 +16,13 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.safeContentPadding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -76,7 +79,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -130,8 +132,8 @@ fun AppSettingsDialog(
     var selectedPage by remember { mutableStateOf(SettingsPage.MAIN) }
     var selectedTab by remember { mutableStateOf(SettingsTab.PHONE) }
 
-    val onDismiss = {
-        when(selectedPage) {
+    val handleBack = {
+        when (selectedPage) {
             SettingsPage.MAIN -> onDismiss()
             SettingsPage.QUICK_REPLIES -> {
                 selectedPage = SettingsPage.MAIN
@@ -149,39 +151,62 @@ fun AppSettingsDialog(
     }
 
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = handleBack,
         properties = DialogProperties(
             usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
+            decorFitsSystemWindows = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false
         )
     ) {
+        BackHandler(onBack = handleBack)
+
         Scaffold(
-            modifier = Modifier.safeContentPadding(),
+            modifier = Modifier
+                .fillMaxSize()
+                .background(MaterialTheme.colorScheme.background),
+            containerColor = MaterialTheme.colorScheme.background,
+            contentWindowInsets = WindowInsets(0, 0, 0, 0),
             topBar = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .statusBarsPadding()
+                        .padding(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = handleBack) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = stringResource(R.string.cd_back)
+                        )
                     }
 
                     Text(
                         text = stringResource(selectedPage.titleRes),
                         fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onBackground,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             },
             bottomBar = {
-                val quarter = LocalWindowInfo.current.containerDpSize.height.value.dp / 4
-                AdBanner(Modifier.fillMaxWidth().height(quarter))
+                AdBanner(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(168.dp)
+                )
             }
         ) { innerPadding ->
-            Surface(
-                Modifier
+            Column(
+                modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 16.dp)
             ) {
-                when(selectedPage) {
+                when (selectedPage) {
                     SettingsPage.MAIN -> MainPage(
                         selectedRowsCount,
                         favoritesViewMode,
@@ -197,14 +222,41 @@ fun AppSettingsDialog(
                         onReorderTabs,
                         onGotoPage = { selectedPage = it },
                         selectedTab = selectedTab,
-                        onSelectTab = { selectedTab = it}
+                        onSelectTab = { selectedTab = it }
                     )
 
-                    SettingsPage.QUICK_REPLIES -> QuickRepliesPage()
+                    SettingsPage.QUICK_REPLIES -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(bottom = 16.dp)
+                        ) {
+                            QuickRepliesPage()
+                        }
+                    }
 
-                    SettingsPage.LICENSES -> ThirdPartyLicensesPage()
+                    SettingsPage.LICENSES -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(bottom = 16.dp)
+                        ) {
+                            ThirdPartyLicensesPage()
+                        }
+                    }
 
-                    SettingsPage.PRIVACY_POLICY -> PrivacyPolicyPage()
+                    SettingsPage.PRIVACY_POLICY -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(bottom = 16.dp)
+                        ) {
+                            PrivacyPolicyPage()
+                        }
+                    }
                 }
             }
         }
@@ -238,7 +290,7 @@ private fun MainPage(
     Column(modifier = Modifier.fillMaxSize()) {
         SecondaryScrollableTabRow(
             selectedTabIndex = selectedTab.ordinal,
-            containerColor = Color.Transparent,
+            containerColor = MaterialTheme.colorScheme.background,
             contentColor = SamsungGreen,
             edgePadding = 0.dp,
             divider = {
@@ -272,8 +324,11 @@ private fun MainPage(
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        Box(
-            modifier = Modifier.fillMaxWidth()
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 16.dp)
         ) {
             when (selectedTab) {
                 SettingsTab.PHONE -> PhoneSettingsTab(
