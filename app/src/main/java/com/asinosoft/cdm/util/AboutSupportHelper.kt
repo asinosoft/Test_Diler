@@ -65,17 +65,6 @@ object AboutSupportHelper {
         }
     }
 
-    fun openPrivacyPolicy(context: Context) {
-        try {
-            context.startActivity(
-                Intent(Intent.ACTION_VIEW, PRIVACY_POLICY_URL.toUri())
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        } catch (_: Exception) {
-            Toast.makeText(context, context.getString(R.string.error_open_link), Toast.LENGTH_SHORT).show()
-        }
-    }
-
     suspend fun openSupportEmail(context: Context, appName: String) = withContext(Dispatchers.IO) {
         val reportFile = buildSupportReportFile(context, appName)
         withContext(Dispatchers.Main) {

@@ -575,7 +575,7 @@ fun ContactDetailDialog(
                                 onTabSelected = { selectedTab = it }
                             )
 
-                            AdBanner(Modifier.fillMaxWidth().height(120.dp).padding(vertical = 4.dp))
+                            AdBanner(Modifier.fillMaxWidth().height(64.dp).padding(vertical = 4.dp))
 
                             AnimatedContent(
                                 targetState = selectedTab,

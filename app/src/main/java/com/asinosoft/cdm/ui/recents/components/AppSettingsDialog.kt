@@ -1,8 +1,11 @@
 package com.asinosoft.cdm.ui.recents.components
 
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.os.Build
-import androidx.activity.compose.BackHandler
+import android.view.ViewGroup
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -11,7 +14,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -40,6 +42,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.Dialpad
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -56,7 +59,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,11 +76,13 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
@@ -90,8 +94,16 @@ import com.asinosoft.cdm.data.repository.QuickRepliesManager
 import com.asinosoft.cdm.ui.components.AdBanner
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.util.AboutSupportHelper
+import com.asinosoft.cdm.util.AboutSupportHelper.PRIVACY_POLICY_URL
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+
+private enum class SettingsPage(val titleRes: Int) {
+    MAIN(R.string.settings_title),
+    QUICK_REPLIES(R.string.quick_replies_screen_title),
+    LICENSES(R.string.about_licenses_title),
+    PRIVACY_POLICY(R.string.about_privacy_title)
+}
 
 private enum class SettingsTab(@androidx.annotation.StringRes val titleRes: Int) {
     PHONE(R.string.settings_tab_phone),
@@ -115,109 +127,182 @@ fun AppSettingsDialog(
     onReorderTabs: (List<FavoriteTab>) -> Unit = {},
     onDismiss: () -> Unit
 ) {
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
+    var selectedPage by remember { mutableStateOf(SettingsPage.MAIN) }
+    var selectedTab by remember { mutableStateOf(SettingsTab.PHONE) }
 
+    val onDismiss = {
+        when(selectedPage) {
+            SettingsPage.MAIN -> onDismiss()
+            SettingsPage.QUICK_REPLIES -> {
+                selectedPage = SettingsPage.MAIN
+                selectedTab = SettingsTab.PHONE
+            }
+            SettingsPage.LICENSES -> {
+                selectedPage = SettingsPage.MAIN
+                selectedTab = SettingsTab.ABOUT
+            }
+            SettingsPage.PRIVACY_POLICY -> {
+                selectedPage = SettingsPage.MAIN
+                selectedTab = SettingsTab.ABOUT
+            }
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Scaffold(
+            modifier = Modifier.safeContentPadding(),
+            topBar = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+                    }
+
+                    Text(
+                        text = stringResource(selectedPage.titleRes),
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            },
+            bottomBar = {
+                val quarter = LocalWindowInfo.current.containerDpSize.height.value.dp / 4
+                AdBanner(Modifier.fillMaxWidth().height(quarter))
+            }
+        ) { innerPadding ->
+            Surface(
+                Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                when(selectedPage) {
+                    SettingsPage.MAIN -> MainPage(
+                        selectedRowsCount,
+                        favoritesViewMode,
+                        maxPossibleRows,
+                        tabs,
+                        dialerOpenMode,
+                        onRowsCountSelected,
+                        onFavoritesViewModeSelected,
+                        onDialerOpenModeSelected,
+                        onAddTab,
+                        onRenameTab,
+                        onDeleteTab,
+                        onReorderTabs,
+                        onGotoPage = { selectedPage = it },
+                        selectedTab = selectedTab,
+                        onSelectTab = { selectedTab = it}
+                    )
+
+                    SettingsPage.QUICK_REPLIES -> QuickRepliesPage()
+
+                    SettingsPage.LICENSES -> ThirdPartyLicensesPage()
+
+                    SettingsPage.PRIVACY_POLICY -> PrivacyPolicyPage()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MainPage(
+    selectedRowsCount: Int,
+    favoritesViewMode: FavoritesViewMode = FavoritesViewMode.GRID,
+    maxPossibleRows: Int = 8,
+    tabs: List<FavoriteTab> = emptyList(),
+    dialerOpenMode: DialerOpenMode = DialerOpenMode.BUTTON_AND_DOUBLE_TAP,
+    onRowsCountSelected: (Int) -> Unit,
+    onFavoritesViewModeSelected: (FavoritesViewMode) -> Unit = {},
+    onDialerOpenModeSelected: (DialerOpenMode) -> Unit = {},
+    onAddTab: (String) -> Unit = {},
+    onRenameTab: (String, String) -> Unit = { _, _ -> },
+    onDeleteTab: (String) -> Unit = {},
+    onReorderTabs: (List<FavoriteTab>) -> Unit = {},
+    onGotoPage: (SettingsPage) -> Unit = {},
+    selectedTab: SettingsTab,
+    onSelectTab: (SettingsTab) -> Unit = {},
+) {
     var showAddTabDialog by remember { mutableStateOf(false) }
     var newTabNameInput by remember { mutableStateOf("") }
 
     var tabToRename by remember { mutableStateOf<FavoriteTab?>(null) }
     var renameTabInput by remember { mutableStateOf("") }
 
-    BackHandler(onBack = onDismiss)
-
-    Scaffold(
-        modifier = Modifier.safeContentPadding(),
-        topBar = {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onDismiss) {
-                    Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
-                }
-
-                Text(
-                    text = stringResource(R.string.settings_title),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
+    Column(modifier = Modifier.fillMaxSize()) {
+        SecondaryScrollableTabRow(
+            selectedTabIndex = selectedTab.ordinal,
+            containerColor = Color.Transparent,
+            contentColor = SamsungGreen,
+            edgePadding = 0.dp,
+            divider = {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                )
+            }
+        ) {
+            SettingsTab.entries.forEach { tab ->
+                Tab(
+                    selected = selectedTab == tab,
+                    onClick = { onSelectTab(tab) },
+                    text = {
+                        Text(
+                            text = stringResource(tab.titleRes),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontSize = 13.sp,
+                            fontWeight = if (selectedTab == tab) {
+                                FontWeight.Bold
+                            } else {
+                                FontWeight.Medium
+                            }
+                        )
+                    },
+                    selectedContentColor = SamsungGreen,
+                    unselectedContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
                 )
             }
         }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-                .verticalScroll(rememberScrollState())
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Box(
+            modifier = Modifier.fillMaxWidth()
         ) {
-            SecondaryScrollableTabRow(
-                selectedTabIndex = selectedTabIndex,
-                containerColor = Color.Transparent,
-                contentColor = SamsungGreen,
-                edgePadding = 0.dp,
-                divider = {
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
-                    )
-                }
-            ) {
-                SettingsTab.entries.forEachIndexed { index, tab ->
-                    Tab(
-                        selected = selectedTabIndex == index,
-                        onClick = { selectedTabIndex = index },
-                        text = {
-                            Text(
-                                text = stringResource(tab.titleRes),
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                fontSize = 13.sp,
-                                fontWeight = if (selectedTabIndex == index) {
-                                    FontWeight.Bold
-                                } else {
-                                    FontWeight.Medium
-                                }
-                            )
-                        },
-                        selectedContentColor = SamsungGreen,
-                        unselectedContentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-                    )
-                }
+            when (selectedTab) {
+                SettingsTab.PHONE -> PhoneSettingsTab(
+                    dialerOpenMode = dialerOpenMode,
+                    onDialerOpenModeSelected = onDialerOpenModeSelected,
+                    onGotoPage = onGotoPage
+                )
+
+                SettingsTab.FAVORITES -> FavoritesSettingsTab(
+                    selectedRowsCount = selectedRowsCount,
+                    favoritesViewMode = favoritesViewMode,
+                    maxPossibleRows = maxPossibleRows,
+                    tabs = tabs,
+                    onRowsCountSelected = onRowsCountSelected,
+                    onFavoritesViewModeSelected = onFavoritesViewModeSelected,
+                    onAddTabClick = {
+                        newTabNameInput = ""
+                        showAddTabDialog = true
+                    },
+                    onRenameTabClick = { tab ->
+                        tabToRename = tab
+                        renameTabInput = tab.name
+                    },
+                    onDeleteTab = onDeleteTab,
+                    onReorderTabs = onReorderTabs
+                )
+
+                SettingsTab.ABOUT -> AboutSettingsTab(onGotoPage)
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Box(
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                when (SettingsTab.entries[selectedTabIndex]) {
-                    SettingsTab.PHONE -> PhoneSettingsTab(
-                        dialerOpenMode = dialerOpenMode,
-                        onDialerOpenModeSelected = onDialerOpenModeSelected
-                    )
-
-                    SettingsTab.FAVORITES -> FavoritesSettingsTab(
-                        selectedRowsCount = selectedRowsCount,
-                        favoritesViewMode = favoritesViewMode,
-                        maxPossibleRows = maxPossibleRows,
-                        tabs = tabs,
-                        onRowsCountSelected = onRowsCountSelected,
-                        onFavoritesViewModeSelected = onFavoritesViewModeSelected,
-                        onAddTabClick = {
-                            newTabNameInput = ""
-                            showAddTabDialog = true
-                        },
-                        onRenameTabClick = { tab ->
-                            tabToRename = tab
-                            renameTabInput = tab.name
-                        },
-                        onDeleteTab = onDeleteTab,
-                        onReorderTabs = onReorderTabs
-                    )
-
-                    SettingsTab.ABOUT -> AboutSettingsTab()
-                }
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            AdBanner(Modifier.fillMaxWidth().aspectRatio(1f))
         }
     }
 
@@ -300,7 +385,8 @@ fun AppSettingsDialog(
 @Composable
 private fun PhoneSettingsTab(
     dialerOpenMode: DialerOpenMode,
-    onDialerOpenModeSelected: (DialerOpenMode) -> Unit
+    onDialerOpenModeSelected: (DialerOpenMode) -> Unit,
+    onGotoPage: (SettingsPage) -> Unit = {},
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -354,13 +440,11 @@ private fun PhoneSettingsTab(
             HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
             Spacer(modifier = Modifier.height(14.dp))
 
-            var showQuickRepliesEditor by remember { mutableStateOf(false) }
-
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
-                    .clickable { showQuickRepliesEditor = true }
+                    .clickable { onGotoPage(SettingsPage.QUICK_REPLIES) }
                     .padding(vertical = 10.dp, horizontal = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -394,12 +478,6 @@ private fun PhoneSettingsTab(
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     modifier = Modifier.size(20.dp)
-                )
-            }
-
-            if (showQuickRepliesEditor) {
-                QuickRepliesEditorDialog(
-                    onDismiss = { showQuickRepliesEditor = false }
                 )
             }
         }
@@ -777,10 +855,11 @@ internal fun FavoritesSettingsTab(
 }
 
 @Composable
-private fun AboutSettingsTab() {
+private fun AboutSettingsTab(
+    onGotoPage: (SettingsPage) -> Unit = {}
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var showLicenses by remember { mutableStateOf(false) }
     var isPreparingSupport by remember { mutableStateOf(false) }
 
     val versionName = remember {
@@ -868,7 +947,7 @@ private fun AboutSettingsTab() {
                     icon = Icons.Default.Description,
                     title = stringResource(R.string.about_licenses_title),
                     subtitle = stringResource(R.string.about_licenses_subtitle),
-                    onClick = { showLicenses = true }
+                    onClick = { onGotoPage(SettingsPage.LICENSES) }
                 )
                 HorizontalDivider(
                     modifier = Modifier.padding(horizontal = 18.dp),
@@ -878,14 +957,10 @@ private fun AboutSettingsTab() {
                     icon = Icons.Default.Policy,
                     title = stringResource(R.string.about_privacy_title),
                     subtitle = "asinosoft.ru",
-                    onClick = { AboutSupportHelper.openPrivacyPolicy(context) }
+                    onClick = { onGotoPage(SettingsPage.PRIVACY_POLICY) }
                 )
             }
         }
-    }
-
-    if (showLicenses) {
-        ThirdPartyLicensesDialog(onDismiss = { showLicenses = false })
     }
 }
 
@@ -937,92 +1012,62 @@ private fun AboutActionRow(
 }
 
 @Composable
-private fun ThirdPartyLicensesDialog(onDismiss: () -> Unit) {
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+private fun ThirdPartyLicensesPage() {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(horizontal = 20.dp, vertical = 8.dp)
     ) {
-        Scaffold(
-            modifier = Modifier.safeContentPadding(),
-            topBar = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Default.ArrowBack,
-                            contentDescription = stringResource(R.string.cd_back)
-                        )
-                    }
+        Text(
+            text = stringResource(R.string.about_licenses_intro),
+            fontSize = 14.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
+        )
+        Spacer(modifier = Modifier.height(20.dp))
 
-                    Text(
-                        text = stringResource(R.string.about_licenses_title),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        ) {
-            Column(
-                modifier = Modifier
-                    .padding(it)
-                    .fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(horizontal = 20.dp, vertical = 8.dp)
-            ) {
-                Text(
-                    text = stringResource(R.string.about_licenses_intro),
-                    fontSize = 14.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.7f)
-                )
-                Spacer(modifier = Modifier.height(20.dp))
+        LicenseSection(
+            title = "AndroidX / Jetpack",
+            components = "Core KTX, Activity, Lifecycle, AppCompat components, " +
+                "Jetpack Compose UI, Compose Foundation, Compose Material3, " +
+                "Compose Material Icons",
+            licenseName = "Apache License 2.0"
+        )
+        LicenseSection(
+            title = "CameraX",
+            components = "camera-camera2, camera-lifecycle, camera-view",
+            licenseName = "Apache License 2.0"
+        )
+        LicenseSection(
+            title = "Google ML Kit",
+            components = "Barcode Scanning",
+            licenseName = stringResource(R.string.about_license_mlkit)
+        )
+        LicenseSection(
+            title = "libphonenumber",
+            components = stringResource(R.string.about_license_libphonenumber),
+            licenseName = "Apache License 2.0"
+        )
+        LicenseSection(
+            title = "Kotlin",
+            components = "Kotlin Standard Library, Kotlin Coroutines",
+            licenseName = "Apache License 2.0"
+        )
 
-                LicenseSection(
-                    title = "AndroidX / Jetpack",
-                    components = "Core KTX, Activity, Lifecycle, AppCompat components, " +
-                        "Jetpack Compose UI, Compose Foundation, Compose Material3, " +
-                        "Compose Material Icons",
-                    licenseName = "Apache License 2.0"
-                )
-                LicenseSection(
-                    title = "CameraX",
-                    components = "camera-camera2, camera-lifecycle, camera-view",
-                    licenseName = "Apache License 2.0"
-                )
-                LicenseSection(
-                    title = "Google ML Kit",
-                    components = "Barcode Scanning",
-                    licenseName = stringResource(R.string.about_license_mlkit)
-                )
-                LicenseSection(
-                    title = "libphonenumber",
-                    components = stringResource(R.string.about_license_libphonenumber),
-                    licenseName = "Apache License 2.0"
-                )
-                LicenseSection(
-                    title = "Kotlin",
-                    components = "Kotlin Standard Library, Kotlin Coroutines",
-                    licenseName = "Apache License 2.0"
-                )
-
-                Spacer(modifier = Modifier.height(12.dp))
-                Text(
-                    text = "Apache License 2.0",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = stringResource(R.string.about_apache_license_notice),
-                    fontSize = 12.sp,
-                    color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
-                    lineHeight = 17.sp
-                )
-                Spacer(modifier = Modifier.height(32.dp))
-            }
-        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "Apache License 2.0",
+            fontSize = 16.sp,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.about_apache_license_notice),
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.65f),
+            lineHeight = 17.sp
+        )
+        Spacer(modifier = Modifier.height(32.dp))
     }
 }
 
@@ -1069,9 +1114,7 @@ private fun LicenseSection(
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun QuickRepliesEditorDialog(
-    onDismiss: () -> Unit
-) {
+private fun QuickRepliesPage() {
     val context = LocalContext.current
     val density = LocalDensity.current
     val haptic = LocalHapticFeedback.current
@@ -1090,159 +1133,128 @@ private fun QuickRepliesEditorDialog(
     var showAddDialog by remember { mutableStateOf(false) }
     var newReplyText by remember { mutableStateOf("") }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+    Column(
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Scaffold(
-            modifier = Modifier.safeContentPadding(),
-            topBar = {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.AutoMirrored.Default.ArrowBack, contentDescription = "Back")
+        replies.forEachIndexed { index, reply ->
+            val isDragging = draggingIndex == index
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        if (isDragging) {
+                            translationY = dragOffsetY
+                            shadowElevation = 12f
+                            scaleX = 1.02f
+                            scaleY = 1.02f
+                        }
+                    }
+                    .zIndex(if (isDragging) 10f else 1f)
+                    .pointerInput(index, replies.size) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                draggingIndex = index
+                                dragOffsetY = 0f
+                            },
+                            onDrag = { change, dragAmount ->
+                                change.consume()
+                                dragOffsetY += dragAmount.y
+                                val currentList = replies.toMutableList()
+                                val currentIndex = draggingIndex ?: index
+                                val rowHeightPx = with(density) { 60.dp.toPx() }
+                                val shift = (dragOffsetY / rowHeightPx).roundToInt()
+                                val targetIndex =
+                                    (currentIndex + shift).coerceIn(0, currentList.size - 1)
+
+                                if (targetIndex != currentIndex) {
+                                    val item = currentList.removeAt(currentIndex)
+                                    currentList.add(targetIndex, item)
+                                    replies = currentList
+                                    QuickRepliesManager.saveQuickReplies(context, currentList)
+                                    dragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
+                                    draggingIndex = targetIndex
+                                }
+                            },
+                            onDragEnd = {
+                                draggingIndex = null
+                                dragOffsetY = 0f
+                            },
+                            onDragCancel = {
+                                draggingIndex = null
+                                dragOffsetY = 0f
+                            }
+                        )
+                    },
+                shape = RoundedCornerShape(16.dp),
+                color = if (isDragging) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
+                tonalElevation = if (isDragging) 4.dp else 1.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.DragHandle,
+                            contentDescription = stringResource(R.string.cd_drag),
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = reply,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
                     }
 
-                    Text(
-                        text = stringResource(R.string.quick_replies_screen_title),
-                        fontSize = 20.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-        ) { innerPadding ->
-            // List of Replies
-            Column(
-                modifier = Modifier
-                    .verticalScroll(rememberScrollState())
-                    .padding(innerPadding),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                replies.forEachIndexed { index, reply ->
-                    val isDragging = draggingIndex == index
-
-                    Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .graphicsLayer {
-                                if (isDragging) {
-                                    translationY = dragOffsetY
-                                    shadowElevation = 12f
-                                    scaleX = 1.02f
-                                    scaleY = 1.02f
-                                }
-                            }
-                            .zIndex(if (isDragging) 10f else 1f)
-                            .pointerInput(index, replies.size) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = {
-                                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        draggingIndex = index
-                                        dragOffsetY = 0f
-                                    },
-                                    onDrag = { change, dragAmount ->
-                                        change.consume()
-                                        dragOffsetY += dragAmount.y
-                                        val currentList = replies.toMutableList()
-                                        val currentIndex = draggingIndex ?: index
-                                        val rowHeightPx = with(density) { 60.dp.toPx() }
-                                        val shift = (dragOffsetY / rowHeightPx).roundToInt()
-                                        val targetIndex =
-                                            (currentIndex + shift).coerceIn(0, currentList.size - 1)
-
-                                        if (targetIndex != currentIndex) {
-                                            val item = currentList.removeAt(currentIndex)
-                                            currentList.add(targetIndex, item)
-                                            replies = currentList
-                                            QuickRepliesManager.saveQuickReplies(context, currentList)
-                                            dragOffsetY -= (targetIndex - currentIndex) * rowHeightPx
-                                            draggingIndex = targetIndex
-                                        }
-                                    },
-                                    onDragEnd = {
-                                        draggingIndex = null
-                                        dragOffsetY = 0f
-                                    },
-                                    onDragCancel = {
-                                        draggingIndex = null
-                                        dragOffsetY = 0f
-                                    }
-                                )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(
+                            onClick = {
+                                editingReplyIndex = index
+                                editingText = reply
+                                showEditDialog = true
                             },
-                        shape = RoundedCornerShape(16.dp),
-                        color = if (isDragging) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.surface,
-                        tonalElevation = if (isDragging) 4.dp else 1.dp
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            modifier = Modifier.size(36.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.weight(1f)
+                            Icon(
+                                imageVector = Icons.Default.Edit,
+                                contentDescription = stringResource(R.string.action_edit),
+                                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        if (replies.size > 1) {
+                            IconButton(
+                                onClick = {
+                                    val updated = replies.toMutableList().apply { removeAt(index) }
+                                    replies = updated
+                                    QuickRepliesManager.saveQuickReplies(context, updated)
+                                },
+                                modifier = Modifier.size(36.dp)
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.DragHandle,
-                                    contentDescription = stringResource(R.string.cd_drag),
-                                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                                    modifier = Modifier.size(20.dp)
+                                    imageVector = Icons.Default.Delete,
+                                    contentDescription = stringResource(R.string.action_delete),
+                                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
+                                    modifier = Modifier.size(18.dp)
                                 )
-                                Spacer(modifier = Modifier.width(12.dp))
-                                Text(
-                                    text = reply,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                IconButton(
-                                    onClick = {
-                                        editingReplyIndex = index
-                                        editingText = reply
-                                        showEditDialog = true
-                                    },
-                                    modifier = Modifier.size(36.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Edit,
-                                        contentDescription = stringResource(R.string.action_edit),
-                                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
-                                        modifier = Modifier.size(18.dp)
-                                    )
-                                }
-
-                                if (replies.size > 1) {
-                                    IconButton(
-                                        onClick = {
-                                            val updated = replies.toMutableList().apply { removeAt(index) }
-                                            replies = updated
-                                            QuickRepliesManager.saveQuickReplies(context, updated)
-                                        },
-                                        modifier = Modifier.size(36.dp)
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Delete,
-                                            contentDescription = stringResource(R.string.action_delete),
-                                            tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f),
-                                            modifier = Modifier.size(18.dp)
-                                        )
-                                    }
-                                }
                             }
                         }
                     }
                 }
-
-                Spacer(modifier = Modifier.height(24.dp))
             }
         }
     }
@@ -1322,5 +1334,44 @@ private fun QuickRepliesEditorDialog(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun PrivacyPolicyPage() {
+    var isLoading by remember { mutableStateOf(true) }
+
+    Box(
+        contentAlignment = Alignment.Center,
+        modifier = Modifier.fillMaxSize()
+    ) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { context ->
+                WebView(context).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+
+                    webViewClient = object: WebViewClient() {
+                        override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
+                            super.onPageStarted(view, url, favicon)
+                            isLoading = true
+                        }
+
+                        override fun onPageFinished(view: WebView?, url: String?) {
+                            super.onPageFinished(view, url)
+                            isLoading = false
+                        }
+                    }
+
+                    loadUrl(PRIVACY_POLICY_URL)
+                }
+
+            }
+        )
+
+        if (isLoading) CircularProgressIndicator()
     }
 }
