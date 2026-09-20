@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DragHandle
@@ -93,12 +96,17 @@ import com.asinosoft.cdm.ui.components.AdBanner
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.util.AboutSupportHelper
 import com.asinosoft.cdm.util.AboutSupportHelper.PRIVACY_POLICY_URL
+import com.asinosoft.cdm.util.BlockedNumberItem
+import com.asinosoft.cdm.util.BlockedNumbersHelper
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 private enum class SettingsPage(val titleRes: Int) {
     MAIN(R.string.settings_title),
     QUICK_REPLIES(R.string.quick_replies_screen_title),
+    BLOCKED_CONTACTS(R.string.settings_blocked_contacts_title),
     LICENSES(R.string.about_licenses_title),
     PRIVACY_POLICY(R.string.about_privacy_title)
 }
@@ -130,6 +138,10 @@ fun AppSettingsDialog(
         when (selectedPage) {
             SettingsPage.MAIN -> onDismiss()
             SettingsPage.QUICK_REPLIES -> {
+                selectedPage = SettingsPage.MAIN
+                selectedTab = SettingsTab.PHONE
+            }
+            SettingsPage.BLOCKED_CONTACTS -> {
                 selectedPage = SettingsPage.MAIN
                 selectedTab = SettingsTab.PHONE
             }
@@ -226,6 +238,10 @@ fun AppSettingsDialog(
                         ) {
                             QuickRepliesPage()
                         }
+                    }
+
+                    SettingsPage.BLOCKED_CONTACTS -> {
+                        BlockedContactsPage()
                     }
 
                     SettingsPage.LICENSES -> {
@@ -427,11 +443,41 @@ private fun MainPage(
 private fun PhoneSettingsTab(
     onGotoPage: (SettingsPage) -> Unit = {},
 ) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        PhoneSettingsNavCard(
+            icon = Icons.Default.Block,
+            title = stringResource(R.string.settings_blocked_contacts_title),
+            subtitle = stringResource(R.string.settings_blocked_contacts_subtitle),
+            trailingIcon = Icons.AutoMirrored.Filled.ArrowForward,
+            onClick = { onGotoPage(SettingsPage.BLOCKED_CONTACTS) }
+        )
+
+        PhoneSettingsNavCard(
+            icon = Icons.AutoMirrored.Filled.Message,
+            title = stringResource(R.string.settings_quick_replies_title),
+            subtitle = stringResource(R.string.settings_quick_replies_subtitle),
+            trailingIcon = Icons.Default.Edit,
+            onClick = { onGotoPage(SettingsPage.QUICK_REPLIES) }
+        )
+    }
+}
+
+@Composable
+private fun PhoneSettingsNavCard(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    trailingIcon: ImageVector,
+    onClick: () -> Unit
+) {
     Surface(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(20.dp))
-            .clickable { onGotoPage(SettingsPage.QUICK_REPLIES) },
+            .clickable(onClick = onClick),
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp
@@ -448,7 +494,7 @@ private fun PhoneSettingsTab(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Message,
+                    imageVector = icon,
                     contentDescription = null,
                     tint = SamsungGreen,
                     modifier = Modifier.size(20.dp)
@@ -456,14 +502,14 @@ private fun PhoneSettingsTab(
                 Spacer(modifier = Modifier.width(10.dp))
                 Column {
                     Text(
-                        text = stringResource(R.string.settings_quick_replies_title),
+                        text = title,
                         fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = stringResource(R.string.settings_quick_replies_subtitle),
+                        text = subtitle,
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
                     )
@@ -471,10 +517,193 @@ private fun PhoneSettingsTab(
             }
 
             Icon(
-                imageVector = Icons.Default.Edit,
+                imageVector = trailingIcon,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 modifier = Modifier.size(20.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun BlockedContactsPage() {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val canBlock = remember { BlockedNumbersHelper.canBlockNumbers(context) }
+
+    var blockedItems by remember { mutableStateOf<List<BlockedNumberItem>>(emptyList()) }
+    var isLoading by remember { mutableStateOf(true) }
+    var showAddDialog by remember { mutableStateOf(false) }
+    var refreshKey by remember { mutableStateOf(0) }
+
+    LaunchedEffect(refreshKey) {
+        isLoading = true
+        blockedItems = if (canBlock) {
+            BlockedNumbersHelper.loadBlockedNumbers(context)
+        } else {
+            emptyList()
+        }
+        isLoading = false
+    }
+
+    Column(modifier = Modifier.fillMaxSize()) {
+        when {
+            !canBlock -> {
+                Text(
+                    text = stringResource(R.string.settings_blocked_unavailable),
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
+                )
+            }
+
+            isLoading -> {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(color = SamsungGreen)
+                }
+            }
+
+            blockedItems.isEmpty() -> {
+                Text(
+                    text = stringResource(R.string.settings_blocked_empty),
+                    fontSize = 14.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                    modifier = Modifier.padding(top = 8.dp, bottom = 16.dp)
+                )
+            }
+
+            else -> {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false),
+                    shape = RoundedCornerShape(20.dp),
+                    color = MaterialTheme.colorScheme.surface,
+                    tonalElevation = 1.dp
+                ) {
+                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
+                        items(
+                            items = blockedItems,
+                            key = { it.number }
+                        ) { item ->
+                            BlockedContactRow(
+                                item = item,
+                                onUnblock = {
+                                    scope.launch {
+                                        withContext(Dispatchers.IO) {
+                                            BlockedNumbersHelper.unblock(context, item.number)
+                                        }
+                                        refreshKey++
+                                    }
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (canBlock) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(20.dp))
+                    .clickable { showAddDialog = true },
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 1.dp
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(18.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = null,
+                        tint = SamsungGreen,
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Text(
+                        text = stringResource(R.string.settings_blocked_add),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+        }
+    }
+
+    if (showAddDialog) {
+        AddFavoriteDialog(
+            onDismiss = { showAddDialog = false },
+            title = stringResource(R.string.settings_blocked_add),
+            onContactSelect = { contact ->
+                scope.launch {
+                    withContext(Dispatchers.IO) {
+                        BlockedNumbersHelper.block(context, contact.number)
+                    }
+                    showAddDialog = false
+                    refreshKey++
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun BlockedContactRow(
+    item: BlockedNumberItem,
+    onUnblock: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            imageVector = Icons.Default.Block,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = item.displayName ?: item.number,
+                fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (item.displayName != null) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = item.number,
+                    fontSize = 13.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        TextButton(onClick = onUnblock) {
+            Text(
+                text = stringResource(R.string.settings_blocked_unblock),
+                color = SamsungGreen,
+                fontWeight = FontWeight.Bold
             )
         }
     }

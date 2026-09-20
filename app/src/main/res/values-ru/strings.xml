@@ -160,6 +160,12 @@
     <string name="settings_tab_phone">Телефон</string>
     <string name="settings_tab_favorites">Избранное</string>
     <string name="settings_tab_about">О приложении</string>
+    <string name="settings_blocked_contacts_title">Заблокированные контакты</string>
+    <string name="settings_blocked_contacts_subtitle">Управление номерами, которые не могут вам звонить</string>
+    <string name="settings_blocked_empty">Нет заблокированных контактов</string>
+    <string name="settings_blocked_add">Заблокировать контакт</string>
+    <string name="settings_blocked_unblock">Разблокировать</string>
+    <string name="settings_blocked_unavailable">Блокировка недоступна. Установите это приложение телефоном по умолчанию.</string>
     <string name="settings_quick_replies_title">Редактировать ответы</string>
     <string name="settings_quick_replies_subtitle">Быстрые сообщения при отклонении вызова</string>
     <string name="settings_favorites_view_title">Вид отображения</string>

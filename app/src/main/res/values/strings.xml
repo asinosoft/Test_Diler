@@ -167,6 +167,12 @@
     <string name="settings_tab_phone">Phone</string>
     <string name="settings_tab_favorites">Favorites</string>
     <string name="settings_tab_about">About</string>
+    <string name="settings_blocked_contacts_title">Blocked contacts</string>
+    <string name="settings_blocked_contacts_subtitle">Manage numbers that cannot call you</string>
+    <string name="settings_blocked_empty">No blocked contacts</string>
+    <string name="settings_blocked_add">Block contact</string>
+    <string name="settings_blocked_unblock">Unblock</string>
+    <string name="settings_blocked_unavailable">Blocking is unavailable. Set this app as the default phone app.</string>
     <string name="settings_quick_replies_title">Edit replies</string>
     <string name="settings_quick_replies_subtitle">Quick messages when declining a call</string>
     <string name="settings_favorites_view_title">Display style</string>
