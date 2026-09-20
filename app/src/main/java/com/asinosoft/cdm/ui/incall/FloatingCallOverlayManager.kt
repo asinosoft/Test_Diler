@@ -307,6 +307,7 @@ private fun FloatingIncomingCallOverlayContent(
 
     val isMuted by CallManager.isMuted.collectAsState()
     val audioRoute by CallManager.audioRoute.collectAsState()
+    val isBluetoothHeadsetConnected by CallManager.bluetoothHeadsetConnected.collectAsState()
     val isSpeakerOn = audioRoute == CallAudioState.ROUTE_SPEAKER
 
     var callState by remember { mutableStateOf(activeCall?.state ?: Call.STATE_DISCONNECTED) }
@@ -654,7 +655,6 @@ private fun FloatingIncomingCallOverlayContent(
                         }
                     } else {
                         // Ringing state: Green Answer Button
-                        val isBluetoothConnected = CallManager.isBluetoothConnected()
                         FloatingActionButton(
                             onClick = onAnswer,
                             containerColor = SamsungGreen,
@@ -668,7 +668,7 @@ private fun FloatingIncomingCallOverlayContent(
                                     contentDescription = stringResource(R.string.incall_answer),
                                     modifier = Modifier.size(24.dp)
                                 )
-                                if (isBluetoothConnected) {
+                                if (isBluetoothHeadsetConnected) {
                                     Icon(
                                         imageVector = Icons.Default.Bluetooth,
                                         contentDescription = "Bluetooth",

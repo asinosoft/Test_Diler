@@ -301,6 +301,27 @@ class CallService : InCallService() {
     @RequiresApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
     private fun refreshBluetoothDevicesFromEndpoints() {
         val btEndpoints = availableEndpoints.filter { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
+        val headsetConnected = hasConnectedBluetoothHeadset()
+        CallManager.updateBluetoothHeadsetConnected(headsetConnected)
+
+        if (!headsetConnected) {
+            // Endpoints can linger after BT audio toggle; don't treat them as a connected headset.
+            val hasBtRoute = callAudioState?.let {
+                (it.supportedRouteMask and CallAudioState.ROUTE_BLUETOOTH) != 0
+            } == true
+            CallManager.updateBluetoothDevices(
+                if (hasBtRoute) {
+                    listOf(BluetoothAudioDevice(id = "default_bt", name = "Bluetooth", isCurrent = false))
+                } else {
+                    emptyList()
+                }
+            )
+            if (CallManager.audioRoute.value != CallAudioState.ROUTE_BLUETOOTH) {
+                CallManager.updateCurrentBluetoothDeviceName(null)
+            }
+            return
+        }
+
         if (btEndpoints.isEmpty()) return
 
         val supportedBt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
@@ -358,22 +379,36 @@ class CallService : InCallService() {
 
     private fun updateBluetoothDevicesFromAudioState(audioState: CallAudioState) {
         val hasBtRoute = (audioState.supportedRouteMask and CallAudioState.ROUTE_BLUETOOTH) != 0
+        val headsetConnected = hasConnectedBluetoothHeadset(audioState)
+        CallManager.updateBluetoothHeadsetConnected(headsetConnected)
 
-        // API 34+: prefer CallEndpoint list — audio-state BT devices often lack readable names
-        // and would overwrite good endpoint names with the "Bluetooth" placeholder.
+        // API 34+: prefer CallEndpoint list — but only when a headset is really connected.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE &&
             availableEndpoints.any { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
         ) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                val activeName = resolveBluetoothDeviceName(
-                    getDeviceDisplayName(audioState.activeBluetoothDevice)
-                        ?: audioState.activeBluetoothDevice?.address
+            if (headsetConnected) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    val activeName = resolveBluetoothDeviceName(
+                        getDeviceDisplayName(audioState.activeBluetoothDevice)
+                            ?: audioState.activeBluetoothDevice?.address
+                    )
+                    if (activeName != "Bluetooth") {
+                        CallManager.updateCurrentBluetoothDeviceName(activeName)
+                    }
+                }
+                refreshBluetoothDevicesFromEndpoints()
+            } else {
+                CallManager.updateBluetoothDevices(
+                    if (hasBtRoute) {
+                        listOf(BluetoothAudioDevice(id = "default_bt", name = "Bluetooth", isCurrent = false))
+                    } else {
+                        emptyList()
+                    }
                 )
-                if (activeName != "Bluetooth") {
-                    CallManager.updateCurrentBluetoothDeviceName(activeName)
+                if (audioState.route != CallAudioState.ROUTE_BLUETOOTH) {
+                    CallManager.updateCurrentBluetoothDeviceName(null)
                 }
             }
-            refreshBluetoothDevicesFromEndpoints()
             return
         }
 
@@ -381,40 +416,76 @@ class CallService : InCallService() {
             val activeBt = audioState.activeBluetoothDevice
             val supportedBt = audioState.supportedBluetoothDevices?.toList().orEmpty()
 
-            val activeName = resolveBluetoothDeviceName(
-                getDeviceDisplayName(activeBt) ?: activeBt?.address
-            )
-            if (activeName != "Bluetooth") {
-                CallManager.updateCurrentBluetoothDeviceName(activeName)
-            }
+            if (headsetConnected && supportedBt.isNotEmpty()) {
+                val activeName = resolveBluetoothDeviceName(
+                    getDeviceDisplayName(activeBt) ?: activeBt?.address
+                )
+                if (activeName != "Bluetooth") {
+                    CallManager.updateCurrentBluetoothDeviceName(activeName)
+                }
 
-            val devices = supportedBt.map { device ->
-                val name = resolveBluetoothDeviceName(
-                    getDeviceDisplayName(device) ?: device.address
-                )
-                val isCurrent = device == activeBt ||
-                        (activeBt != null && device.address.equals(activeBt.address, ignoreCase = true))
-                BluetoothAudioDevice(
-                    id = device.address ?: name,
-                    name = name,
-                    isCurrent = isCurrent,
-                    bluetoothDevice = device
-                )
-            }
-            if (devices.isNotEmpty()) {
+                val devices = supportedBt.map { device ->
+                    val name = resolveBluetoothDeviceName(
+                        getDeviceDisplayName(device) ?: device.address
+                    )
+                    val isCurrent = device == activeBt ||
+                            (activeBt != null && device.address.equals(activeBt.address, ignoreCase = true))
+                    BluetoothAudioDevice(
+                        id = device.address ?: name,
+                        name = name,
+                        isCurrent = isCurrent,
+                        bluetoothDevice = device
+                    )
+                }
                 CallManager.updateBluetoothDevices(devices)
-            } else if (hasBtRoute) {
-                val fallbackName = CallManager.currentBluetoothDeviceName.value
-                    ?.takeIf { it.isNotBlank() && it != "Bluetooth" }
-                    ?: "Bluetooth"
+            } else {
                 CallManager.updateBluetoothDevices(
-                    listOf(BluetoothAudioDevice(id = "default_bt", name = fallbackName, isCurrent = true))
+                    if (hasBtRoute) {
+                        listOf(BluetoothAudioDevice(id = "default_bt", name = "Bluetooth", isCurrent = false))
+                    } else {
+                        emptyList()
+                    }
                 )
+                if (audioState.route != CallAudioState.ROUTE_BLUETOOTH) {
+                    CallManager.updateCurrentBluetoothDeviceName(null)
+                }
             }
-        } else if (hasBtRoute) {
+        } else {
             CallManager.updateBluetoothDevices(
-                listOf(BluetoothAudioDevice(id = "default_bt", name = "Bluetooth", isCurrent = true))
+                if (hasBtRoute) {
+                    listOf(BluetoothAudioDevice(id = "default_bt", name = "Bluetooth", isCurrent = false))
+                } else {
+                    emptyList()
+                }
             )
+        }
+    }
+
+    private fun hasConnectedBluetoothHeadset(
+        audioState: CallAudioState? = callAudioState
+    ): Boolean {
+        if (audioState != null && audioState.route == CallAudioState.ROUTE_BLUETOOTH) {
+            return true
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P && audioState != null) {
+            if (audioState.activeBluetoothDevice != null) return true
+            if (!audioState.supportedBluetoothDevices.isNullOrEmpty()) return true
+        }
+        return hasConnectedBluetoothAudioDevice()
+    }
+
+    private fun hasConnectedBluetoothAudioDevice(): Boolean {
+        return try {
+            val am = getSystemService(AUDIO_SERVICE) as? AudioManager ?: return false
+            val btTypes = setOf(
+                android.media.AudioDeviceInfo.TYPE_BLUETOOTH_SCO,
+                android.media.AudioDeviceInfo.TYPE_BLE_HEADSET
+            )
+            val outputs = am.getDevices(AudioManager.GET_DEVICES_OUTPUTS)
+            val inputs = am.getDevices(AudioManager.GET_DEVICES_INPUTS)
+            outputs.any { it.type in btTypes } || inputs.any { it.type in btTypes }
+        } catch (_: Exception) {
+            false
         }
     }
 

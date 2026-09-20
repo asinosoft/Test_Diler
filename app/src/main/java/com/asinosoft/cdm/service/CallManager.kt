@@ -38,10 +38,14 @@ object CallManager {
     private val _currentBluetoothDeviceName = MutableStateFlow<String?>(null)
     val currentBluetoothDeviceName: StateFlow<String?> = _currentBluetoothDeviceName.asStateFlow()
 
-    fun isBluetoothConnected(): Boolean {
-        return _audioRoute.value == CallAudioState.ROUTE_BLUETOOTH ||
-                _bluetoothDevices.value.isNotEmpty() ||
-                !_currentBluetoothDeviceName.value.isNullOrBlank()
+    /** True only when a Bluetooth headset is actually connected (not merely BT route supported). */
+    private val _bluetoothHeadsetConnected = MutableStateFlow(false)
+    val bluetoothHeadsetConnected: StateFlow<Boolean> = _bluetoothHeadsetConnected.asStateFlow()
+
+    fun isBluetoothConnected(): Boolean = _bluetoothHeadsetConnected.value
+
+    fun updateBluetoothHeadsetConnected(connected: Boolean) {
+        _bluetoothHeadsetConnected.value = connected
     }
 
     private val _isHold = MutableStateFlow(false)
@@ -103,6 +107,7 @@ object CallManager {
             _isRecording.value = false
             _bluetoothDevices.value = emptyList()
             _currentBluetoothDeviceName.value = null
+            _bluetoothHeadsetConnected.value = false
         }
     }
 

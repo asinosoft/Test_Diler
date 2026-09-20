@@ -1307,7 +1307,7 @@ private fun SamsungSwipeAnswerDeclineRow(
                 }
 
                 // Green Draggable Answer Button
-                val isBluetoothConnected = CallManager.isBluetoothConnected()
+                val isBluetoothConnected by CallManager.bluetoothHeadsetConnected.collectAsState()
                 Surface(
                     shape = CircleShape,
                     color = SamsungGreen,
