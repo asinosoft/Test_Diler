@@ -166,11 +166,6 @@
     <string name="settings_tab_phone">Telefono</string>
     <string name="settings_tab_favorites">Preferiti</string>
     <string name="settings_tab_about">Info</string>
-    <string name="settings_open_dialer_title">Apri tastiera</string>
-    <string name="settings_open_dialer_subtitle">Come aprire la tastiera dalla schermata Home</string>
-    <string name="settings_dialer_mode_button">Pulsante</string>
-    <string name="settings_dialer_mode_button_double_tap">Pulsante / doppio tocco</string>
-    <string name="settings_dialer_mode_double_tap">Doppio tocco</string>
     <string name="settings_quick_replies_title">Modifica risposte</string>
     <string name="settings_quick_replies_subtitle">Messaggi rapidi quando rifiuti una chiamata</string>
     <string name="settings_favorites_view_title">Stile visualizzazione</string>

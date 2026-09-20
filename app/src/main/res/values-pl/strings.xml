@@ -168,11 +168,6 @@
     <string name="settings_tab_phone">Telefon</string>
     <string name="settings_tab_favorites">Ulubione</string>
     <string name="settings_tab_about">Informacje</string>
-    <string name="settings_open_dialer_title">Otwórz klawiaturę</string>
-    <string name="settings_open_dialer_subtitle">Jak otworzyć klawiaturę z ekranu głównego</string>
-    <string name="settings_dialer_mode_button">Przycisk</string>
-    <string name="settings_dialer_mode_button_double_tap">Przycisk / dwukrotne dotknięcie ekranu</string>
-    <string name="settings_dialer_mode_double_tap">Dwukrotne dotknięcie ekranu</string>
     <string name="settings_quick_replies_title">Edytuj odpowiedzi</string>
     <string name="settings_quick_replies_subtitle">Szybkie wiadomości przy odrzucaniu połączenia</string>
     <string name="settings_favorites_view_title">Styl wyświetlania</string>

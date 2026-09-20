@@ -160,11 +160,6 @@
     <string name="settings_tab_phone">Телефон</string>
     <string name="settings_tab_favorites">Избранное</string>
     <string name="settings_tab_about">О приложении</string>
-    <string name="settings_open_dialer_title">Открывать номеронабиратель</string>
-    <string name="settings_open_dialer_subtitle">Как открывать набор номера с главного экрана</string>
-    <string name="settings_dialer_mode_button">Кнопка</string>
-    <string name="settings_dialer_mode_button_double_tap">Кнопка / двойное нажатие на экране</string>
-    <string name="settings_dialer_mode_double_tap">Двойное нажатие на экране</string>
     <string name="settings_quick_replies_title">Редактировать ответы</string>
     <string name="settings_quick_replies_subtitle">Быстрые сообщения при отклонении вызова</string>
     <string name="settings_favorites_view_title">Вид отображения</string>

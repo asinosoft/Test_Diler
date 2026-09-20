@@ -166,11 +166,6 @@
     <string name="settings_tab_phone">Telefone</string>
     <string name="settings_tab_favorites">Favoritos</string>
     <string name="settings_tab_about">Sobre</string>
-    <string name="settings_open_dialer_title">Abrir teclado</string>
-    <string name="settings_open_dialer_subtitle">Como abrir o teclado numérico na tela inicial</string>
-    <string name="settings_dialer_mode_button">Botão</string>
-    <string name="settings_dialer_mode_button_double_tap">Botão / toque duplo na tela</string>
-    <string name="settings_dialer_mode_double_tap">Toque duplo na tela</string>
     <string name="settings_quick_replies_title">Editar respostas</string>
     <string name="settings_quick_replies_subtitle">Mensagens rápidas ao recusar uma chamada</string>
     <string name="settings_favorites_view_title">Estilo de exibição</string>

@@ -166,11 +166,6 @@
     <string name="settings_tab_phone">फ़ोन</string>
     <string name="settings_tab_favorites">पसंदीदा</string>
     <string name="settings_tab_about">के बारे में</string>
-    <string name="settings_open_dialer_title">डायल पैड खोलें</string>
-    <string name="settings_open_dialer_subtitle">होम स्क्रीन से डायल पैड कैसे खोलें</string>
-    <string name="settings_dialer_mode_button">बटन</string>
-    <string name="settings_dialer_mode_button_double_tap">बटन / स्क्रीन पर दो बार टैप</string>
-    <string name="settings_dialer_mode_double_tap">स्क्रीन पर दो बार टैप</string>
     <string name="settings_quick_replies_title">उत्तर संपादित करें</string>
     <string name="settings_quick_replies_subtitle">कॉल अस्वीकार करने पर त्वरित संदेश</string>
     <string name="settings_favorites_view_title">प्रदर्शन शैली</string>

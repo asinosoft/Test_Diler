@@ -165,11 +165,6 @@
     <string name="settings_tab_phone">電話</string>
     <string name="settings_tab_favorites">お気に入り</string>
     <string name="settings_tab_about">情報</string>
-    <string name="settings_open_dialer_title">ダイヤルパッドを開く</string>
-    <string name="settings_open_dialer_subtitle">ホーム画面からダイヤルパッドを開く方法</string>
-    <string name="settings_dialer_mode_button">ボタン</string>
-    <string name="settings_dialer_mode_button_double_tap">ボタン / 画面をダブルタップ</string>
-    <string name="settings_dialer_mode_double_tap">画面をダブルタップ</string>
     <string name="settings_quick_replies_title">返信を編集</string>
     <string name="settings_quick_replies_subtitle">着信拒否時のクイックメッセージ</string>
     <string name="settings_favorites_view_title">表示スタイル</string>

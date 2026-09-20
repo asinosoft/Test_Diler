@@ -274,10 +274,6 @@ fun RecentsScreen(
         callLogs.groupBy { DateHeaderFormatter.formatDateHeader(context, it.timestamp) }
     }
 
-    var lastTapTimestamp by remember { mutableLongStateOf(0L) }
-    var lastTapPosition by remember { mutableStateOf(Offset.Zero) }
-    val dialerOpenMode by viewModel.dialerOpenMode.collectAsState()
-
     // Search & Dialpad Screen Overlay
     val isSearchDialerOpen by viewModel.isSearchDialerOpen.collectAsState()
 
@@ -295,33 +291,6 @@ fun RecentsScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .then(
-                if (dialerOpenMode.allowsDoubleTap) {
-                    Modifier.pointerInput(dialerOpenMode) {
-                        awaitPointerEventScope {
-                            while (true) {
-                                val event = awaitPointerEvent(PointerEventPass.Initial)
-                                val down = event.changes.firstOrNull { it.changedToDown() }
-                                if (down != null) {
-                                    val now = System.currentTimeMillis()
-                                    val pos = down.position
-                                    if (now - lastTapTimestamp < 380L &&
-                                        (pos - lastTapPosition).getDistance() < 120f
-                                    ) {
-                                        viewModel.openSearchDialer()
-                                        lastTapTimestamp = 0L
-                                    } else {
-                                        lastTapTimestamp = now
-                                        lastTapPosition = pos
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    Modifier
-                }
-            )
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -879,15 +848,11 @@ fun RecentsScreen(
                 favoritesViewMode = favoritesViewMode,
                 maxPossibleRows = 8,
                 tabs = tabs,
-                dialerOpenMode = dialerOpenMode,
                 onRowsCountSelected = { count ->
                     viewModel.setFavoriteRowsCount(count)
                 },
                 onFavoritesViewModeSelected = { mode ->
                     viewModel.setFavoritesViewMode(mode)
-                },
-                onDialerOpenModeSelected = { mode ->
-                    viewModel.setDialerOpenMode(mode)
                 },
                 onAddTab = { viewModel.addTab(it) },
                 onRenameTab = { id, name -> viewModel.renameTab(id, name) },
@@ -1012,7 +977,7 @@ fun RecentsScreen(
         }
 
         // Floating Dialpad Button (Only show on main screen when search dialer is closed)
-        if (!isSearchDialerOpen && dialerOpenMode.showsFab) {
+        if (!isSearchDialerOpen) {
             FloatingActionButton(
                 onClick = { viewModel.openSearchDialer() },
                 containerColor = SamsungGreen,

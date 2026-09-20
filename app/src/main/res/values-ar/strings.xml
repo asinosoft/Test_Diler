@@ -170,11 +170,6 @@
     <string name="settings_tab_phone">الهاتف</string>
     <string name="settings_tab_favorites">المفضلة</string>
     <string name="settings_tab_about">حول</string>
-    <string name="settings_open_dialer_title">فتح لوحة الاتصال</string>
-    <string name="settings_open_dialer_subtitle">كيفية فتح لوحة الاتصال من الشاشة الرئيسية</string>
-    <string name="settings_dialer_mode_button">زر</string>
-    <string name="settings_dialer_mode_button_double_tap">زر / نقرتان على الشاشة</string>
-    <string name="settings_dialer_mode_double_tap">نقرتان على الشاشة</string>
     <string name="settings_quick_replies_title">تعديل الردود</string>
     <string name="settings_quick_replies_subtitle">رسائل سريعة عند رفض مكالمة</string>
     <string name="settings_favorites_view_title">نمط العرض</string>

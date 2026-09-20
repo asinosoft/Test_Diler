@@ -165,11 +165,6 @@
     <string name="settings_tab_phone">电话</string>
     <string name="settings_tab_favorites">收藏</string>
     <string name="settings_tab_about">关于</string>
-    <string name="settings_open_dialer_title">打开拨号键盘</string>
-    <string name="settings_open_dialer_subtitle">如何从主屏幕打开拨号键盘</string>
-    <string name="settings_dialer_mode_button">按钮</string>
-    <string name="settings_dialer_mode_button_double_tap">按钮 / 双击屏幕</string>
-    <string name="settings_dialer_mode_double_tap">双击屏幕</string>
     <string name="settings_quick_replies_title">编辑回复</string>
     <string name="settings_quick_replies_subtitle">拒接来电时的快速消息</string>
     <string name="settings_favorites_view_title">显示样式</string>

@@ -166,11 +166,6 @@
     <string name="settings_tab_phone">Phone</string>
     <string name="settings_tab_favorites">Favourites</string>
     <string name="settings_tab_about">About</string>
-    <string name="settings_open_dialer_title">Open dial pad</string>
-    <string name="settings_open_dialer_subtitle">How to open the dial pad from the home screen</string>
-    <string name="settings_dialer_mode_button">Button</string>
-    <string name="settings_dialer_mode_button_double_tap">Button / double-tap screen</string>
-    <string name="settings_dialer_mode_double_tap">Double-tap screen</string>
     <string name="settings_quick_replies_title">Edit replies</string>
     <string name="settings_quick_replies_subtitle">Quick messages when declining a call</string>
     <string name="settings_favorites_view_title">Display style</string>

@@ -33,17 +33,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Policy
-import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ThumbUp
-import androidx.compose.material.icons.outlined.Dialpad
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -89,7 +86,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.zIndex
 import com.asinosoft.cdm.R
-import com.asinosoft.cdm.data.model.DialerOpenMode
 import com.asinosoft.cdm.data.model.FavoriteTab
 import com.asinosoft.cdm.data.model.FavoritesViewMode
 import com.asinosoft.cdm.data.repository.QuickRepliesManager
@@ -108,8 +104,8 @@ private enum class SettingsPage(val titleRes: Int) {
 }
 
 private enum class SettingsTab(@androidx.annotation.StringRes val titleRes: Int) {
-    PHONE(R.string.settings_tab_phone),
     FAVORITES(R.string.settings_tab_favorites),
+    PHONE(R.string.settings_tab_phone),
     ABOUT(R.string.settings_tab_about)
 }
 
@@ -119,10 +115,8 @@ fun AppSettingsDialog(
     favoritesViewMode: FavoritesViewMode = FavoritesViewMode.GRID,
     maxPossibleRows: Int = 8,
     tabs: List<FavoriteTab> = emptyList(),
-    dialerOpenMode: DialerOpenMode = DialerOpenMode.BUTTON_AND_DOUBLE_TAP,
     onRowsCountSelected: (Int) -> Unit,
     onFavoritesViewModeSelected: (FavoritesViewMode) -> Unit = {},
-    onDialerOpenModeSelected: (DialerOpenMode) -> Unit = {},
     onAddTab: (String) -> Unit = {},
     onRenameTab: (String, String) -> Unit = { _, _ -> },
     onDeleteTab: (String) -> Unit = {},
@@ -130,7 +124,7 @@ fun AppSettingsDialog(
     onDismiss: () -> Unit
 ) {
     var selectedPage by remember { mutableStateOf(SettingsPage.MAIN) }
-    var selectedTab by remember { mutableStateOf(SettingsTab.PHONE) }
+    var selectedTab by remember { mutableStateOf(SettingsTab.FAVORITES) }
 
     val handleBack = {
         when (selectedPage) {
@@ -212,10 +206,8 @@ fun AppSettingsDialog(
                         favoritesViewMode,
                         maxPossibleRows,
                         tabs,
-                        dialerOpenMode,
                         onRowsCountSelected,
                         onFavoritesViewModeSelected,
-                        onDialerOpenModeSelected,
                         onAddTab,
                         onRenameTab,
                         onDeleteTab,
@@ -269,10 +261,8 @@ private fun MainPage(
     favoritesViewMode: FavoritesViewMode = FavoritesViewMode.GRID,
     maxPossibleRows: Int = 8,
     tabs: List<FavoriteTab> = emptyList(),
-    dialerOpenMode: DialerOpenMode = DialerOpenMode.BUTTON_AND_DOUBLE_TAP,
     onRowsCountSelected: (Int) -> Unit,
     onFavoritesViewModeSelected: (FavoritesViewMode) -> Unit = {},
-    onDialerOpenModeSelected: (DialerOpenMode) -> Unit = {},
     onAddTab: (String) -> Unit = {},
     onRenameTab: (String, String) -> Unit = { _, _ -> },
     onDeleteTab: (String) -> Unit = {},
@@ -331,12 +321,6 @@ private fun MainPage(
                 .padding(bottom = 16.dp)
         ) {
             when (selectedTab) {
-                SettingsTab.PHONE -> PhoneSettingsTab(
-                    dialerOpenMode = dialerOpenMode,
-                    onDialerOpenModeSelected = onDialerOpenModeSelected,
-                    onGotoPage = onGotoPage
-                )
-
                 SettingsTab.FAVORITES -> FavoritesSettingsTab(
                     selectedRowsCount = selectedRowsCount,
                     favoritesViewMode = favoritesViewMode,
@@ -355,6 +339,8 @@ private fun MainPage(
                     onDeleteTab = onDeleteTab,
                     onReorderTabs = onReorderTabs
                 )
+
+                SettingsTab.PHONE -> PhoneSettingsTab(onGotoPage = onGotoPage)
 
                 SettingsTab.ABOUT -> AboutSettingsTab(onGotoPage)
             }
@@ -439,133 +425,58 @@ private fun MainPage(
 
 @Composable
 private fun PhoneSettingsTab(
-    dialerOpenMode: DialerOpenMode,
-    onDialerOpenModeSelected: (DialerOpenMode) -> Unit,
     onGotoPage: (SettingsPage) -> Unit = {},
 ) {
     Surface(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .clickable { onGotoPage(SettingsPage.QUICK_REPLIES) },
         shape = RoundedCornerShape(20.dp),
         color = MaterialTheme.colorScheme.surface,
         tonalElevation = 1.dp
     ) {
-        Column(modifier = Modifier.padding(18.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(18.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 Icon(
-                    imageVector = Icons.Outlined.Dialpad,
+                    imageVector = Icons.AutoMirrored.Filled.Message,
                     contentDescription = null,
                     tint = SamsungGreen,
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
-                Text(
-                    text = stringResource(R.string.settings_open_dialer_title),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-            }
-
-            Spacer(modifier = Modifier.height(6.dp))
-            Text(
-                text = stringResource(R.string.settings_open_dialer_subtitle),
-                fontSize = 13.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            DialerOpenModeOption(
-                label = stringResource(R.string.settings_dialer_mode_button),
-                selected = dialerOpenMode == DialerOpenMode.BUTTON,
-                onClick = { onDialerOpenModeSelected(DialerOpenMode.BUTTON) }
-            )
-            DialerOpenModeOption(
-                label = stringResource(R.string.settings_dialer_mode_button_double_tap),
-                selected = dialerOpenMode == DialerOpenMode.BUTTON_AND_DOUBLE_TAP,
-                onClick = { onDialerOpenModeSelected(DialerOpenMode.BUTTON_AND_DOUBLE_TAP) }
-            )
-            DialerOpenModeOption(
-                label = stringResource(R.string.settings_dialer_mode_double_tap),
-                selected = dialerOpenMode == DialerOpenMode.DOUBLE_TAP,
-                onClick = { onDialerOpenModeSelected(DialerOpenMode.DOUBLE_TAP) }
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f))
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .clickable { onGotoPage(SettingsPage.QUICK_REPLIES) }
-                    .padding(vertical = 10.dp, horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Message,
-                        contentDescription = null,
-                        tint = SamsungGreen,
-                        modifier = Modifier.size(20.dp)
+                Column {
+                    Text(
+                        text = stringResource(R.string.settings_quick_replies_title),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Column {
-                        Text(
-                            text = stringResource(R.string.settings_quick_replies_title),
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text(
-                            text = stringResource(R.string.settings_quick_replies_subtitle),
-                            fontSize = 13.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
-                        )
-                    }
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = stringResource(R.string.settings_quick_replies_subtitle),
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                    )
                 }
-
-                Icon(
-                    imageVector = Icons.Default.Edit,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                    modifier = Modifier.size(20.dp)
-                )
             }
-        }
-    }
-}
 
-@Composable
-private fun DialerOpenModeOption(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 10.dp, horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Icon(
-            imageVector = if (selected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
-            contentDescription = null,
-            tint = if (selected) SamsungGreen else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
-            modifier = Modifier.size(22.dp)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Text(
-            text = label,
-            fontSize = 15.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-            color = MaterialTheme.colorScheme.onSurface
-        )
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                modifier = Modifier.size(20.dp)
+            )
+        }
     }
 }
 

@@ -166,11 +166,6 @@
     <string name="settings_tab_phone">Telefon</string>
     <string name="settings_tab_favorites">Favoriten</string>
     <string name="settings_tab_about">Info</string>
-    <string name="settings_open_dialer_title">Wähltastatur öffnen</string>
-    <string name="settings_open_dialer_subtitle">So öffnest du die Wähltastatur vom Startbildschirm</string>
-    <string name="settings_dialer_mode_button">Schaltfläche</string>
-    <string name="settings_dialer_mode_button_double_tap">Schaltfläche / Doppeltippen</string>
-    <string name="settings_dialer_mode_double_tap">Doppeltippen</string>
     <string name="settings_quick_replies_title">Antworten bearbeiten</string>
     <string name="settings_quick_replies_subtitle">Schnellnachrichten beim Ablehnen eines Anrufs</string>
     <string name="settings_favorites_view_title">Anzeigestil</string>
