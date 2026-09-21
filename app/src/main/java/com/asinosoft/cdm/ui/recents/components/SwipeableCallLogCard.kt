@@ -236,25 +236,11 @@ fun SwipeableCallLogCard(
                         onDragEnd = {
                             coroutineScope.launch {
                                 val finalOffset = drawnOffset
-                                val rAction = getCustomSwipeAction(
-                                    context,
-                                    contactKey,
-                                    isRight = true,
-                                    fallbackNumber = item.number,
-                                    contactName = item.name
-                                )
-                                val lAction = getCustomSwipeAction(
-                                    context,
-                                    contactKey,
-                                    isRight = false,
-                                    fallbackNumber = item.number,
-                                    contactName = item.name
-                                )
                                 if (finalOffset > thresholdPx) {
-                                    if (rAction != null) {
+                                    if (customRightAction != null) {
                                         executeCustomSwipeAction(
                                             context,
-                                            rAction,
+                                            customRightAction,
                                             { num, _ -> onCall(num) },
                                             onSms
                                         )
@@ -262,10 +248,10 @@ fun SwipeableCallLogCard(
                                         onCall(item.number)
                                     }
                                 } else if (finalOffset < -thresholdPx) {
-                                    if (lAction != null) {
+                                    if (customLeftAction != null) {
                                         executeCustomSwipeAction(
                                             context,
-                                            lAction,
+                                            customLeftAction,
                                             { num, _ -> onCall(num) },
                                             onSms
                                         )

@@ -337,7 +337,7 @@ fun SearchDialerScreen(
                                         onCardClick = { clickedItem ->
                                             val contact = FavoriteContact(
                                                 id = clickedItem.id,
-                                                name = clickedItem.name ?: clickedItem.number,
+                                                name = clickedItem.name,
                                                 number = clickedItem.number,
                                                 photoUri = clickedItem.photoUri
                                             )
@@ -364,7 +364,7 @@ fun SearchDialerScreen(
                                         onCardClick = { clickedItem ->
                                             val contact = FavoriteContact(
                                                 id = clickedItem.id,
-                                                name = clickedItem.name ?: clickedItem.number,
+                                                name = clickedItem.name,
                                                 number = clickedItem.number,
                                                 photoUri = clickedItem.photoUri
                                             )
@@ -677,30 +677,34 @@ fun SwipeableSearchDialerCard(
     ) {
         val currentOffset = offsetX.value
 
-        val customRightAction = if (currentOffset > 0f) {
-            getCustomSwipeAction(
-                context,
-                contactKey,
-                isRight = true,
-                fallbackNumber = item.number,
-                contactName = item.name
+        val rightVisuals = if (currentOffset > 0f) {
+            getSwipeBackgroundVisuals(
+                getCustomSwipeAction(
+                    context,
+                    contactKey,
+                    isRight = true,
+                    fallbackNumber = item.number,
+                    contactName = item.name
+                ),
+                defaultIsRight = true
             )
         } else null
-        val rightVisuals = getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true)
 
-        val customLeftAction = if (currentOffset < 0f) {
-            getCustomSwipeAction(
-                context,
-                contactKey,
-                isRight = false,
-                fallbackNumber = item.number,
-                contactName = item.name
+        val leftVisuals = if (currentOffset < 0f) {
+            getSwipeBackgroundVisuals(
+                getCustomSwipeAction(
+                    context,
+                    contactKey,
+                    isRight = false,
+                    fallbackNumber = item.number,
+                    contactName = item.name
+                ),
+                defaultIsRight = false
             )
         } else null
-        val leftVisuals = getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false)
 
         // Background layer visible during swipe
-        if (currentOffset > 0f) {
+        rightVisuals?.let {
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -726,7 +730,7 @@ fun SwipeableSearchDialerCard(
             }
         }
 
-        if (currentOffset < 0f) {
+        leftVisuals?.let {
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -773,6 +777,13 @@ fun SwipeableSearchDialerCard(
                             coroutineScope.launch {
                                 val targetOffset = offsetX.value
                                 if (targetOffset >= thresholdPx) {
+                                    val customRightAction = getCustomSwipeAction(
+                                        context,
+                                        contactKey,
+                                        isRight = true,
+                                        fallbackNumber = item.number,
+                                        contactName = item.name
+                                    )
                                     if (customRightAction != null) {
                                         executeCustomSwipeAction(
                                             context,
@@ -784,6 +795,13 @@ fun SwipeableSearchDialerCard(
                                         onCall(item.number, selectedSimSlot)
                                     }
                                 } else if (targetOffset <= -thresholdPx) {
+                                    val customLeftAction = getCustomSwipeAction(
+                                        context,
+                                        contactKey,
+                                        isRight = false,
+                                        fallbackNumber = item.number,
+                                        contactName = item.name
+                                    )
                                     if (customLeftAction != null) {
                                         executeCustomSwipeAction(
                                             context,
