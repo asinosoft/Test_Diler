@@ -190,6 +190,8 @@ import com.asinosoft.cdm.ui.components.OneUiPopupMenu
 import com.asinosoft.cdm.ui.components.OneUiPopupMenuDivider
 import com.asinosoft.cdm.ui.components.OneUiPopupMenuItem
 import com.asinosoft.cdm.ui.components.SimIcon
+import com.asinosoft.cdm.ui.icons.CallSim1
+import com.asinosoft.cdm.ui.icons.CallSim2
 import com.asinosoft.cdm.ui.recents.CallTypeFilter
 import com.asinosoft.cdm.ui.recents.SimFilter
 import com.asinosoft.cdm.ui.theme.BlockedRed
@@ -1345,67 +1347,40 @@ private fun ContactTabContent(
                                 IconButton(
                                     onClick = {
                                         onDismiss()
-                                        onCall(phoneItem.number, 1)
-                                    },
-                                    modifier = Modifier
-                                        .size(37.6.dp)
-                                        .clip(CircleShape)
-                                        .background(SamsungSmsBlue.copy(alpha = 0.12f))
-                                ) {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Phone,
-                                            contentDescription = stringResource(R.string.contact_call_sim1),
-                                            tint = SamsungSmsBlue,
-                                            modifier = Modifier
-                                                .size(26.dp)
-                                                .align(Alignment.Center)
-                                                .offset(x = (-1).dp, y = 2.dp)
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .padding(top = 7.dp, end = 7.dp)
-                                        ) {
-                                            SimIcon(simNumber = 1, size = 11.dp)
-                                        }
-                                    }
-                                }
-
-                                // SIM 2 Call Button
-                                IconButton(
-                                    onClick = {
-                                        onDismiss()
-                                        onCall(phoneItem.number, 2)
+                                        onCall(phoneItem.number, null)
                                     },
                                     modifier = Modifier
                                         .size(37.6.dp)
                                         .clip(CircleShape)
                                         .background(SamsungGreen.copy(alpha = 0.12f))
                                 ) {
-                                    Box(
-                                        modifier = Modifier.fillMaxSize()
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.Phone,
-                                            contentDescription = stringResource(R.string.contact_call_sim2),
-                                            tint = SamsungGreen,
-                                            modifier = Modifier
-                                                .size(26.dp)
-                                                .align(Alignment.Center)
-                                                .offset(x = (-1).dp, y = 2.dp)
-                                        )
-                                        Box(
-                                            modifier = Modifier
-                                                .align(Alignment.TopEnd)
-                                                .padding(top = 7.dp, end = 7.dp)
-                                        ) {
-                                            SimIcon(simNumber = 2, size = 11.dp)
-                                        }
-                                    }
+                                    Icon(
+                                        imageVector = CallSim1,
+                                        contentDescription = stringResource(R.string.contact_call_sim1),
+                                        tint = SamsungSmsBlue,
+                                        modifier = Modifier.size(18.dp)
+                                    )
                                 }
+
+                                // SIM 2 Call Button
+                                IconButton(
+                                    onClick = {
+                                        onDismiss()
+                                        onCall(phoneItem.number, null)
+                                    },
+                                    modifier = Modifier
+                                        .size(37.6.dp)
+                                        .clip(CircleShape)
+                                        .background(SamsungGreen.copy(alpha = 0.12f))
+                                ) {
+                                    Icon(
+                                        imageVector = CallSim2,
+                                        contentDescription = stringResource(R.string.contact_call_sim2),
+                                        tint = SamsungGreen,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+
                             } else {
                                 // Single Call Button
                                 IconButton(
@@ -2511,33 +2486,12 @@ private fun SettingsTabContent(
                             .clip(CircleShape)
                             .background(rightVisuals.color.copy(alpha = 0.15f))
                     ) {
-                        if (rightVisuals.simNumber != null) {
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                Icon(
-                                    imageVector = rightVisuals.icon,
-                                    contentDescription = stringResource(R.string.change_swipe_right),
-                                    tint = rightVisuals.color,
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .align(Alignment.Center)
-                                        .offset(x = (-1).dp, y = 2.dp)
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(top = 7.dp, end = 7.dp)
-                                ) {
-                                    SimIcon(simNumber = rightVisuals.simNumber, size = 11.dp)
-                                }
-                            }
-                        } else {
-                            Icon(
-                                imageVector = rightVisuals.icon,
-                                contentDescription = stringResource(R.string.change_swipe_right),
-                                tint = rightVisuals.color,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = rightVisuals.icon,
+                            contentDescription = stringResource(R.string.change_swipe_right),
+                            tint = rightVisuals.color,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
 
@@ -2597,33 +2551,12 @@ private fun SettingsTabContent(
                             .clip(CircleShape)
                             .background(leftVisuals.color.copy(alpha = 0.15f))
                     ) {
-                        if (leftVisuals.simNumber != null) {
-                            Box(modifier = Modifier.fillMaxSize()) {
-                                Icon(
-                                    imageVector = leftVisuals.icon,
-                                    contentDescription = stringResource(R.string.change_swipe_left),
-                                    tint = leftVisuals.color,
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .align(Alignment.Center)
-                                        .offset(x = (-1).dp, y = 2.dp)
-                                )
-                                Box(
-                                    modifier = Modifier
-                                        .align(Alignment.TopEnd)
-                                        .padding(top = 7.dp, end = 7.dp)
-                                ) {
-                                    SimIcon(simNumber = leftVisuals.simNumber, size = 11.dp)
-                                }
-                            }
-                        } else {
-                            Icon(
-                                imageVector = leftVisuals.icon,
-                                contentDescription = stringResource(R.string.change_swipe_left),
-                                tint = leftVisuals.color,
-                                modifier = Modifier.size(18.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = leftVisuals.icon,
+                            contentDescription = stringResource(R.string.change_swipe_left),
+                            tint = leftVisuals.color,
+                            modifier = Modifier.size(18.dp)
+                        )
                     }
                 }
             }
@@ -4143,23 +4076,31 @@ fun getSwipeBackgroundVisuals(
     }
 
     return when (customAction.actionType) {
-        "call_sim1", "call_sim2", "call_single" -> {
-            val messenger = customAction.messengerName
+        "call_sim1" ->
+            SwipeBackgroundVisuals(
+                icon = CallSim1,
+                backgroundColor = SamsungSmsBlue,
+                label = customAction.messengerName.orEmpty().ifEmpty { callLabel }
+            )
+        "call_sim2" ->
+            SwipeBackgroundVisuals(
+                icon = CallSim2,
+                backgroundColor = SamsungGreen,
+                label = customAction.messengerName.orEmpty().ifEmpty { callLabel }
+            )
+        "call_single" ->
             SwipeBackgroundVisuals(
                 icon = Icons.Default.Phone,
                 backgroundColor = SamsungGreen,
-                label = if (!messenger.isNullOrBlank()) messenger else callLabel
+                label = customAction.messengerName.orEmpty().ifEmpty { callLabel }
             )
-        }
 
-        "sms" -> {
-            val messenger = customAction.messengerName
+        "sms" ->
             SwipeBackgroundVisuals(
                 icon = Icons.AutoMirrored.Filled.Message,
                 backgroundColor = SamsungSmsBlue,
-                label = if (!messenger.isNullOrBlank()) messenger else messageLabel
+                label = customAction.messengerName.orEmpty().ifEmpty { messageLabel }
             )
-        }
 
         "messenger_chat" -> {
             val messenger = customAction.messengerName ?: messageLabel
@@ -4190,31 +4131,25 @@ fun getSwipeBackgroundVisuals(
             )
         }
 
-        "messenger_audio" -> {
-            val messenger = customAction.messengerName ?: callLabel
-            SwipeBackgroundVisuals(
+        "messenger_audio" ->SwipeBackgroundVisuals(
                 icon = Icons.Default.Phone,
                 backgroundColor = SamsungGreen,
-                label = messenger
+                label = customAction.messengerName.orEmpty().ifEmpty { callLabel }
             )
-        }
 
-        "messenger_video" -> {
-            val messenger = customAction.messengerName ?: videoLabel
+        "messenger_video" ->
             SwipeBackgroundVisuals(
                 icon = Icons.Default.Videocam,
                 backgroundColor = Color(0xFF7360F2),
-                label = messenger
+                label = customAction.messengerName.orEmpty().ifEmpty { videoLabel }
             )
-        }
 
-        "email" -> {
+        "email" ->
             SwipeBackgroundVisuals(
                 icon = Icons.Default.Email,
                 backgroundColor = Color(0xFFFFB300),
                 label = "E-mail"
             )
-        }
 
         else -> {
             if (defaultIsRight) {
@@ -4228,8 +4163,7 @@ fun getSwipeBackgroundVisuals(
 
 private data class ActionVisuals(
     val icon: ImageVector,
-    val color: Color,
-    val simNumber: Int? = null
+    val color: Color
 )
 
 private fun getActionVisuals(action: CustomSwipeAction?, defaultIsRight: Boolean): ActionVisuals {
@@ -4246,8 +4180,8 @@ private fun getActionVisuals(action: CustomSwipeAction?, defaultIsRight: Boolean
     } else null
 
     return when (action.actionType) {
-        "call_sim1" -> ActionVisuals(Icons.Default.Phone, SamsungSmsBlue, simNumber = 1)
-        "call_sim2" -> ActionVisuals(Icons.Default.Phone, SamsungGreen, simNumber = 2)
+        "call_sim1" -> ActionVisuals(CallSim1, SamsungSmsBlue)
+        "call_sim2" -> ActionVisuals(CallSim2, SamsungGreen)
         "call_single" -> ActionVisuals(Icons.Default.Phone, brandColor ?: SamsungGreen)
         "sms" -> ActionVisuals(Icons.AutoMirrored.Filled.Message, brandColor ?: SamsungSmsBlue)
         "email" -> ActionVisuals(Icons.Default.Email, Color(0xFFFFB300))
@@ -4374,24 +4308,12 @@ private fun SwipeActionPickerDialog(
                                                 .clip(CircleShape)
                                                 .background(SamsungSmsBlue.copy(alpha = 0.12f))
                                         ) {
-                                            Box(modifier = Modifier.fillMaxSize()) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Phone,
-                                                    contentDescription = stringResource(R.string.contact_call_sim1),
-                                                    tint = SamsungSmsBlue,
-                                                    modifier = Modifier
-                                                        .size(26.dp)
-                                                        .align(Alignment.Center)
-                                                        .offset(x = (-1).dp, y = 2.dp)
-                                                )
-                                                Box(
-                                                    modifier = Modifier
-                                                        .align(Alignment.TopEnd)
-                                                        .padding(top = 7.dp, end = 7.dp)
-                                                ) {
-                                                    SimIcon(simNumber = 1, size = 11.dp)
-                                                }
-                                            }
+                                            Icon(
+                                                imageVector = CallSim1,
+                                                contentDescription = stringResource(R.string.contact_call_sim1),
+                                                tint = SamsungSmsBlue,
+                                                modifier = Modifier.size(18.dp)
+                                            )
                                         }
 
                                         // SIM 2 Call Button
@@ -4413,24 +4335,12 @@ private fun SwipeActionPickerDialog(
                                                 .clip(CircleShape)
                                                 .background(SamsungGreen.copy(alpha = 0.12f))
                                         ) {
-                                            Box(modifier = Modifier.fillMaxSize()) {
-                                                Icon(
-                                                    imageVector = Icons.Default.Phone,
-                                                    contentDescription = stringResource(R.string.contact_call_sim2),
-                                                    tint = SamsungGreen,
-                                                    modifier = Modifier
-                                                        .size(26.dp)
-                                                        .align(Alignment.Center)
-                                                        .offset(x = (-1).dp, y = 2.dp)
-                                                )
-                                                Box(
-                                                    modifier = Modifier
-                                                        .align(Alignment.TopEnd)
-                                                        .padding(top = 7.dp, end = 7.dp)
-                                                ) {
-                                                    SimIcon(simNumber = 2, size = 11.dp)
-                                                }
-                                            }
+                                            Icon(
+                                                imageVector = CallSim2,
+                                                contentDescription = stringResource(R.string.contact_call_sim2),
+                                                tint = SamsungGreen,
+                                                modifier = Modifier.size(18.dp)
+                                            )
                                         }
                                     } else {
                                         // Single Call Button
@@ -4485,7 +4395,7 @@ private fun SwipeActionPickerDialog(
                                             imageVector = Icons.AutoMirrored.Filled.Message,
                                             contentDescription = "SMS",
                                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            modifier = Modifier.size(17.dp)
+                                            modifier = Modifier.size(18.dp)
                                         )
                                     }
                                 }

@@ -45,7 +45,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -425,10 +424,9 @@ fun RecentsScreen(
                             items = favorites,
                             key = { _, item -> "fav_list_${item.id}" }
                         ) { idx, contact ->
-                            val contactIndex = idx
                             val isBeingDragged = draggingContactId == contact.id
                             val isTargetSlot = draggingContactId != null &&
-                                    dragToIndex == contactIndex &&
+                                    dragToIndex == idx &&
                                     draggingContactId != contact.id
 
                             Box(

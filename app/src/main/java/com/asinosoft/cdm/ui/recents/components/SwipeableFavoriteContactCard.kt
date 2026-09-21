@@ -53,7 +53,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -167,30 +166,12 @@ fun SwipeableFavoriteContactCard(
                             .fillMaxHeight()
                             .padding(start = 24.dp)
                     ) {
-                        val isSim1 = customRightAction?.actionType == "call_sim1"
-                        val isSim2 = customRightAction?.actionType == "call_sim2"
-                        if (isSim1) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_sim1),
-                                contentDescription = "SIM 1",
-                                tint = Color.Unspecified,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        } else if (isSim2) {
-                            Icon(
-                                painter = painterResource(R.drawable.ic_sim2),
-                                contentDescription = "SIM 2",
-                                tint = Color.Unspecified,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        } else {
-                            Icon(
-                                imageVector = rightVisuals.icon,
-                                contentDescription = rightVisuals.label,
-                                tint = Color.White,
-                                modifier = Modifier.size(26.dp)
-                            )
-                        }
+                        Icon(
+                            imageVector = rightVisuals.icon,
+                            contentDescription = rightVisuals.label,
+                            tint = Color.White,
+                            modifier = Modifier.size(26.dp)
+                        )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = rightVisuals.label,
