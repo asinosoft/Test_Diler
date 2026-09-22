@@ -133,6 +133,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 import kotlin.time.Duration.Companion.milliseconds
@@ -281,8 +282,11 @@ fun InCallScreen(
     LaunchedEffect(isCallActive) {
         if (isCallActive) {
             while (true) {
+                durationSeconds = activeCall?.details?.connectTimeMillis?.let {
+                    (Date().time - it).milliseconds.inWholeSeconds.toInt()
+                } ?: 0
+
                 delay(1000L.milliseconds)
-                durationSeconds++
             }
         }
     }
