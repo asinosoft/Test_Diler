@@ -44,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -166,12 +167,24 @@ fun SwipeableFavoriteContactCard(
                             .fillMaxHeight()
                             .padding(start = 24.dp)
                     ) {
-                        Icon(
-                            imageVector = rightVisuals.icon,
-                            contentDescription = rightVisuals.label,
-                            tint = Color.White,
-                            modifier = Modifier.size(26.dp)
-                        )
+                        if (rightVisuals.iconBitmap != null) {
+                            Image(
+                                bitmap = rightVisuals.iconBitmap,
+                                contentDescription = rightVisuals.label,
+                                modifier = Modifier
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .scale(1.08f),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Icon(
+                                imageVector = rightVisuals.icon,
+                                contentDescription = rightVisuals.label,
+                                tint = Color.White,
+                                modifier = Modifier.size(28.dp)
+                            )
+                        }
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
                             text = rightVisuals.label,
@@ -207,8 +220,9 @@ fun SwipeableFavoriteContactCard(
                                 bitmap = leftVisuals.iconBitmap,
                                 contentDescription = leftVisuals.label,
                                 modifier = Modifier
-                                    .size(26.dp)
-                                    .clip(CircleShape),
+                                    .size(28.dp)
+                                    .clip(CircleShape)
+                                    .scale(1.08f),
                                 contentScale = ContentScale.Crop
                             )
                         } else {
@@ -216,7 +230,7 @@ fun SwipeableFavoriteContactCard(
                                 imageVector = leftVisuals.icon,
                                 contentDescription = leftVisuals.label,
                                 tint = Color.White,
-                                modifier = Modifier.size(26.dp)
+                                modifier = Modifier.size(28.dp)
                             )
                         }
                     }

@@ -75,6 +75,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -329,7 +330,6 @@ fun SearchDialerScreen(
                                 ) { item ->
                                     SwipeableSearchDialerCard(
                                         item = item,
-                                        context = context,
                                         query = searchQuery.text.toString(),
                                         selectedSimSlot = selectedSimSlot,
                                         onCall = onCall,
@@ -356,7 +356,6 @@ fun SearchDialerScreen(
                                 ) { item ->
                                     SwipeableSearchDialerCard(
                                         item = item,
-                                        context = context,
                                         query = searchQuery.text.toString(),
                                         selectedSimSlot = selectedSimSlot,
                                         onCall = onCall,
@@ -634,13 +633,13 @@ fun SearchDialerScreen(
 @Composable
 fun SwipeableSearchDialerCard(
     item: SearchDialerItem,
-    context: Context,
     query: String,
     selectedSimSlot: Int,
     onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
     onCardClick: (SearchDialerItem) -> Unit
 ) {
+    val context = LocalContext.current
     val haptic = LocalHapticFeedback.current
     val coroutineScope = rememberCoroutineScope()
     val offsetX = remember { Animatable(0f) }
@@ -686,7 +685,8 @@ fun SwipeableSearchDialerCard(
                     fallbackNumber = item.number,
                     contactName = item.name
                 ),
-                defaultIsRight = true
+                defaultIsRight = true,
+                context = context
             )
         } else null
 
@@ -699,7 +699,8 @@ fun SwipeableSearchDialerCard(
                     fallbackNumber = item.number,
                     contactName = item.name
                 ),
-                defaultIsRight = false
+                defaultIsRight = false,
+                context = context
             )
         } else null
 
@@ -713,12 +714,24 @@ fun SwipeableSearchDialerCard(
                 contentAlignment = Alignment.CenterStart
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = rightVisuals.icon,
-                        contentDescription = rightVisuals.label,
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    if (rightVisuals.iconBitmap != null) {
+                        Image(
+                            bitmap = rightVisuals.iconBitmap,
+                            contentDescription = rightVisuals.label,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .scale(1.08f),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = rightVisuals.icon,
+                            contentDescription = rightVisuals.label,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
                         text = rightVisuals.label,
@@ -746,12 +759,24 @@ fun SwipeableSearchDialerCard(
                         fontSize = 15.sp
                     )
                     Spacer(modifier = Modifier.width(10.dp))
-                    Icon(
-                        imageVector = leftVisuals.icon,
-                        contentDescription = leftVisuals.label,
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    if (leftVisuals.iconBitmap != null) {
+                        Image(
+                            bitmap = leftVisuals.iconBitmap,
+                            contentDescription = leftVisuals.label,
+                            modifier = Modifier
+                                .size(28.dp)
+                                .clip(CircleShape)
+                                .scale(1.08f),
+                            contentScale = ContentScale.Crop
+                        )
+                    } else {
+                        Icon(
+                            imageVector = leftVisuals.icon,
+                            contentDescription = leftVisuals.label,
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
         }

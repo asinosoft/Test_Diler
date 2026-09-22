@@ -1975,6 +1975,8 @@ fun InCallPostCallActionButton(
                         bitmap = iconBitmap,
                         contentDescription = label,
                         modifier = Modifier
+                            .scale(1.08f)
+                            .clip(CircleShape)
                             .fillMaxSize(),
                         contentScale = ContentScale.Crop
                     )
