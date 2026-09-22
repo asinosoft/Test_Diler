@@ -95,6 +95,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -1530,6 +1531,7 @@ private fun InCallActionButton(
                         contentDescription = label,
                         modifier = Modifier
                             .fillMaxSize()
+                            .scale(1.08f)
                             .clip(CircleShape),
                         contentScale = ContentScale.Crop
                     )
