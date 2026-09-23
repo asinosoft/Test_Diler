@@ -25,7 +25,6 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -44,12 +43,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
 import androidx.compose.ui.platform.LocalDensity
@@ -157,25 +154,20 @@ fun SwipeableFavoriteContactCard(
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
-                        .background(rightVisuals.backgroundColor),
+                        .background(rightVisuals.backgroundColor)
+                        .padding(start = 16.dp),
                     contentAlignment = Alignment.CenterStart
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Start,
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .padding(start = 24.dp)
+                        modifier = Modifier.fillMaxHeight()
                     ) {
                         if (rightVisuals.iconBitmap != null) {
                             Image(
                                 bitmap = rightVisuals.iconBitmap,
                                 contentDescription = rightVisuals.label,
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .scale(1.08f),
-                                contentScale = ContentScale.Crop
+                                modifier = Modifier.size(48.dp)
                             )
                         } else {
                             Icon(
@@ -206,7 +198,7 @@ fun SwipeableFavoriteContactCard(
                         horizontalArrangement = Arrangement.End,
                         modifier = Modifier
                             .fillMaxHeight()
-                            .padding(end = 24.dp)
+                            .padding(end = 16.dp)
                     ) {
                         Text(
                             text = leftVisuals.label,
@@ -219,11 +211,7 @@ fun SwipeableFavoriteContactCard(
                             Image(
                                 bitmap = leftVisuals.iconBitmap,
                                 contentDescription = leftVisuals.label,
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .scale(1.08f),
-                                contentScale = ContentScale.Crop
+                                modifier = Modifier.size(36.dp)
                             )
                         } else {
                             Icon(

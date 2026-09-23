@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -48,13 +47,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -182,17 +179,13 @@ fun SwipeableCallLogCard(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(start = 24.dp)
+                        modifier = Modifier.padding(start = 16.dp)
                     ) {
                         if (rightVisuals.iconBitmap != null) {
                             Image(
                                 bitmap = rightVisuals.iconBitmap,
                                 contentDescription = rightVisuals.label,
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .scale(1.08f),
-                                contentScale = ContentScale.Crop
+                                modifier = Modifier.size(36.dp)
                             )
                         } else {
                             Icon(
@@ -222,7 +215,7 @@ fun SwipeableCallLogCard(
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.padding(end = 24.dp)
+                        modifier = Modifier.padding(end = 16.dp)
                     ) {
                         Text(
                             leftVisuals.label,
@@ -235,11 +228,7 @@ fun SwipeableCallLogCard(
                             Image(
                                 bitmap = leftVisuals.iconBitmap,
                                 contentDescription = leftVisuals.label,
-                                modifier = Modifier
-                                    .size(28.dp)
-                                    .clip(CircleShape)
-                                    .scale(1.08f),
-                                contentScale = ContentScale.Crop
+                                modifier = Modifier.size(36.dp)
                             )
                         } else {
                             Icon(

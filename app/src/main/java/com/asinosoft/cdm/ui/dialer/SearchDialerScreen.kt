@@ -75,7 +75,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -710,7 +709,7 @@ fun SwipeableSearchDialerCard(
                 modifier = Modifier
                     .matchParentSize()
                     .background(rightVisuals.backgroundColor)
-                    .padding(horizontal = 20.dp),
+                    .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -718,26 +717,22 @@ fun SwipeableSearchDialerCard(
                         Image(
                             bitmap = rightVisuals.iconBitmap,
                             contentDescription = rightVisuals.label,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .scale(1.08f),
-                            contentScale = ContentScale.Crop
+                            modifier = Modifier.size(36.dp)
                         )
                     } else {
                         Icon(
                             imageVector = rightVisuals.icon,
                             contentDescription = rightVisuals.label,
                             tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(28.dp)
                         )
                     }
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(12.dp))
                     Text(
                         text = rightVisuals.label,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
+                        fontSize = 16.sp
                     )
                 }
             }
@@ -748,7 +743,7 @@ fun SwipeableSearchDialerCard(
                 modifier = Modifier
                     .matchParentSize()
                     .background(leftVisuals.backgroundColor)
-                    .padding(horizontal = 20.dp),
+                    .padding(horizontal = 16.dp),
                 contentAlignment = Alignment.CenterEnd
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -756,25 +751,21 @@ fun SwipeableSearchDialerCard(
                         text = leftVisuals.label,
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp
+                        fontSize = 16.sp
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     if (leftVisuals.iconBitmap != null) {
                         Image(
                             bitmap = leftVisuals.iconBitmap,
                             contentDescription = leftVisuals.label,
-                            modifier = Modifier
-                                .size(28.dp)
-                                .clip(CircleShape)
-                                .scale(1.08f),
-                            contentScale = ContentScale.Crop
+                            modifier = Modifier.size(36.dp)
                         )
                     } else {
                         Icon(
                             imageVector = leftVisuals.icon,
                             contentDescription = leftVisuals.label,
                             tint = Color.White,
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(28.dp)
                         )
                     }
                 }
