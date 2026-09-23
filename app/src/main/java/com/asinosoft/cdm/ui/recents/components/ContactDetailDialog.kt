@@ -17,7 +17,6 @@ import android.provider.BlockedNumberContract
 import android.provider.ContactsContract
 import android.provider.OpenableColumns
 import android.telephony.SubscriptionManager
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -128,6 +127,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -149,6 +149,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLocale
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
@@ -491,8 +492,6 @@ fun ContactDetailDialog(
                         heroHeight = (heroHeight + available.y / 2).coerceIn(minHeight, maxHeight)
                         val consumed = heroHeight - previousHeight
 
-                        Log.d("hero", "Available = $available, Consumed = $consumed")
-
                         return Offset(0f, consumed)
                     }
                 }
@@ -651,8 +650,7 @@ fun ContactDetailDialog(
                                                 context = context,
                                                 onCall = onCall,
                                                 onSms = onSms,
-                                                onDismiss = onDismiss,
-                                                onRemoveFavorite = onRemoveFavorite
+                                                onDismiss = onDismiss
                                             )
                                             Spacer(modifier = Modifier.height(40.dp))
                                         }
@@ -732,8 +730,6 @@ fun ContactDetailDialog(
                                                 context = context,
                                                 tabs = tabs,
                                                 avatarBitmap = avatarBitmap,
-                                                onDismiss = onDismiss,
-                                                onRemoveFavorite = onRemoveFavorite,
                                                 onToggleFavorite = onToggleFavorite,
                                                 onUpdateContact = onUpdateContact,
                                                 onAddTab = onAddTab
@@ -1204,8 +1200,7 @@ private fun ContactTabContent(
     context: Context,
     onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
-    onDismiss: () -> Unit,
-    onRemoveFavorite: (FavoriteContact) -> Unit
+    onDismiss: () -> Unit
 ) {
     var editablePhoneList by remember(phoneNumbersList) { mutableStateOf(phoneNumbersList) }
     var draggingPhoneIndex by remember { mutableStateOf<Int?>(null) }
@@ -2172,8 +2167,6 @@ private fun SettingsTabContent(
     context: Context,
     tabs: List<FavoriteTab>,
     avatarBitmap: ImageBitmap?,
-    onDismiss: () -> Unit,
-    onRemoveFavorite: (FavoriteContact) -> Unit,
     onToggleFavorite: (FavoriteContact, Boolean) -> Unit,
     onUpdateContact: (FavoriteContact) -> Unit,
     onAddTab: (String) -> FavoriteTab
@@ -5460,16 +5453,16 @@ private fun EditContactDialog(
     onDismiss: () -> Unit
 ) {
     var nameInput by remember { mutableStateOf(contact.name) }
-    var editablePhones by remember { mutableStateOf(phoneNumbersList.toMutableList()) }
-    var editableEmails by remember { mutableStateOf(emailsList.toMutableList()) }
+    val editablePhones = remember { phoneNumbersList.toMutableStateList() }
+    val editableEmails = remember { emailsList.toMutableStateList() }
     var editableBirthday by remember { mutableStateOf(birthdayInfo) }
     var birthdayInput by remember { mutableStateOf(birthdayInfo?.formattedDate ?: "") }
     var isEditingBirthday by remember { mutableStateOf(birthdayInfo != null) }
 
-    var customImportantDates by remember { mutableStateOf(importantDatesList.toMutableList()) }
+    val customImportantDates = remember { importantDatesList.toMutableStateList() }
     var currentAvatarBitmap by remember { mutableStateOf(avatarBitmap) }
 
-    var editableMessengers by remember { mutableStateOf(messengerAccountsList.toMutableList()) }
+    val editableMessengers = remember { messengerAccountsList.toMutableStateList() }
 
     val contactKey = remember(contact) { getContactCustomKey(contact) }
     var hiddenSet by remember {
@@ -5477,7 +5470,7 @@ private fun EditContactDialog(
             getHiddenMessengers(
                 context,
                 contactKey
-            ).toMutableSet()
+            )
         )
     }
 
@@ -5618,12 +5611,12 @@ private fun EditContactDialog(
                     )
                     IconButton(
                         onClick = {
-                            editablePhones = (
-                                editablePhones + ContactPhoneNumber(
+                            editablePhones.add(
+                                ContactPhoneNumber(
                                     "",
                                     ContactLabelHelper.defaultMobileLabel(context)
                                 )
-                            ).toMutableList()
+                            )
                         },
                         modifier = Modifier.size(28.dp)
                     ) {
@@ -5646,22 +5639,14 @@ private fun EditContactDialog(
                     ) {
                         OutlinedTextField(
                             value = phoneItem.number,
-                            onValueChange = { newNum ->
-                                val updated = editablePhones.toMutableList()
-                                updated[index] = phoneItem.copy(number = newNum)
-                                editablePhones = updated
-                            },
+                            onValueChange = { editablePhones[index] = phoneItem.copy(number = it) },
                             label = { Text(phoneItem.label) },
                             singleLine = true,
                             modifier = Modifier.weight(1f)
                         )
                         if (editablePhones.size > 1) {
                             IconButton(
-                                onClick = {
-                                    val updated = editablePhones.toMutableList()
-                                    updated.removeAt(index)
-                                    editablePhones = updated
-                                }
+                                onClick = { editablePhones.removeAt(index) }
                             ) {
                                 Icon(
                                     Icons.Default.Delete,
@@ -5769,11 +5754,7 @@ private fun EditContactDialog(
 
                                         // Delete Custom Link Button
                                         IconButton(
-                                            onClick = {
-                                                val updated = editableMessengers.toMutableList()
-                                                updated.removeAt(index)
-                                                editableMessengers = updated
-                                            },
+                                            onClick = { editableMessengers.removeAt(index) },
                                             modifier = Modifier.size(32.dp)
                                         ) {
                                             Icon(
@@ -5826,15 +5807,7 @@ private fun EditContactDialog(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
                     )
                     IconButton(
-                        onClick = {
-                            editableEmails =
-                                (
-                                    editableEmails + ContactEmail(
-                                        "",
-                                        context.getString(R.string.email_type_personal)
-                                    )
-                                ).toMutableList()
-                        },
+                        onClick = { editableEmails.add(ContactEmail("", context.getString(R.string.email_type_personal))) },
                         modifier = Modifier.size(28.dp)
                     ) {
                         Icon(
@@ -5864,22 +5837,14 @@ private fun EditContactDialog(
                         ) {
                             OutlinedTextField(
                                 value = emailItem.email,
-                                onValueChange = { newEmail ->
-                                    val updated = editableEmails.toMutableList()
-                                    updated[index] = emailItem.copy(email = newEmail)
-                                    editableEmails = updated
-                                },
+                                onValueChange = { editableEmails[index] = emailItem.copy(email = it) },
                                 label = { Text(emailItem.label) },
                                 placeholder = { Text("example@mail.ru") },
                                 singleLine = true,
                                 modifier = Modifier.weight(1f)
                             )
                             IconButton(
-                                onClick = {
-                                    val updated = editableEmails.toMutableList()
-                                    updated.removeAt(index)
-                                    editableEmails = updated
-                                }
+                                onClick = { editableEmails.removeAt(index) }
                             ) {
                                 Icon(
                                     Icons.Default.Delete,
@@ -5986,11 +5951,7 @@ private fun EditContactDialog(
                     ) {
                         OutlinedTextField(
                             value = dateItem.label,
-                            onValueChange = { newLabel ->
-                                val updated = customImportantDates.toMutableList()
-                                updated[index] = dateItem.copy(label = newLabel)
-                                customImportantDates = updated
-                            },
+                            onValueChange = { customImportantDates[index] = dateItem.copy(label = it) },
                             label = { Text(stringResource(R.string.contact_custom_date_label)) },
                             placeholder = { Text(stringResource(R.string.contact_custom_date_placeholder)) },
                             singleLine = true,
@@ -6001,11 +5962,7 @@ private fun EditContactDialog(
 
                         OutlinedTextField(
                             value = dateItem.dateString,
-                            onValueChange = { newDate ->
-                                val updated = customImportantDates.toMutableList()
-                                updated[index] = dateItem.copy(dateString = newDate)
-                                customImportantDates = updated
-                            },
+                            onValueChange = { customImportantDates[index] = dateItem.copy(dateString = it) },
                             label = { Text(stringResource(R.string.contact_date_label)) },
                             placeholder = { Text(stringResource(R.string.contact_date_example_placeholder)) },
                             singleLine = true,
@@ -6016,9 +5973,7 @@ private fun EditContactDialog(
                                             context,
                                             dateItem.dateString
                                         ) { newDate ->
-                                            val updated = customImportantDates.toMutableList()
-                                            updated[index] = dateItem.copy(dateString = newDate)
-                                            customImportantDates = updated
+                                            customImportantDates[index] = dateItem.copy(dateString = newDate)
                                         }
                                     }
                                 ) {
@@ -6033,11 +5988,7 @@ private fun EditContactDialog(
                         )
 
                         IconButton(
-                            onClick = {
-                                val updated = customImportantDates.toMutableList()
-                                updated.removeAt(index)
-                                customImportantDates = updated
-                            }
+                            onClick = { customImportantDates.removeAt(index) }
                         ) {
                             Icon(
                                 Icons.Default.Delete,
@@ -6066,10 +6017,9 @@ private fun EditContactDialog(
                             val nextLabel = labels.getOrElse(customImportantDates.size % labels.size) {
                                 context.getString(R.string.contact_important_date)
                             }
-                            customImportantDates = (customImportantDates + ContactImportantDate(
-                                label = nextLabel,
-                                dateString = ""
-                            )).toMutableList()
+                            customImportantDates.add(
+                                ContactImportantDate(label = nextLabel, dateString = "")
+                            )
                         }
                         .padding(horizontal = 14.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
@@ -6134,9 +6084,7 @@ private fun EditContactDialog(
     if (showAddMessengerDialogInEdit) {
         AddCustomMessengerLinkDialog(
             context = context,
-            onAddCustomLink = { newAccount ->
-                editableMessengers = (editableMessengers + newAccount).toMutableList()
-            },
+            onAddCustomLink = { newAccount -> editableMessengers.add(newAccount) },
             onDismiss = { showAddMessengerDialogInEdit = false }
         )
     }
@@ -6148,9 +6096,7 @@ private fun EditContactDialog(
             initialMessenger = targetMessenger,
             context = context,
             onSaveCustomLink = { updatedMessenger ->
-                val updated = editableMessengers.toMutableList()
-                updated[editingIndex] = updatedMessenger
-                editableMessengers = updated
+                editableMessengers[editingIndex] = updatedMessenger
                 customLinkToEditIndex = null
             },
             onDismiss = { customLinkToEditIndex = null }
@@ -6431,7 +6377,7 @@ private fun ShareTextSelectionDialog(
     onSend: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val context = LocalContext.current
+    val resources = LocalResources.current
     data class ShareFieldItem(
         val id: String,
         val title: String,
@@ -6439,14 +6385,14 @@ private fun ShareTextSelectionDialog(
         val isName: Boolean = false
     )
 
-    val items = remember(contact, phoneNumbers, emails, birthday, importantDates, messengers, context) {
+    val items = remember(contact, phoneNumbers, emails, birthday, importantDates, messengers, resources) {
         val list = mutableListOf<ShareFieldItem>()
         // 1. Имя
         if (contact.name.isNotBlank()) {
             list.add(
                 ShareFieldItem(
                     id = "name",
-                    title = context.getString(R.string.contact_name),
+                    title = resources.getString(R.string.contact_name),
                     subtitle = contact.name,
                     isName = true
                 )
@@ -6455,13 +6401,10 @@ private fun ShareTextSelectionDialog(
         // 2. Телефоны
         phoneNumbers.forEachIndexed { idx, p ->
             if (p.number.isNotBlank()) {
-                val labelText = p.label.ifBlank {
-                    context.getString(R.string.contact_phone_generic)
-                }
                 list.add(
                     ShareFieldItem(
                         id = "phone_$idx",
-                        title = labelText,
+                        title = p.label.ifBlank { resources.getString(R.string.contact_phone_generic) },
                         subtitle = PhoneNumberHelper.format(p.number)
                     )
                 )
@@ -6485,7 +6428,7 @@ private fun ShareTextSelectionDialog(
             list.add(
                 ShareFieldItem(
                     id = "birthday",
-                    title = context.getString(R.string.contact_birthday),
+                    title = resources.getString(R.string.contact_birthday),
                     subtitle = birthday.dateString
                 )
             )
@@ -6496,7 +6439,7 @@ private fun ShareTextSelectionDialog(
                 list.add(
                     ShareFieldItem(
                         id = "date_$idx",
-                        title = d.label.ifBlank { context.getString(R.string.contact_date_label) },
+                        title = d.label.ifBlank { resources.getString(R.string.contact_date_label) },
                         subtitle = d.dateString
                     )
                 )
