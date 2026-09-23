@@ -121,8 +121,13 @@ fun SwipeableFavoriteContactCard(
         getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false, context = context)
     }
 
-    val formattedNumber = remember(contact.number) {
-        PhoneNumberHelper.format(contact.number)
+    val displayNumber = remember(customRightAction, customLeftAction, contact.number) {
+        phoneNumberFromSwipeAction(customRightAction)
+            ?: phoneNumberFromSwipeAction(customLeftAction)
+            ?: contact.number
+    }
+    val formattedNumber = remember(displayNumber) {
+        PhoneNumberHelper.format(displayNumber)
     }
 
     val currentOnDragStart by rememberUpdatedState(onDragStart)
@@ -380,6 +385,15 @@ fun SwipeableFavoriteContactCard(
                 }
             }
         }
+    }
+}
+
+private fun phoneNumberFromSwipeAction(action: CustomSwipeAction?): String? {
+    if (action == null) return null
+    return when (action.actionType) {
+        "call_sim1", "call_sim2", "call_single", "sms" ->
+            action.targetValue.takeIf { it.isNotBlank() }
+        else -> null
     }
 }
 
