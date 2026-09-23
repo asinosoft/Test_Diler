@@ -148,6 +148,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
@@ -2066,6 +2067,8 @@ private fun ContactTabContent(
 @Composable
 private fun HistoryCallRow(item: CallLogItem) {
     val context = LocalContext.current
+    val locale = LocalLocale.current
+    val hhmm = remember { SimpleDateFormat("HH:mm", locale.platformLocale) }
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -2121,7 +2124,7 @@ private fun HistoryCallRow(item: CallLogItem) {
 
             Column {
                 Text(
-                    text = formatTimeOnly(item.timestamp),
+                    text = if (item.timestamp == 0L) "" else hhmm.format(item.timestamp),
                     fontSize = 15.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = if (item.type == CallType.MISSED || item.type == CallType.REJECTED || item.type == CallType.BLOCKED) {
@@ -2967,11 +2970,6 @@ private fun openSystemContact(context: Context, contactNumber: String) {
                 .show()
         }
     }
-}
-
-private fun formatTimeOnly(timestamp: Long): String {
-    if (timestamp == 0L) return ""
-    return SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(timestamp))
 }
 
 private fun getHighResContactPhotoUri(context: Context, contactNumber: String): String? {
@@ -6457,9 +6455,7 @@ private fun ShareTextSelectionDialog(
         // 2. Телефоны
         phoneNumbers.forEachIndexed { idx, p ->
             if (p.number.isNotBlank()) {
-                val labelText = if (p.label.isNotBlank()) {
-                    p.label
-                } else {
+                val labelText = p.label.ifBlank {
                     context.getString(R.string.contact_phone_generic)
                 }
                 list.add(
@@ -6474,7 +6470,7 @@ private fun ShareTextSelectionDialog(
         // 3. Email
         emails.forEachIndexed { idx, e ->
             if (e.email.isNotBlank()) {
-                val labelText = if (e.label.isNotBlank()) e.label else "Email"
+                val labelText = e.label.ifBlank { "Email" }
                 list.add(
                     ShareFieldItem(
                         id = "email_$idx",
@@ -6828,15 +6824,11 @@ private fun buildContactShareText(
         sb.append(contact.name).append("\n")
     }
     phoneNumbers.filter { it.number.isNotBlank() }.forEach { p ->
-        val labelText = if (p.label.isNotBlank()) {
-            p.label
-        } else {
-            context.getString(R.string.contact_phone_generic)
-        }
+        val labelText = p.label.ifBlank { context.getString(R.string.contact_phone_generic) }
         sb.append("$labelText: ${PhoneNumberHelper.format(p.number)}\n")
     }
     emails.filter { it.email.isNotBlank() }.forEach { e ->
-        val labelText = if (e.label.isNotBlank()) e.label else "Email"
+        val labelText = e.label.ifBlank { "Email" }
         sb.append("$labelText: ${e.email}\n")
     }
     if (birthday != null && birthday.dateString.isNotBlank()) {
@@ -6914,14 +6906,8 @@ private fun OneUiRingtonePickerDialog(
     fun playPreview(uriStr: String?) {
         try {
             previewPlayer?.stop()
-            val playUri = if (uriStr != null) {
-                uriStr.toUri()
-            } else {
-                RingtoneManager.getActualDefaultRingtoneUri(
-                    context,
-                    RingtoneManager.TYPE_RINGTONE
-                )
-            }
+            val playUri = uriStr?.toUri()
+                ?: RingtoneManager.getActualDefaultRingtoneUri(context,RingtoneManager.TYPE_RINGTONE)
             val r = RingtoneManager.getRingtone(context, playUri)
             r?.audioAttributes = AudioAttributes.Builder()
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)

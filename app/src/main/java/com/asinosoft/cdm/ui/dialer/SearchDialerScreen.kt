@@ -88,6 +88,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -120,8 +121,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import kotlin.math.roundToInt
 
 @Composable
@@ -652,6 +651,9 @@ fun SwipeableSearchDialerCard(
 
     val contactKey = item.id.ifBlank { item.number.replace(Regex("[^0-9+]"), "") }
 
+    val locale = LocalLocale.current
+    val hhmm = remember { SimpleDateFormat("HH:mm", locale.platformLocale) }
+
     LaunchedEffect(item.photoUri) {
         if (!item.photoUri.isNullOrEmpty()) {
             withContext(Dispatchers.IO) {
@@ -925,7 +927,7 @@ fun SwipeableSearchDialerCard(
                         if (item.timestamp > 0L) {
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                text = formatCallTime(item.timestamp),
+                                text = hhmm.format(item.timestamp),
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
@@ -1046,10 +1048,4 @@ private fun CallTypeIcon(type: CallType) {
         tint = tint,
         modifier = Modifier.size(15.dp)
     )
-}
-
-private fun formatCallTime(timestamp: Long): String {
-    if (timestamp == 0L) return ""
-    val date = Date(timestamp)
-    return SimpleDateFormat("HH:mm", Locale.getDefault()).format(date)
 }

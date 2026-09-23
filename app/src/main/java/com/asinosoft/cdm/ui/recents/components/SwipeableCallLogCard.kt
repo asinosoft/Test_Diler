@@ -55,6 +55,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -79,14 +80,8 @@ import com.asinosoft.cdm.ui.theme.SamsungSmsBlue
 import com.asinosoft.cdm.util.PhoneNumberHelper
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
-
-private val timeFormatter = ThreadLocal.withInitial {
-    SimpleDateFormat("HH:mm", Locale.getDefault())
-}
 
 @Composable
 fun SwipeableCallLogCard(
@@ -156,10 +151,8 @@ fun SwipeableCallLogCard(
         val baseName = item.name ?: formattedNumber
         if (item.count > 1) "$baseName (${item.count})" else baseName
     }
-    val subText = remember(item.name, formattedNumber) {
-        if (item.name != null) formattedNumber else context.getString(R.string.call_log_not_saved)
-    }
-    val timeText = remember(item.timestamp) { formatTimeOnly(item.timestamp) }
+    val locale = LocalLocale.current
+    val hhmm = remember(locale) { SimpleDateFormat("HH:mm", locale.platformLocale) }
     val avatarName = remember(item.name, formattedNumber) { item.name ?: formattedNumber }
     val isMissed = item.type == CallType.MISSED || item.type == CallType.REJECTED || item.type == CallType.BLOCKED
 
@@ -375,7 +368,9 @@ fun SwipeableCallLogCard(
                             SimIcon(simNumber = item.simNumber, size = 12.dp)
                             Spacer(modifier.width(5.dp))
                             Text(
-                                text = subText,
+                                text =
+                                    if (item.name != null) formattedNumber
+                                    else stringResource(R.string.call_log_not_saved),
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                 maxLines = 1,
@@ -385,7 +380,7 @@ fun SwipeableCallLogCard(
                     }
                     Spacer(modifier.width(8.dp))
                     Text(
-                        text = timeText,
+                        text = if (item.timestamp == 0L) "" else hhmm.format(item.timestamp),
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         maxLines = 1
@@ -433,11 +428,7 @@ fun SwipeableCallLogCard(
                                         val ok = onBlockNumber(item)
                                         Toast.makeText(
                                             context,
-                                            if (ok) {
-                                                context.getString(R.string.toast_number_blocked)
-                                            } else {
-                                                context.getString(R.string.toast_block_failed)
-                                            },
+                                            if (ok) R.string.toast_number_blocked else R.string.toast_block_failed,
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     }
@@ -529,17 +520,4 @@ private fun CallTypeIcon(type: CallType) {
         tint = color,
         modifier = Modifier.size(16.dp)
     )
-}
-
-private fun formatTimeOnly(timestamp: Long): String {
-    if (timestamp == 0L) return ""
-    return timeFormatter.get()!!.format(Date(timestamp))
-}
-
-private fun digitsOnlyPhone(number: String): String {
-    val sb = StringBuilder(number.length)
-    for (c in number) {
-        if (c.isDigit() || c == '+') sb.append(c)
-    }
-    return sb.toString()
 }
