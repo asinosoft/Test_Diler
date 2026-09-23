@@ -734,7 +734,7 @@ fun InCallScreen(
                             InCallPostCallActionButton(
                                 icon = leftVisuals.icon,
                                 iconBitmap = leftVisuals.iconBitmap,
-                                label = stringResource(R.string.incall_action_message),
+                                label = leftVisuals.label,
                                 containerColor = leftVisuals.backgroundColor,
                                 onClick = {
                                     onFinish()
@@ -1967,6 +1967,7 @@ fun InCallPostCallActionButton(
         if (iconBitmap != null) {
             Surface(
                 modifier = Modifier.size(60.dp),
+                shape = CircleShape,
                 color = Color.Transparent,
                 shadowElevation = 4.dp
             ) {
