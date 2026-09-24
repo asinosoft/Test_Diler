@@ -129,6 +129,7 @@ import com.asinosoft.cdm.ui.theme.MissedRed
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.ui.theme.SamsungSmsBlue
 import com.asinosoft.cdm.util.PhoneNumberHelper
+import com.asinosoft.cdm.util.rememberActiveSimCount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -157,7 +158,7 @@ fun InCallScreen(
 
     var callState by remember { mutableIntStateOf(activeCall?.state ?: Call.STATE_DISCONNECTED) }
     var durationSeconds by remember { mutableIntStateOf(0) }
-    var activeSimCount by remember { mutableIntStateOf(1) }
+    val activeSimCount = rememberActiveSimCount()
     var showKeypadSheet by remember { mutableStateOf(false) }
 
     val handle = activeCall?.details?.handle
@@ -220,30 +221,6 @@ fun InCallScreen(
                 } else {
                     contactPhotoBitmap = null
                 }
-            }
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            try {
-                val hasPermission = ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.READ_PHONE_STATE
-                ) == PackageManager.PERMISSION_GRANTED
-
-                if (hasPermission) {
-                    val sm =
-                        context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
-
-                    @Suppress("MissingPermission")
-                    val count = sm?.activeSubscriptionInfoCount ?: 1
-                    activeSimCount = if (count > 1) count else 1
-                } else {
-                    activeSimCount = 1
-                }
-            } catch (_: Exception) {
-                activeSimCount = 1
             }
         }
     }

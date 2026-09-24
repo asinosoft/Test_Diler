@@ -75,7 +75,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
-import android.telephony.SubscriptionManager
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.key
@@ -83,6 +82,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.asinosoft.cdm.R
 import com.asinosoft.cdm.data.model.FavoriteTab
 import com.asinosoft.cdm.util.DateHeaderFormatter
+import com.asinosoft.cdm.util.rememberActiveSimCount
 import com.asinosoft.cdm.data.model.FavoritesViewMode
 import com.asinosoft.cdm.ui.components.FloatingStickyDateHeader
 import com.asinosoft.cdm.ui.components.LazyListVerticalScrollbar
@@ -134,16 +134,7 @@ fun RecentsScreen(
     val showHint by viewModel.showSwipeHint.collectAsState()
     val listReady by remember { derivedStateOf { hasLoadedCallLogs || callLogs.isNotEmpty() } }
 
-    val activeSimCount = remember(context) {
-        try {
-            val sm = context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
-            @Suppress("MissingPermission")
-            val count = sm?.activeSubscriptionInfoCount ?: 1
-            if (count > 1) count else 1
-        } catch (_: Exception) {
-            1
-        }
-    }
+    val activeSimCount = rememberActiveSimCount()
 
     val callTypeFilter by viewModel.callTypeFilter.collectAsState()
     val simFilter by viewModel.simFilter.collectAsState()
@@ -809,7 +800,8 @@ fun RecentsScreen(
                                 },
                                 onBlockNumber = { viewModel.blockCallLogNumber(it) },
                                 onDeleteGroup = { viewModel.deleteCallLogGroup(it) },
-                                onClearContactCalls = { viewModel.clearContactCallLogs(it) }
+                                onClearContactCalls = { viewModel.clearContactCallLogs(it) },
+                                showSimIcon = activeSimCount > 1
                             )
                         }
                     }

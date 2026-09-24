@@ -117,6 +117,7 @@ import com.asinosoft.cdm.ui.theme.OutgoingBlue
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.ui.theme.SamsungSmsBlue
 import com.asinosoft.cdm.util.PhoneNumberHelper
+import com.asinosoft.cdm.util.rememberActiveSimCount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -161,6 +162,8 @@ fun SearchDialerScreen(
 
     var selectedSimSlot by remember { mutableIntStateOf(defaultSimSlot) }
     var isDialpadVisible by remember { mutableStateOf(true) }
+    val activeSimCount = rememberActiveSimCount()
+    val simForCall: Int? = if (activeSimCount > 1) selectedSimSlot else null
 
     val listState = rememberLazyListState()
 
@@ -329,7 +332,8 @@ fun SearchDialerScreen(
                                     SwipeableSearchDialerCard(
                                         item = item,
                                         query = searchQuery.text.toString(),
-                                        selectedSimSlot = selectedSimSlot,
+                                        selectedSimSlot = simForCall,
+                                        showSimIcon = activeSimCount > 1,
                                         onCall = onCall,
                                         onSms = onSms,
                                         onCardClick = { clickedItem ->
@@ -355,7 +359,8 @@ fun SearchDialerScreen(
                                     SwipeableSearchDialerCard(
                                         item = item,
                                         query = searchQuery.text.toString(),
-                                        selectedSimSlot = selectedSimSlot,
+                                        selectedSimSlot = simForCall,
+                                        showSimIcon = activeSimCount > 1,
                                         onCall = onCall,
                                         onSms = onSms,
                                         onCardClick = { clickedItem ->
@@ -482,7 +487,7 @@ fun SearchDialerScreen(
                                                                     searchQuery.text.toString() + "+"
                                                                 )
                                                             } else if (digit == "1") {
-                                                                onCall("121", selectedSimSlot)
+                                                                onCall("121", simForCall)
                                                             }
                                                         }
                                                     )
@@ -555,28 +560,32 @@ fun SearchDialerScreen(
                             horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Single Animated SIM Selector Toggle Button
-                            Surface(
-                                shape = RoundedCornerShape(10.dp),
-                                color = animatedSimBgColor,
-                                modifier = Modifier.clickable {
-                                    selectedSimSlot = if (selectedSimSlot == 1) 2 else 1
+                            if (activeSimCount > 1) {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = animatedSimBgColor,
+                                    modifier = Modifier.clickable {
+                                        selectedSimSlot = if (selectedSimSlot == 1) 2 else 1
+                                    }
+                                ) {
+                                    Text(
+                                        text = "SIM $selectedSimSlot",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White,
+                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                                    )
                                 }
-                            ) {
-                                Text(
-                                    text = "SIM $selectedSimSlot",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color.White,
-                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                                )
+                            } else {
+                                // Keep call button centered when SIM toggle is hidden
+                                Spacer(modifier = Modifier.width(48.dp))
                             }
 
                             // Center: Green Call FAB Button
                             FloatingActionButton(
                                 onClick = {
                                     if (searchQuery.text.isNotBlank()) {
-                                        onCall(searchQuery.text.toString(), selectedSimSlot)
+                                        onCall(searchQuery.text.toString(), simForCall)
                                     }
                                 },
                                 containerColor = SamsungGreen,
@@ -632,7 +641,8 @@ fun SearchDialerScreen(
 fun SwipeableSearchDialerCard(
     item: SearchDialerItem,
     query: String,
-    selectedSimSlot: Int,
+    selectedSimSlot: Int?,
+    showSimIcon: Boolean = true,
     onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
     onCardClick: (SearchDialerItem) -> Unit
@@ -946,7 +956,7 @@ fun SwipeableSearchDialerCard(
                             Spacer(modifier = Modifier.width(5.dp))
                         }
 
-                        if (item.simSlot != null) {
+                        if (showSimIcon && item.simSlot != null) {
                             SimIcon(simNumber = item.simSlot, size = 12.dp)
                             Spacer(modifier = Modifier.width(6.dp))
                         }

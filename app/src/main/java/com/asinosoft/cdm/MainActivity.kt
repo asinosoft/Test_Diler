@@ -70,6 +70,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         com.asinosoft.cdm.util.AppLifecycleTracker.init(application)
+        com.asinosoft.cdm.util.ActiveSimCount.ensureObserving(this)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
         enableEdgeToEdge()
 
@@ -335,6 +336,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        com.asinosoft.cdm.util.ActiveSimCount.refreshNow(this)
         clearMissedCallNotifications()
     }
 

@@ -94,6 +94,7 @@ fun SwipeableCallLogCard(
     onBlockNumber: (CallLogItem) -> Boolean = { false },
     onDeleteGroup: (CallLogItem) -> Unit = {},
     onClearContactCalls: (CallLogItem) -> Unit = {},
+    showSimIcon: Boolean = true,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -365,8 +366,10 @@ fun SwipeableCallLogCard(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             CallTypeIcon(item.type)
                             Spacer(modifier.width(5.dp))
-                            SimIcon(simNumber = item.simNumber, size = 12.dp)
-                            Spacer(modifier.width(5.dp))
+                            if (showSimIcon) {
+                                SimIcon(simNumber = item.simNumber, size = 12.dp)
+                                Spacer(modifier.width(5.dp))
+                            }
                             Text(
                                 text =
                                     if (item.name != null) formattedNumber

@@ -16,7 +16,6 @@ import android.net.Uri
 import android.provider.BlockedNumberContract
 import android.provider.ContactsContract
 import android.provider.OpenableColumns
-import android.telephony.SubscriptionManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -205,6 +204,7 @@ import com.asinosoft.cdm.ui.theme.SamsungSmsBlue
 import com.asinosoft.cdm.util.ContactLabelHelper
 import com.asinosoft.cdm.util.DateHeaderFormatter
 import com.asinosoft.cdm.util.PhoneNumberHelper
+import com.asinosoft.cdm.util.rememberActiveSimCount
 import com.google.mlkit.vision.barcode.BarcodeScanning
 import com.google.mlkit.vision.common.InputImage
 import kotlinx.coroutines.Dispatchers
@@ -261,7 +261,7 @@ fun ContactDetailDialog(
             )
         )
     }
-    var activeSimCount by remember { mutableIntStateOf(1) }
+    val activeSimCount = rememberActiveSimCount()
     var selectedTab by remember(initialTab, contact.id, contact.number) {
         mutableIntStateOf(initialTab)
     }
@@ -272,21 +272,6 @@ fun ContactDetailDialog(
     LaunchedEffect(contact) {
         historyLogs = emptyList()
         isLoadingHistory = false
-    }
-
-    LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            try {
-                val sm =
-                    context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
-
-                @Suppress("MissingPermission")
-                val count = sm?.activeSubscriptionInfoCount ?: 1
-                activeSimCount = if (count > 1) count else 1
-            } catch (_: Exception) {
-                activeSimCount = 1
-            }
-        }
     }
 
     var messengerAccountsList by remember(contact) {
@@ -855,7 +840,10 @@ fun ContactDetailDialog(
                                                 modifier = Modifier.padding(horizontal = 16.dp)
                                             )
                                         }
-                                        HistoryCallRow(item = item)
+                                        HistoryCallRow(
+                                            item = item,
+                                            showSimIcon = activeSimCount > 1
+                                        )
                                     }
                                 }
                             }
@@ -2060,7 +2048,10 @@ private fun ContactTabContent(
 }
 
 @Composable
-private fun HistoryCallRow(item: CallLogItem) {
+private fun HistoryCallRow(
+    item: CallLogItem,
+    showSimIcon: Boolean = true
+) {
     val context = LocalContext.current
     val locale = LocalLocale.current
     val hhmm = remember { SimpleDateFormat("HH:mm", locale.platformLocale) }
@@ -2132,8 +2123,10 @@ private fun HistoryCallRow(item: CallLogItem) {
                 Spacer(modifier = Modifier.height(3.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    SimIcon(simNumber = item.simNumber, size = 12.dp)
-                    Spacer(modifier = Modifier.width(6.dp))
+                    if (showSimIcon) {
+                        SimIcon(simNumber = item.simNumber, size = 12.dp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                    }
                     Text(
                         text = PhoneNumberHelper.format(item.number),
                         fontSize = 13.sp,
