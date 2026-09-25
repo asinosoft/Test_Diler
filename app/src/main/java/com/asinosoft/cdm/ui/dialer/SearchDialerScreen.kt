@@ -333,7 +333,7 @@ fun SearchDialerScreen(
                                         item = item,
                                         query = searchQuery.text.toString(),
                                         selectedSimSlot = simForCall,
-                                        showSimIcon = activeSimCount > 1,
+                                        activeSimCount = activeSimCount,
                                         onCall = onCall,
                                         onSms = onSms,
                                         onCardClick = { clickedItem ->
@@ -360,7 +360,7 @@ fun SearchDialerScreen(
                                         item = item,
                                         query = searchQuery.text.toString(),
                                         selectedSimSlot = simForCall,
-                                        showSimIcon = activeSimCount > 1,
+                                        activeSimCount = activeSimCount,
                                         onCall = onCall,
                                         onSms = onSms,
                                         onCardClick = { clickedItem ->
@@ -642,7 +642,7 @@ fun SwipeableSearchDialerCard(
     item: SearchDialerItem,
     query: String,
     selectedSimSlot: Int?,
-    showSimIcon: Boolean = true,
+    activeSimCount: Int,
     onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
     onCardClick: (SearchDialerItem) -> Unit
@@ -696,8 +696,9 @@ fun SwipeableSearchDialerCard(
                     fallbackNumber = item.number,
                     contactName = item.name
                 ),
-                defaultIsRight = true,
-                context = context
+                true,
+                activeSimCount,
+                context
             )
         } else null
 
@@ -710,8 +711,9 @@ fun SwipeableSearchDialerCard(
                     fallbackNumber = item.number,
                     contactName = item.name
                 ),
-                defaultIsRight = false,
-                context = context
+                false,
+                activeSimCount,
+                context
             )
         } else null
 
@@ -956,7 +958,7 @@ fun SwipeableSearchDialerCard(
                             Spacer(modifier = Modifier.width(5.dp))
                         }
 
-                        if (showSimIcon && item.simSlot != null) {
+                        if (activeSimCount > 1 && item.simSlot != null) {
                             SimIcon(simNumber = item.simSlot, size = 12.dp)
                             Spacer(modifier = Modifier.width(6.dp))
                         }

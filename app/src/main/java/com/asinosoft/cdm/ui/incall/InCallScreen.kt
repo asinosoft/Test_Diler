@@ -107,6 +107,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -144,6 +145,7 @@ fun InCallScreen(
     onFinish: () -> Unit
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val allCalls by CallManager.calls.collectAsState()
     val activeCall by CallManager.currentCall.collectAsState()
 
@@ -200,7 +202,7 @@ fun InCallScreen(
     LaunchedEffect(rawNumber, isConference) {
         if (isConference) {
             contactId = null
-            contactName = context.getString(R.string.incall_conference)
+            contactName = resources.getString(R.string.incall_conference)
             contactPhotoBitmap = null
         } else if (rawNumber.isNotBlank()) {
             withContext(Dispatchers.IO) {
@@ -284,10 +286,10 @@ fun InCallScreen(
         } else null
     }
     val rightVisuals = remember(swipeRightAction) {
-        getSwipeBackgroundVisuals(swipeRightAction, defaultIsRight = true, context = context)
+        getSwipeBackgroundVisuals(swipeRightAction, true, activeSimCount, context)
     }
     val leftVisuals = remember(swipeLeftAction) {
-        getSwipeBackgroundVisuals(swipeLeftAction, defaultIsRight = false, context = context)
+        getSwipeBackgroundVisuals(swipeLeftAction, false, activeSimCount, context)
     }
 
     val quickReplies = remember {

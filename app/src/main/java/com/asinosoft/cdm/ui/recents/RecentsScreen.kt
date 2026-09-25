@@ -71,7 +71,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
@@ -428,6 +427,7 @@ fun RecentsScreen(
                             ) {
                                 SwipeableFavoriteContactCard(
                                     contact = contact,
+                                    activeSimCount = activeSimCount,
                                     isSelected = selectedFavorite?.id == contact.id || isTargetSlot,
                                     isDragging = isBeingDragged,
                                     dragVisualOffsetY = if (isBeingDragged) dragOffset.y else 0f,
@@ -526,6 +526,7 @@ fun RecentsScreen(
 
                                         FavoriteContactCard(
                                             contact = contact,
+                                            activeSimCount = activeSimCount,
                                             isSelected = selectedFavorite?.id == contact.id || isTargetSlot,
                                             isDragging = draggingContactId == contact.id,
                                             dragVisualOffset = if (draggingContactId == contact.id) dragOffset else Offset.Zero,
@@ -785,6 +786,7 @@ fun RecentsScreen(
                         ) { item ->
                             SwipeableCallLogCard(
                                 item = item,
+                                activeSimCount = activeSimCount,
                                 onCall = { num -> onCall(num, null) },
                                 onSms = onSms,
                                 onCallWithSim = { num, slot -> onCall(num, slot) },

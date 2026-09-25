@@ -69,6 +69,7 @@ import kotlin.math.roundToInt
 @Composable
 fun SwipeableFavoriteContactCard(
     contact: FavoriteContact,
+    activeSimCount: Int,
     isSelected: Boolean = false,
     isDragging: Boolean = false,
     dragVisualOffsetY: Float = 0f,
@@ -115,10 +116,10 @@ fun SwipeableFavoriteContactCard(
     }
 
     val rightVisuals = remember(customRightAction) {
-        getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true, context = context)
+        getSwipeBackgroundVisuals(customRightAction, true, activeSimCount, context)
     }
     val leftVisuals = remember(customLeftAction) {
-        getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false, context = context)
+        getSwipeBackgroundVisuals(customLeftAction, false, activeSimCount, context)
     }
 
     val displayNumber = remember(customRightAction, customLeftAction, contact.number) {

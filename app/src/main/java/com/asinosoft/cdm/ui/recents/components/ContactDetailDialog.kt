@@ -1982,7 +1982,12 @@ private fun ContactTabContent(
             )
         }
         val leftVisuals = remember(swipeLeftAction) {
-            getSwipeBackgroundVisuals(swipeLeftAction, defaultIsRight = false, context = context)
+            getSwipeBackgroundVisuals(
+                swipeLeftAction,
+                false,
+                activeSimCount,
+                context
+            )
         }
 
         Row(
@@ -2427,10 +2432,7 @@ private fun SettingsTabContent(
 
                 // Row 1: Свайп вправо
                 val rightVisuals = remember(swipeRightAction) {
-                    getActionVisuals(
-                        swipeRightAction,
-                        defaultIsRight = true
-                    )
+                    getActionVisuals(swipeRightAction, true, activeSimCount)
                 }
 
                 Row(
@@ -2492,10 +2494,7 @@ private fun SettingsTabContent(
 
                 // Row 2: Свайп влево
                 val leftVisuals = remember(swipeLeftAction) {
-                    getActionVisuals(
-                        swipeLeftAction,
-                        defaultIsRight = false
-                    )
+                    getActionVisuals(swipeLeftAction, false, activeSimCount)
                 }
 
                 Row(
@@ -4037,6 +4036,7 @@ private fun swipeActionLabel(context: Context?, @androidx.annotation.StringRes r
 fun getSwipeBackgroundVisuals(
     customAction: CustomSwipeAction?,
     defaultIsRight: Boolean,
+    activeSimCount: Int,
     context: Context? = null
 ): SwipeBackgroundVisuals {
     val callLabel = swipeActionLabel(context, R.string.contact_call, "Call")
@@ -4062,13 +4062,13 @@ fun getSwipeBackgroundVisuals(
     return when (customAction.actionType) {
         "call_sim1" ->
             SwipeBackgroundVisuals(
-                icon = CallSim1,
-                backgroundColor = SamsungSmsBlue,
+                icon = if (activeSimCount > 1) CallSim1 else Icons.Default.Phone,
+                backgroundColor = if (activeSimCount > 1) SamsungSmsBlue else SamsungGreen,
                 label = customAction.messengerName.orEmpty().ifEmpty { callLabel }
             )
         "call_sim2" ->
             SwipeBackgroundVisuals(
-                icon = CallSim2,
+                icon = if (activeSimCount > 1) CallSim2 else Icons.Default.Phone,
                 backgroundColor = SamsungGreen,
                 label = customAction.messengerName.orEmpty().ifEmpty { callLabel }
             )
@@ -4150,7 +4150,11 @@ private data class ActionVisuals(
     val color: Color
 )
 
-private fun getActionVisuals(action: CustomSwipeAction?, defaultIsRight: Boolean): ActionVisuals {
+private fun getActionVisuals(
+    action: CustomSwipeAction?,
+    defaultIsRight: Boolean,
+    activeSimCount: Int
+): ActionVisuals {
     if (action == null) {
         return if (defaultIsRight) {
             ActionVisuals(Icons.Default.Phone, SamsungGreen)
@@ -4164,8 +4168,12 @@ private fun getActionVisuals(action: CustomSwipeAction?, defaultIsRight: Boolean
     } else null
 
     return when (action.actionType) {
-        "call_sim1" -> ActionVisuals(CallSim1, SamsungSmsBlue)
-        "call_sim2" -> ActionVisuals(CallSim2, SamsungGreen)
+        "call_sim1" ->
+            if (activeSimCount > 1) ActionVisuals(CallSim1, SamsungSmsBlue)
+            else ActionVisuals(Icons.Default.Phone, brandColor ?: SamsungGreen)
+        "call_sim2" ->
+            if (activeSimCount > 1) ActionVisuals(CallSim2, SamsungGreen)
+            else ActionVisuals(Icons.Default.Phone, brandColor ?: SamsungGreen)
         "call_single" -> ActionVisuals(Icons.Default.Phone, brandColor ?: SamsungGreen)
         "sms" -> ActionVisuals(Icons.AutoMirrored.Filled.Message, brandColor ?: SamsungSmsBlue)
         "email" -> ActionVisuals(Icons.Default.Email, Color(0xFFFFB300))

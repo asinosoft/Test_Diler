@@ -60,6 +60,7 @@ import kotlin.math.sin
 fun FavoriteContactCard(
     contact: FavoriteContact,
     isSelected: Boolean,
+    activeSimCount: Int,
     onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
     onSelect: (FavoriteContact) -> Unit,
@@ -270,7 +271,12 @@ fun FavoriteContactCard(
                     isRight = isRightSwipe,
                     fallbackNumber = contact.number
                 )
-                val visuals = getSwipeBackgroundVisuals(customAction, defaultIsRight = isRightSwipe, context)
+                val visuals = getSwipeBackgroundVisuals(
+                    customAction,
+                    isRightSwipe,
+                    activeSimCount,
+                    context
+                )
 
                 Surface(
                     modifier = Modifier

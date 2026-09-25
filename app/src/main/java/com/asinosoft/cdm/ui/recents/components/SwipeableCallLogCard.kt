@@ -86,6 +86,7 @@ import kotlin.math.roundToInt
 @Composable
 fun SwipeableCallLogCard(
     item: CallLogItem,
+    activeSimCount: Int,
     onCall: (String) -> Unit,
     onSms: (String) -> Unit,
     onCallWithSim: (String, Int) -> Unit = { number, _ -> onCall(number) },
@@ -135,11 +136,11 @@ fun SwipeableCallLogCard(
             contactName = item.name
         )
     }
-    val rightVisuals = remember(customRightAction, context) {
-        getSwipeBackgroundVisuals(customRightAction, defaultIsRight = true, context = context)
+    val rightVisuals = remember(customRightAction, context, activeSimCount) {
+        getSwipeBackgroundVisuals(customRightAction, true, activeSimCount, context)
     }
-    val leftVisuals = remember(customLeftAction, context) {
-        getSwipeBackgroundVisuals(customLeftAction, defaultIsRight = false, context = context)
+    val leftVisuals = remember(customLeftAction, context, activeSimCount) {
+        getSwipeBackgroundVisuals(customLeftAction, false, activeSimCount, context)
     }
 
     fun dismissMenu() {

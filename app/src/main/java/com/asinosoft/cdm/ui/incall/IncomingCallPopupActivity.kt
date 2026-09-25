@@ -67,6 +67,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -86,6 +87,7 @@ import com.asinosoft.cdm.ui.theme.MissedRed
 import com.asinosoft.cdm.ui.theme.OutgoingBlue
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.util.PhoneNumberHelper
+import com.asinosoft.cdm.util.rememberActiveSimCount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -427,6 +429,7 @@ private fun IncomingCallPopupScreen(
                 ) {
                     if (isDisconnected) {
                         // After call disconnect: Only centered green "Вызов" button with configured right-swipe action
+                        val activeSimCount = rememberActiveSimCount()
                         val contactKey = remember(call.rawNumber) { call.rawNumber }
                         val swipeRightAction = remember(contactKey, call.rawNumber, contactName) {
                             getCustomSwipeAction(
@@ -440,8 +443,9 @@ private fun IncomingCallPopupScreen(
                         val rightVisuals = remember(swipeRightAction) {
                             getSwipeBackgroundVisuals(
                                 swipeRightAction,
-                                defaultIsRight = true,
-                                context = context
+                                true,
+                                activeSimCount,
+                                context
                             )
                         }
 
@@ -565,6 +569,7 @@ private fun IncomingCallPopupScreen(
                         }
 
                         // Send SMS Button
+                        val resources = LocalResources.current
                         Surface(
                             shape = RoundedCornerShape(20.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.45f else 0.7f),
@@ -582,7 +587,7 @@ private fun IncomingCallPopupScreen(
                                     } catch (_: Exception) {
                                         Toast.makeText(
                                             context,
-                                            context.getString(R.string.error_open_messages),
+                                            resources.getString(R.string.error_open_messages),
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     }

@@ -105,6 +105,7 @@ import com.asinosoft.cdm.ui.theme.OutgoingBlue
 import com.asinosoft.cdm.ui.theme.SamsungSmsBlue
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.util.PhoneNumberHelper
+import com.asinosoft.cdm.util.rememberActiveSimCount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -312,6 +313,7 @@ private fun FloatingIncomingCallOverlayContent(
 
     var callState by remember { mutableStateOf(activeCall?.state ?: Call.STATE_DISCONNECTED) }
     var durationSeconds by remember { mutableStateOf(0) }
+    val activeSimCount = rememberActiveSimCount()
 
     LaunchedEffect(callState) {
         if (callState == Call.STATE_ACTIVE && !isDisconnected) {
@@ -385,8 +387,9 @@ private fun FloatingIncomingCallOverlayContent(
     val leftVisuals = remember(swipeLeftAction) {
         getSwipeBackgroundVisuals(
             swipeLeftAction,
-            defaultIsRight = false,
-            context = context
+            false,
+            activeSimCount,
+            context
         )
     }
 
@@ -558,8 +561,9 @@ private fun FloatingIncomingCallOverlayContent(
                         val rightVisuals = remember(swipeRightAction) {
                             getSwipeBackgroundVisuals(
                                 swipeRightAction,
-                                defaultIsRight = true,
-                                context = context
+                                true,
+                                activeSimCount,
+                                context
                             )
                         }
 
