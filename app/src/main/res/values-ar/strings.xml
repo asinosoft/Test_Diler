@@ -52,6 +52,8 @@
     <string name="onboarding_rename_tab_title">إعادة تسمية التبويب</string>
     <string name="onboarding_tab_rename_label">الاسم</string>
     <string name="onboarding_overlay_toast">فعّل Contacts Dialer Messages على هذه الشاشة</string>
+    <string name="onboarding_dialer_title">تطبيقات المكالمات</string>
+    <string name="onboarding_dialer_subtitle">لإجراء المكالمات واستقبالها كتطبيق الهاتف الافتراضي</string>
     <string name="error_open_settings">تعذر فتح الإعدادات</string>
 
     <!-- Dates -->

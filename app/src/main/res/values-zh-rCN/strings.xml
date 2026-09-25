@@ -52,6 +52,8 @@
     <string name="onboarding_rename_tab_title">重命名标签</string>
     <string name="onboarding_tab_rename_label">名称</string>
     <string name="onboarding_overlay_toast">请在此屏幕启用 Contacts Dialer Messages</string>
+    <string name="onboarding_dialer_title">通话应用</string>
+    <string name="onboarding_dialer_subtitle">作为默认电话应用拨打和接听电话</string>
     <string name="error_open_settings">无法打开设置</string>
 
     <!-- Dates -->

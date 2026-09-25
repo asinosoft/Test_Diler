@@ -52,6 +52,8 @@
     <string name="onboarding_rename_tab_title">タブの名前を変更</string>
     <string name="onboarding_tab_rename_label">名前</string>
     <string name="onboarding_overlay_toast">この画面で連絡先・ダイヤラー・メッセージを有効にしてください</string>
+    <string name="onboarding_dialer_title">通話アプリ</string>
+    <string name="onboarding_dialer_subtitle">デフォルトの電話アプリとして通話の発信と着信を行うため</string>
     <string name="error_open_settings">設定を開けませんでした</string>
 
     <!-- Dates -->

@@ -52,6 +52,8 @@
     <string name="onboarding_rename_tab_title">Zmień nazwę karty</string>
     <string name="onboarding_tab_rename_label">Nazwa</string>
     <string name="onboarding_overlay_toast">Włącz Contacts Dialer Messages na tym ekranie</string>
+    <string name="onboarding_dialer_title">Aplikacje do polaczen</string>
+    <string name="onboarding_dialer_subtitle">Aby wykonywac i odbierac polaczenia jako domyslna aplikacja telefonu</string>
     <string name="error_open_settings">Nie można otworzyć ustawień</string>
 
     <!-- Dates -->

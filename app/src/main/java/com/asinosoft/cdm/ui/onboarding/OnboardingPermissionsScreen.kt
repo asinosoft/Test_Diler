@@ -42,21 +42,24 @@ import com.asinosoft.cdm.R
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 
 enum class OnboardingPermissionStep {
+    DIALER,
     RUNTIME,
     OVERLAY
 }
 
 @Composable
 fun OnboardingPermissionsScreen(
+    isDialerGranted: Boolean,
     isRuntimeGranted: Boolean,
     isOverlayGranted: Boolean,
     highlightedStep: OnboardingPermissionStep?,
+    onRequestDialerRole: () -> Unit,
     onRequestRuntimePermissions: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val allGranted = isRuntimeGranted && isOverlayGranted
+    val allGranted = isDialerGranted && isRuntimeGranted && isOverlayGranted
 
     Column(
         modifier = modifier
@@ -107,6 +110,17 @@ fun OnboardingPermissionsScreen(
             Spacer(modifier = Modifier.height(22.dp))
 
             PermissionBlock(
+                title = stringResource(R.string.onboarding_dialer_title),
+                subtitle = stringResource(R.string.onboarding_dialer_subtitle),
+                details = emptyList(),
+                isGranted = isDialerGranted,
+                isHighlighted = highlightedStep == OnboardingPermissionStep.DIALER,
+                onClick = onRequestDialerRole
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            PermissionBlock(
                 title = stringResource(R.string.onboarding_permissions_title),
                 subtitle = stringResource(R.string.onboarding_permissions_subtitle),
                 details = listOf(
@@ -134,6 +148,7 @@ fun OnboardingPermissionsScreen(
         Button(
             onClick = {
                 when {
+                    !isDialerGranted -> onRequestDialerRole()
                     !isRuntimeGranted -> onRequestRuntimePermissions()
                     !isOverlayGranted -> onRequestOverlayPermission()
                     else -> onContinue()

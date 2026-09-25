@@ -52,6 +52,8 @@
     <string name="onboarding_rename_tab_title">Renommer l\'onglet</string>
     <string name="onboarding_tab_rename_label">Nom</string>
     <string name="onboarding_overlay_toast">Activez Contacts Dialer Messages sur cet écran</string>
+    <string name="onboarding_dialer_title">Applications d\'appels</string>
+    <string name="onboarding_dialer_subtitle">Pour passer et recevoir des appels en tant qu\'appli téléphone par défaut</string>
     <string name="error_open_settings">Impossible d\'ouvrir les paramètres</string>
 
     <!-- Dates -->

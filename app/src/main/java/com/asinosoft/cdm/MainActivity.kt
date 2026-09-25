@@ -21,9 +21,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.DisposableEffect
@@ -33,7 +31,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
@@ -44,14 +41,12 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.asinosoft.cdm.data.model.FavoriteContact
-import com.asinosoft.cdm.service.MissedCallNotificationListener
 import com.asinosoft.cdm.ui.onboarding.OnboardingFavoritesSetupScreen
 import com.asinosoft.cdm.ui.onboarding.OnboardingPermissionStep
 import com.asinosoft.cdm.ui.onboarding.OnboardingPermissionsScreen
 import com.asinosoft.cdm.ui.recents.RecentsScreen
 import com.asinosoft.cdm.ui.recents.RecentsViewModel
 import com.asinosoft.cdm.ui.theme.DialerTheme
-import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.util.PhoneNumberHelper
 
 class MainActivity : ComponentActivity() {
@@ -88,79 +83,78 @@ class MainActivity : ComponentActivity() {
                     mutableStateOf(resolveOnboardingComplete(onboardingPrefs))
                 }
 
-                var isCheckingPermissions by remember { mutableStateOf(true) }
-
-                var isPermissionsStepDone by remember { mutableStateOf(false) }
-                var dialerRequestedAfterRuntime by remember { mutableStateOf(false) }
-
+                var isDialerGranted by remember { mutableStateOf(isDefaultDialer()) }
                 var isRuntimeGranted by remember {
                     mutableStateOf(areRuntimePermissionsGranted())
                 }
                 var isOverlayGranted by remember {
                     mutableStateOf(Settings.canDrawOverlays(this))
                 }
+                // Only leave the permissions UI when everything was already OK at launch,
+                // or when the user presses «Дальше» with all items granted.
+                // Dialer role may auto-grant runtime/overlay — don't skip the screen for that.
+                var permissionsUiCompleted by remember {
+                    mutableStateOf(
+                        isDialerGranted && isRuntimeGranted && isOverlayGranted
+                    )
+                }
                 var highlightedStep by remember {
                     mutableStateOf<OnboardingPermissionStep?>(null)
+                }
+
+                fun refreshPermissionFlags() {
+                    isDialerGranted = isDefaultDialer()
+                    isRuntimeGranted = areRuntimePermissionsGranted()
+                    isOverlayGranted = Settings.canDrawOverlays(this@MainActivity)
+                }
+
+                LaunchedEffect(Unit) {
+                    refreshPermissionFlags()
+                }
+
+                fun nextHighlightAfterChange() {
+                    highlightedStep = when {
+                        !isDialerGranted -> OnboardingPermissionStep.DIALER
+                        !isRuntimeGranted -> OnboardingPermissionStep.RUNTIME
+                        !isOverlayGranted -> OnboardingPermissionStep.OVERLAY
+                        else -> null
+                    }
                 }
 
                 val roleLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.StartActivityForResult()
                 ) {
-                    viewModel.loadCallLogs()
-                }
-
-                fun requestDialerAfterRuntimeIfNeeded() {
-                    if (isOnboardingComplete || dialerRequestedAfterRuntime) return
-                    if (!areRuntimePermissionsGranted()) return
-                    dialerRequestedAfterRuntime = true
-                    requestDefaultDialerRole(roleLauncher)
+                    refreshPermissionFlags()
+                    nextHighlightAfterChange()
                 }
 
                 val permissionLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestMultiplePermissions()
                 ) {
-                    isRuntimeGranted = areRuntimePermissionsGranted()
-                    isPermissionsStepDone = isRuntimeGranted && isOverlayGranted
-                    highlightedStep = if (isRuntimeGranted) {
-                        if (!Settings.canDrawOverlays(this)) {
-                            OnboardingPermissionStep.OVERLAY
-                        } else {
-                            null
-                        }
-                    } else {
-                        OnboardingPermissionStep.RUNTIME
-                    }
-                    if (isRuntimeGranted) {
-                        isCheckingPermissions = false
-                        viewModel.loadCallLogs()
-                        requestDialerAfterRuntimeIfNeeded()
-                    }
+                    refreshPermissionFlags()
+                    nextHighlightAfterChange()
                 }
 
                 val overlayLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.StartActivityForResult()
                 ) {
-                    isOverlayGranted = Settings.canDrawOverlays(this)
-                    isPermissionsStepDone = isRuntimeGranted && isOverlayGranted
-                    highlightedStep = if (isOverlayGranted) null else OnboardingPermissionStep.OVERLAY
+                    refreshPermissionFlags()
+                    nextHighlightAfterChange()
                 }
 
                 DisposableEffect(lifecycleOwner) {
                     val observer = LifecycleEventObserver { _, event ->
                         if (event == Lifecycle.Event.ON_RESUME) {
-                            isRuntimeGranted = areRuntimePermissionsGranted()
-                            isOverlayGranted = Settings.canDrawOverlays(this@MainActivity)
-                            isCheckingPermissions = false
-                            isPermissionsStepDone = isRuntimeGranted && isOverlayGranted
+                            refreshPermissionFlags()
+                            nextHighlightAfterChange()
                         }
                     }
                     lifecycleOwner.lifecycle.addObserver(observer)
                     onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
                 }
 
-                LaunchedEffect(isOnboardingComplete, isRuntimeGranted) {
-                    if (isOnboardingComplete && isRuntimeGranted) {
-                        requestDefaultDialerRole(roleLauncher)
+                LaunchedEffect(permissionsUiCompleted, isRuntimeGranted) {
+                    if (permissionsUiCompleted && isRuntimeGranted) {
                         viewModel.loadCallLogs()
                     }
                 }
@@ -195,6 +189,15 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                fun requestDialer() {
+                    highlightedStep = OnboardingPermissionStep.DIALER
+                    val launched = requestDefaultDialerRole(roleLauncher)
+                    if (!launched) {
+                        refreshPermissionFlags()
+                        nextHighlightAfterChange()
+                    }
+                }
+
                 fun requestRuntime() {
                     highlightedStep = OnboardingPermissionStep.RUNTIME
                     permissionLauncher.launch(requiredPermissions)
@@ -205,23 +208,22 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     when {
-                        isCheckingPermissions -> {
-                            Box(Modifier.fillMaxSize(), Alignment.Center) {
-                                CircularProgressIndicator(color = SamsungGreen)
-                            }
-                        }
-
-                        !isPermissionsStepDone -> {
+                        !permissionsUiCompleted -> {
                             OnboardingPermissionsScreen(
+                                isDialerGranted = isDialerGranted,
                                 isRuntimeGranted = isRuntimeGranted,
                                 isOverlayGranted = isOverlayGranted,
                                 highlightedStep = highlightedStep,
+                                onRequestDialerRole = { requestDialer() },
                                 onRequestRuntimePermissions = { requestRuntime() },
                                 onRequestOverlayPermission = { openOverlaySettings() },
                                 onContinue = {
-                                    if (isRuntimeGranted && isOverlayGranted) {
+                                    refreshPermissionFlags()
+                                    if (isDialerGranted && isRuntimeGranted && isOverlayGranted) {
                                         highlightedStep = null
-                                        isPermissionsStepDone = true
+                                        permissionsUiCompleted = true
+                                    } else {
+                                        nextHighlightAfterChange()
                                     }
                                 }
                             )
@@ -269,6 +271,20 @@ class MainActivity : ComponentActivity() {
     private fun areRuntimePermissionsGranted(): Boolean {
         return requiredPermissions.all { perm ->
             ContextCompat.checkSelfPermission(this, perm) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    private fun isDefaultDialer(): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val roleManager = getSystemService(RoleManager::class.java)
+                roleManager?.isRoleHeld(RoleManager.ROLE_DIALER) == true
+            } else {
+                val telecomManager = getSystemService(TELECOM_SERVICE) as? TelecomManager
+                packageName == telecomManager?.defaultDialerPackage
+            }
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -353,11 +369,6 @@ class MainActivity : ComponentActivity() {
                 @Suppress("MissingPermission")
                 telecomManager?.cancelMissedCallsNotification()
             }
-        } catch (_: Exception) {
-        }
-
-        try {
-            MissedCallNotificationListener.cancelActiveIfConnected()
         } catch (_: Exception) {
         }
 

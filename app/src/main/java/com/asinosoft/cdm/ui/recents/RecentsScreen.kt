@@ -71,12 +71,15 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
 import androidx.compose.material.icons.filled.LockOpen
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.key
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.asinosoft.cdm.R
 import com.asinosoft.cdm.data.model.FavoriteTab
@@ -267,13 +270,16 @@ fun RecentsScreen(
     val isSearchDialerOpen by viewModel.isSearchDialerOpen.collectAsState()
 
     if (!listReady) {
-        Box(Modifier.fillMaxSize()) {
-            CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.Center),
-                color = SamsungGreen
-            )
+        // Without call-log permission the load never finishes — don't spin forever.
+        val canReadCallLog = ContextCompat.checkSelfPermission(
+            context,
+            Manifest.permission.READ_CALL_LOG
+        ) == PackageManager.PERMISSION_GRANTED
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (canReadCallLog) {
+                CircularProgressIndicator(color = SamsungGreen)
+            }
         }
-
         return
     }
 

@@ -52,6 +52,8 @@
     <string name="onboarding_rename_tab_title">Tab umbenennen</string>
     <string name="onboarding_tab_rename_label">Name</string>
     <string name="onboarding_overlay_toast">Aktiviere Contacts Dialer Messages auf diesem Bildschirm</string>
+    <string name="onboarding_dialer_title">Anruf-Apps</string>
+    <string name="onboarding_dialer_subtitle">Um Anrufe als Standard-Telefon-App zu taetigen und entgegenzunehmen</string>
     <string name="error_open_settings">Einstellungen konnten nicht geöffnet werden</string>
 
     <!-- Dates -->

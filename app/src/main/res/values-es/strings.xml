@@ -52,6 +52,8 @@
     <string name="onboarding_rename_tab_title">Renombrar pestaña</string>
     <string name="onboarding_tab_rename_label">Nombre</string>
     <string name="onboarding_overlay_toast">Activa Contacts Dialer Messages en esta pantalla</string>
+    <string name="onboarding_dialer_title">Aplicaciones de llamadas</string>
+    <string name="onboarding_dialer_subtitle">Para realizar y recibir llamadas como app de telefono predeterminada</string>
     <string name="error_open_settings">No se pudieron abrir los ajustes</string>
 
     <!-- Dates -->

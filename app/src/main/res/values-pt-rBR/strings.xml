@@ -52,6 +52,8 @@
     <string name="onboarding_rename_tab_title">Renomear aba</string>
     <string name="onboarding_tab_rename_label">Nome</string>
     <string name="onboarding_overlay_toast">Ative Contatos, Discador e Mensagens nesta tela</string>
+    <string name="onboarding_dialer_title">Apps de chamadas</string>
+    <string name="onboarding_dialer_subtitle">Para fazer e receber chamadas como app de telefone padrao</string>
     <string name="error_open_settings">Não foi possível abrir as configurações</string>
 
     <!-- Dates -->
