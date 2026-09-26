@@ -50,6 +50,8 @@ import com.asinosoft.cdm.ui.recents.RecentsScreen
 import com.asinosoft.cdm.ui.recents.RecentsViewModel
 import com.asinosoft.cdm.ui.theme.DialerTheme
 import com.asinosoft.cdm.util.Analytics
+import com.asinosoft.cdm.util.OemShellGuide
+import com.asinosoft.cdm.util.OemShellHelper
 import com.asinosoft.cdm.util.PhoneNumberHelper
 
 class MainActivity : ComponentActivity() {
@@ -96,6 +98,14 @@ class MainActivity : ComponentActivity() {
                 var isNotificationGranted by remember {
                     mutableStateOf(MissedCallNotificationListener.isEnabled(this))
                 }
+                val oemGuide = remember { OemShellHelper.detectGuide() }
+                val showOemPermission = oemGuide.isRequired
+                var isOemGranted by remember {
+                    mutableStateOf(
+                        !showOemPermission || isOemPermissionsDone(onboardingPrefs, oemGuide)
+                    )
+                }
+                var awaitingOemReturn by remember { mutableStateOf(false) }
                 // Only leave the permissions UI when everything was already OK at launch,
                 // or when the user presses «Дальше» with all items granted.
                 // Dialer role may auto-grant runtime/overlay — don't skip the screen for that.
@@ -104,7 +114,8 @@ class MainActivity : ComponentActivity() {
                         isDialerGranted &&
                             isRuntimeGranted &&
                             isOverlayGranted &&
-                            isNotificationGranted
+                            isNotificationGranted &&
+                            (!showOemPermission || isOemGranted)
                     )
                 }
                 var highlightedStep by remember {
@@ -117,6 +128,15 @@ class MainActivity : ComponentActivity() {
                     isOverlayGranted = Settings.canDrawOverlays(this@MainActivity)
                     isNotificationGranted =
                         MissedCallNotificationListener.isEnabled(this@MainActivity)
+                    if (!showOemPermission) {
+                        isOemGranted = true
+                    } else if (awaitingOemReturn) {
+                        isOemGranted = true
+                        awaitingOemReturn = false
+                        onboardingPrefs.edit { putBoolean(KEY_OEM_PERMISSIONS_DONE, true) }
+                    } else {
+                        isOemGranted = isOemPermissionsDone(onboardingPrefs, oemGuide)
+                    }
                 }
 
                 LaunchedEffect(Unit) {
@@ -128,6 +148,7 @@ class MainActivity : ComponentActivity() {
                         !isDialerGranted -> OnboardingPermissionStep.DIALER
                         !isRuntimeGranted -> OnboardingPermissionStep.RUNTIME
                         !isOverlayGranted -> OnboardingPermissionStep.OVERLAY
+                        showOemPermission && !isOemGranted -> OnboardingPermissionStep.OEM
                         !isNotificationGranted -> OnboardingPermissionStep.NOTIFICATION
                         else -> null
                     }
@@ -158,6 +179,13 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val notificationLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.StartActivityForResult()
+                ) {
+                    refreshPermissionFlags()
+                    nextHighlightAfterChange()
+                }
+
+                val oemLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.StartActivityForResult()
                 ) {
                     refreshPermissionFlags()
@@ -229,6 +257,25 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                fun openOemAppInfo() {
+                    highlightedStep = OnboardingPermissionStep.OEM
+                    awaitingOemReturn = true
+                    val intent = Intent(
+                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                        Uri.fromParts("package", packageName, null)
+                    )
+                    try {
+                        oemLauncher.launch(intent)
+                    } catch (_: Exception) {
+                        awaitingOemReturn = false
+                        Toast.makeText(
+                            context,
+                            getString(R.string.error_open_settings),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+
                 fun requestDialer() {
                     highlightedStep = OnboardingPermissionStep.DIALER
                     val launched = requestDefaultDialerRole(roleLauncher)
@@ -254,17 +301,21 @@ class MainActivity : ComponentActivity() {
                                 isRuntimeGranted = isRuntimeGranted,
                                 isOverlayGranted = isOverlayGranted,
                                 isNotificationGranted = isNotificationGranted,
+                                oemGuide = oemGuide,
+                                isOemGranted = isOemGranted,
                                 highlightedStep = highlightedStep,
                                 onRequestDialerRole = { requestDialer() },
                                 onRequestRuntimePermissions = { requestRuntime() },
                                 onRequestOverlayPermission = { openOverlaySettings() },
                                 onRequestNotificationAccess = { openNotificationAccessSettings() },
+                                onRequestOemPermissions = { openOemAppInfo() },
                                 onContinue = {
                                     refreshPermissionFlags()
                                     if (isDialerGranted &&
                                         isRuntimeGranted &&
                                         isOverlayGranted &&
-                                        isNotificationGranted
+                                        isNotificationGranted &&
+                                        (!showOemPermission || isOemGranted)
                                     ) {
                                         highlightedStep = null
                                         permissionsUiCompleted = true
@@ -408,6 +459,18 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_OPEN_CONTACT_NAME = "extra_open_contact_name"
         const val EXTRA_OPEN_CONTACT_ID = "extra_open_contact_id"
         private const val KEY_ONBOARDING_COMPLETE = "onboarding_complete"
+        private const val KEY_OEM_PERMISSIONS_DONE = "oem_permissions_done"
+        private const val KEY_MIUI_PERMISSIONS_DONE = "miui_permissions_done"
+    }
+
+    private fun isOemPermissionsDone(
+        prefs: android.content.SharedPreferences,
+        guide: OemShellGuide
+    ): Boolean {
+        if (prefs.getBoolean(KEY_OEM_PERMISSIONS_DONE, false)) return true
+        // Миграция с прежнего флага только для MIUI.
+        return guide == OemShellGuide.MIUI &&
+            prefs.getBoolean(KEY_MIUI_PERMISSIONS_DONE, false)
     }
 
     override fun onResume() {

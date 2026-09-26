@@ -56,6 +56,23 @@
     <string name="onboarding_dialer_subtitle">To make and receive calls as the default phone app</string>
     <string name="onboarding_notification_title">Notification access</string>
     <string name="onboarding_notification_subtitle">To hide system missed-call notifications</string>
+    <string name="onboarding_miui_title">MIUI permissions</string>
+    <string name="onboarding_miui_subtitle">For correct operation on MIUI</string>
+    <string name="onboarding_miui_dialog_title">MIUI permissions</string>
+    <string name="onboarding_miui_dialog_message">Please enable permissions:\n1. Show on Lock screen\n2. Display pop-up windows\n3. Lock screen notifications\n4. Autostart</string>
+    <string name="onboarding_miui_dialog_ok">OK</string>
+    <string name="onboarding_huawei_title">EMUI / HarmonyOS permissions</string>
+    <string name="onboarding_huawei_subtitle">For correct operation on Huawei / Honor</string>
+    <string name="onboarding_huawei_dialog_title">EMUI / HarmonyOS permissions</string>
+    <string name="onboarding_huawei_dialog_message">Please enable permissions:\n1. Autostart\n2. Run in background\n3. Show on Lock screen\n4. Display pop-up windows</string>
+    <string name="onboarding_oppo_title">ColorOS permissions</string>
+    <string name="onboarding_oppo_subtitle">For correct operation on OPPO / Realme / OnePlus</string>
+    <string name="onboarding_oppo_dialog_title">ColorOS permissions</string>
+    <string name="onboarding_oppo_dialog_message">Please enable permissions:\n1. Autostart\n2. Allow background activity\n3. Floating windows\n4. Lock screen notifications</string>
+    <string name="onboarding_vivo_title">OriginOS / Funtouch permissions</string>
+    <string name="onboarding_vivo_subtitle">For correct operation on vivo / iQOO</string>
+    <string name="onboarding_vivo_dialog_title">OriginOS / Funtouch permissions</string>
+    <string name="onboarding_vivo_dialog_message">Please enable permissions:\n1. Autostart\n2. High background power consumption\n3. Show on Lock screen\n4. Floating windows</string>
     <string name="error_open_settings">Couldn\'t open settings</string>
 
     <!-- Dates -->

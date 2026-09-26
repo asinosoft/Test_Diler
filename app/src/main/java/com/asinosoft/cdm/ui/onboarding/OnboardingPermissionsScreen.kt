@@ -22,14 +22,19 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,11 +45,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.asinosoft.cdm.R
 import com.asinosoft.cdm.ui.theme.SamsungGreen
+import com.asinosoft.cdm.util.OemShellGuide
 
 enum class OnboardingPermissionStep {
     DIALER,
     RUNTIME,
     OVERLAY,
+    OEM,
     NOTIFICATION
 }
 
@@ -54,16 +61,60 @@ fun OnboardingPermissionsScreen(
     isRuntimeGranted: Boolean,
     isOverlayGranted: Boolean,
     isNotificationGranted: Boolean,
+    oemGuide: OemShellGuide,
+    isOemGranted: Boolean,
     highlightedStep: OnboardingPermissionStep?,
     onRequestDialerRole: () -> Unit,
     onRequestRuntimePermissions: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
     onRequestNotificationAccess: () -> Unit,
+    onRequestOemPermissions: () -> Unit,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    var showOemDialog by remember { mutableStateOf(false) }
+    val showOemPermission = oemGuide.isRequired
+
     val allGranted =
-        isDialerGranted && isRuntimeGranted && isOverlayGranted && isNotificationGranted
+        isDialerGranted &&
+            isRuntimeGranted &&
+            isOverlayGranted &&
+            isNotificationGranted &&
+            (!showOemPermission || isOemGranted)
+
+    if (showOemDialog && showOemPermission) {
+        AlertDialog(
+            onDismissRequest = { showOemDialog = false },
+            title = {
+                Text(
+                    text = stringResource(oemGuide.dialogTitleRes),
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Text(
+                    text = stringResource(oemGuide.dialogMessageRes),
+                    lineHeight = 22.sp
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showOemDialog = false
+                        onRequestOemPermissions()
+                    }
+                ) {
+                    Text(
+                        text = stringResource(R.string.onboarding_miui_dialog_ok),
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            },
+            containerColor = Color.White,
+            titleContentColor = Color(0xFF212121),
+            textContentColor = Color(0xFF212121)
+        )
+    }
 
     Column(
         modifier = modifier
@@ -148,6 +199,19 @@ fun OnboardingPermissionsScreen(
                 onClick = onRequestOverlayPermission
             )
 
+            if (showOemPermission) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                PermissionBlock(
+                    title = stringResource(oemGuide.titleRes),
+                    subtitle = stringResource(oemGuide.subtitleRes),
+                    details = emptyList(),
+                    isGranted = isOemGranted,
+                    isHighlighted = highlightedStep == OnboardingPermissionStep.OEM,
+                    onClick = { showOemDialog = true }
+                )
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
 
             PermissionBlock(
@@ -166,6 +230,7 @@ fun OnboardingPermissionsScreen(
                     !isDialerGranted -> onRequestDialerRole()
                     !isRuntimeGranted -> onRequestRuntimePermissions()
                     !isOverlayGranted -> onRequestOverlayPermission()
+                    showOemPermission && !isOemGranted -> showOemDialog = true
                     !isNotificationGranted -> onRequestNotificationAccess()
                     else -> onContinue()
                 }

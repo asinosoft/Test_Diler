@@ -53,6 +53,23 @@
     <string name="onboarding_dialer_subtitle">Чтобы принимать и совершать звонки как основное приложение телефона</string>
     <string name="onboarding_notification_title">Доступ к уведомлениям</string>
     <string name="onboarding_notification_subtitle">Для скрытия системных уведомлений о пропущенных вызовах</string>
+    <string name="onboarding_miui_title">Разрешения MIUI</string>
+    <string name="onboarding_miui_subtitle">Для корректной работы на MIUI</string>
+    <string name="onboarding_miui_dialog_title">Разрешения MIUI</string>
+    <string name="onboarding_miui_dialog_message">Пожалуйста, включите разрешения:\n1. Показывать на Экране блокировки\n2. Показывать всплывающие окна\n3. Уведомления на Экране блокировки\n4. Автозапуск</string>
+    <string name="onboarding_miui_dialog_ok">OK</string>
+    <string name="onboarding_huawei_title">Разрешения EMUI / HarmonyOS</string>
+    <string name="onboarding_huawei_subtitle">Для корректной работы на Huawei / Honor</string>
+    <string name="onboarding_huawei_dialog_title">Разрешения EMUI / HarmonyOS</string>
+    <string name="onboarding_huawei_dialog_message">Пожалуйста, включите разрешения:\n1. Автозапуск\n2. Работа в фоне\n3. Показывать на экране блокировки\n4. Показывать всплывающие окна</string>
+    <string name="onboarding_oppo_title">Разрешения ColorOS</string>
+    <string name="onboarding_oppo_subtitle">Для корректной работы на OPPO / Realme / OnePlus</string>
+    <string name="onboarding_oppo_dialog_title">Разрешения ColorOS</string>
+    <string name="onboarding_oppo_dialog_message">Пожалуйста, включите разрешения:\n1. Автозапуск\n2. Разрешить работу в фоне\n3. Плавающие окна\n4. Уведомления на экране блокировки</string>
+    <string name="onboarding_vivo_title">Разрешения OriginOS / Funtouch</string>
+    <string name="onboarding_vivo_subtitle">Для корректной работы на vivo / iQOO</string>
+    <string name="onboarding_vivo_dialog_title">Разрешения OriginOS / Funtouch</string>
+    <string name="onboarding_vivo_dialog_message">Пожалуйста, включите разрешения:\n1. Автозапуск\n2. Высокое энергопотребление в фоне\n3. Показывать на экране блокировки\n4. Плавающие окна</string>
     <string name="error_open_settings">Не удалось открыть настройки</string>
 
     <string name="date_today">Сегодня</string>
