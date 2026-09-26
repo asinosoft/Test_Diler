@@ -1,6 +1,7 @@
 package com.asinosoft.cdm.service
 
 import android.app.Notification
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.core.app.NotificationManagerCompat
@@ -93,6 +94,7 @@ class MissedCallNotificationListener : NotificationListenerService() {
         fun isEnabled(context: android.content.Context): Boolean =
             NotificationManagerCompat.getEnabledListenerPackages(context)
                 .contains(context.packageName)
+                    || (Build.VERSION.SDK_INT <= 27)
 
         fun cancelActiveIfConnected() {
             instance?.cancelActiveSystemMissedCalls()

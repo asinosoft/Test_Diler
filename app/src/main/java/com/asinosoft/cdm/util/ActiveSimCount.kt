@@ -71,6 +71,11 @@ object ActiveSimCount {
             refreshNow(context)
             return
         }
+
+        if (ContextCompat.checkSelfPermission(context,Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
+            return
+        }
+
         synchronized(this) {
             if (observing) {
                 refreshNow(context)
