@@ -82,6 +82,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Dialer">
 
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="@string/google_ads_application_id" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
