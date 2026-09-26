@@ -29,6 +29,7 @@ android {
             versionCode = code
             versionName = "${name}.${code}"
             testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+            base.archivesName = "$applicationId@$versionName"
         }
     } else {
         throw GradleException("Could not read version.properties!")
@@ -40,6 +41,8 @@ android {
             optimization {
                 enable = false
             }
+
+            applicationIdSuffix
         }
     }
     compileOptions {
