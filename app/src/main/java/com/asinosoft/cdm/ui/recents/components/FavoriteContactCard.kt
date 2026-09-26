@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.asinosoft.cdm.data.model.FavoriteContact
 import com.asinosoft.cdm.ui.theme.SamsungGreen
+import com.asinosoft.cdm.util.Analytics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -152,6 +153,7 @@ fun FavoriteContactCard(
                                             )
                                         }
                                     if (finalOffset > thresholdPx) {
+                                        Analytics.logFavoriteAction("right")
                                         val customAction = getCustomSwipeAction(
                                             context,
                                             contactKey,
@@ -170,6 +172,7 @@ fun FavoriteContactCard(
                                             onCall(contact.number, null)
                                         }
                                     } else if (finalOffset < -thresholdPx) {
+                                        Analytics.logFavoriteAction("left")
                                         val customAction = getCustomSwipeAction(
                                             context,
                                             contactKey,

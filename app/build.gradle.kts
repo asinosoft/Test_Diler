@@ -1,20 +1,37 @@
+import java.io.FileInputStream
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.google.services)
 }
 
 android {
     namespace = "com.asinosoft.cdm"
     compileSdk = 37
 
-    defaultConfig {
-        applicationId = "com.asinosoft.dialer"
-        minSdk = 24
-        targetSdk = 37
-        versionCode = 1
-        versionName = "3.0"
+    // Автоматический инкремент номера сборки
+    val versionPropsFile = file("version.properties")
+    if (versionPropsFile.canRead()) {
+        val versionProps = Properties()
+        versionProps.load(FileInputStream(versionPropsFile))
+        val name = versionProps["VERSION_NAME"]
+        val code = (versionProps["VERSION_CODE"] as String).toInt() + 1
+        versionProps["VERSION_CODE"] = code.toString()
+        versionProps.store(versionPropsFile.writer(), null)
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        defaultConfig {
+            applicationId = "com.asinosoft.cdm"
+            minSdk = 24
+            compileSdk = 37
+            targetSdk = 37
+            versionCode = code
+            versionName = "${name}.${code}"
+            testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        }
+    } else {
+        throw GradleException("Could not read version.properties!")
     }
 
     buildTypes {
@@ -53,7 +70,15 @@ dependencies {
     implementation(libs.androidx.camera.view)
     implementation(libs.barcode.scanning)
     implementation(libs.libphonenumber)
+
+    // Ads and analytics
+    implementation(libs.google.services)
     implementation(libs.yandex.mobileads)
+
+    // Firebase
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.config.ktx)
+    implementation(libs.firebase.analytics.ktx)
 
     testImplementation(libs.junit)
     androidTestImplementation(platform(libs.androidx.compose.bom))

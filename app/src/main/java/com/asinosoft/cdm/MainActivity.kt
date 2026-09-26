@@ -49,6 +49,7 @@ import com.asinosoft.cdm.ui.onboarding.OnboardingPermissionsScreen
 import com.asinosoft.cdm.ui.recents.RecentsScreen
 import com.asinosoft.cdm.ui.recents.RecentsViewModel
 import com.asinosoft.cdm.ui.theme.DialerTheme
+import com.asinosoft.cdm.util.Analytics
 import com.asinosoft.cdm.util.PhoneNumberHelper
 
 class MainActivity : ComponentActivity() {
@@ -137,6 +138,9 @@ class MainActivity : ComponentActivity() {
                 ) {
                     refreshPermissionFlags()
                     nextHighlightAfterChange()
+                    if (isDialerGranted) {
+                        Analytics.logDefaultDialer()
+                    }
                 }
 
                 val permissionLauncher = rememberLauncherForActivityResult(
@@ -484,6 +488,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun makeCall(phoneNumber: String, simSlot: Int? = null) {
+        Analytics.logActionPhoneCall()
         if (phoneNumber.isBlank()) return
 
         val cleanNumber = PhoneNumberHelper.sanitizeForDial(phoneNumber)
@@ -606,6 +611,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun sendSms(phoneNumber: String) {
+        Analytics.logActionPhoneSms()
         if (phoneNumber.isBlank()) return
 
         val cleanNumber = phoneNumber.replace(Regex("[^0-9+]"), "")

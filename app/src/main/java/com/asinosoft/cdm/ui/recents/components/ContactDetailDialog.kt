@@ -201,6 +201,7 @@ import com.asinosoft.cdm.ui.theme.MissedRed
 import com.asinosoft.cdm.ui.theme.OutgoingBlue
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.ui.theme.SamsungSmsBlue
+import com.asinosoft.cdm.util.Analytics
 import com.asinosoft.cdm.util.ContactLabelHelper
 import com.asinosoft.cdm.util.DateHeaderFormatter
 import com.asinosoft.cdm.util.PhoneNumberHelper
@@ -249,6 +250,8 @@ fun ContactDetailDialog(
     onDeleteContact: (FavoriteContact) -> Unit = {},
     onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", it) }
 ) {
+    LaunchedEffect(contact) { Analytics.logActivityContact() }
+
     val context = LocalContext.current
     var avatarBitmap by remember(contact.photoUri) { mutableStateOf<ImageBitmap?>(null) }
     var phoneNumbersList by remember(contact) {
@@ -264,6 +267,14 @@ fun ContactDetailDialog(
     val activeSimCount = rememberActiveSimCount()
     var selectedTab by remember(initialTab, contact.id, contact.number) {
         mutableIntStateOf(initialTab)
+    }
+
+    LaunchedEffect(selectedTab) {
+        when(selectedTab) {
+            0 -> Analytics.logContactDetailsTab()
+            1 -> Analytics.logContactHistoryTab()
+            2 -> Analytics.logContactSettingsTab()
+        }
     }
 
     var historyLogs by remember { mutableStateOf<List<CallLogItem>>(emptyList()) }
@@ -3741,7 +3752,9 @@ data class CustomSwipeAction(
     val targetValue: String,
     val label: String,
     val messengerName: String? = null,
-    val messengerColorHex: String? = null
+    val messengerColorHex: String? = null,
+
+    val code: String = listOf(messengerName, actionType).filterNotNull().joinToString("_")
 )
 
 private fun saveCustomSwipeAction(
@@ -3751,9 +3764,11 @@ private fun saveCustomSwipeAction(
     contactName: String? = null,
     allPhoneNumbers: List<String> = emptyList(),
     isRight: Boolean,
-    action: CustomSwipeAction?
+    action: CustomSwipeAction
 ) {
     try {
+        Analytics.logContactSetAction(if (isRight) "right" else "left", action.code)
+
         SwipeActionCache.clear()
         val prefs = context.getSharedPreferences("contact_custom_orders", Context.MODE_PRIVATE)
         val keySuffix = if (isRight) "swipe_right_" else "swipe_left_"
@@ -3771,14 +3786,6 @@ private fun saveCustomSwipeAction(
             if (noPlus.isNotBlank()) keysToUpdate.add(keySuffix + noPlus)
             if (noPlus.length >= 10) keysToUpdate.add(keySuffix + noPlus.takeLast(10))
             if (noPlus.length >= 7) keysToUpdate.add(keySuffix + noPlus.takeLast(7))
-        }
-
-        if (action == null) {
-            prefs.edit {
-                keysToUpdate.forEach { remove(it) }
-            }
-            SwipeActionCache.clear()
-            return
         }
 
         val obj = JSONObject().apply {
@@ -4002,6 +4009,7 @@ fun executeCustomSwipeAction(
             "call_single" -> onCall(action.targetValue, null)
             "sms" -> onSms(action.targetValue)
             "email" -> {
+                Analytics.logActionEmail()
                 val intent = Intent(Intent.ACTION_SENDTO, "mailto:${action.targetValue}".toUri()).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
@@ -4009,6 +4017,22 @@ fun executeCustomSwipeAction(
             }
 
             "messenger_chat", "messenger_audio", "messenger_video" -> {
+                when(action.messengerName to action.actionType) {
+                    ("Skype" to "messenger_chat") -> Analytics.logActionSkypeChat()
+                    ("Skype" to "messenger_audio") -> Analytics.logActionSkypeCall()
+
+                    ("Telegram" to "messenger_chat") -> Analytics.logActionTelegramChat()
+                    ("Telegram" to "messenger_audio") -> Analytics.logActionTelegramCall()
+                    ("Telegram" to "messenger_video") -> Analytics.logActionTelegramVideo()
+
+                    ("Viber" to "messenger_chat") -> Analytics.logActionViberChat()
+                    ("Viber" to "messenger_audio") -> Analytics.logActionViberCall()
+
+                    ("WhatsApp" to "messenger_chat") -> Analytics.logActionWhatsappChat()
+                    ("WhatsApp" to "messenger_audio") -> Analytics.logActionWhatsappCall()
+                    ("WhatsApp" to "messenger_video") -> Analytics.logActionWhatsappVideo()
+                }
+
                 val uri = action.targetValue.toUri()
                 val intent = Intent(Intent.ACTION_VIEW, uri).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK

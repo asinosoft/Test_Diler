@@ -116,6 +116,7 @@ import com.asinosoft.cdm.ui.theme.MissedRed
 import com.asinosoft.cdm.ui.theme.OutgoingBlue
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.ui.theme.SamsungSmsBlue
+import com.asinosoft.cdm.util.Analytics
 import com.asinosoft.cdm.util.PhoneNumberHelper
 import com.asinosoft.cdm.util.rememberActiveSimCount
 import kotlinx.coroutines.Dispatchers
@@ -131,6 +132,8 @@ fun SearchDialerScreen(
     onSms: (String) -> Unit,
     onClose: () -> Unit
 ) {
+    LaunchedEffect(Unit) { Analytics.logActivitySearch() }
+
     val context = LocalContext.current
     val currentSearchQueryText by viewModel.searchQuery.collectAsState()
     val searchQuery = rememberTextFieldState(initialText = currentSearchQueryText)
@@ -162,6 +165,11 @@ fun SearchDialerScreen(
 
     var selectedSimSlot by remember { mutableIntStateOf(defaultSimSlot) }
     var isDialpadVisible by remember { mutableStateOf(true) }
+    LaunchedEffect(isDialpadVisible) {
+        if (!isDialpadVisible) {
+            Analytics.logSearchKeyboardClose()
+        }
+    }
     val activeSimCount = rememberActiveSimCount()
     val simForCall: Int? = if (activeSimCount > 1) selectedSimSlot else null
 
@@ -245,7 +253,10 @@ fun SearchDialerScreen(
                     },
                     trailingIcon = {
                         if (searchQuery.text.isNotEmpty()) {
-                            IconButton(onClick = { searchQuery.setTextAndPlaceCursorAtEnd("") }) {
+                            IconButton(onClick = {
+                                Analytics.logSearchKeyboardClear()
+                                searchQuery.setTextAndPlaceCursorAtEnd("")
+                            }) {
                                 Icon(
                                     imageVector = Icons.Default.Clear,
                                     contentDescription = stringResource(R.string.cd_clear)
@@ -477,12 +488,14 @@ fun SearchDialerScreen(
                                                 .pointerInput(digit) {
                                                     detectTapGestures(
                                                         onTap = {
+                                                            Analytics.logKeyboardButton()
                                                             searchQuery.setTextAndPlaceCursorAtEnd(
                                                                 searchQuery.text.toString() + digit
                                                             )
                                                         },
                                                         onLongPress = {
                                                             if (digit == "0") {
+                                                                Analytics.logKeyboardButton()
                                                                 searchQuery.setTextAndPlaceCursorAtEnd(
                                                                     searchQuery.text.toString() + "+"
                                                                 )
@@ -585,6 +598,7 @@ fun SearchDialerScreen(
                             FloatingActionButton(
                                 onClick = {
                                     if (searchQuery.text.isNotBlank()) {
+                                        Analytics.logCallFromSearch()
                                         onCall(searchQuery.text.toString(), simForCall)
                                     }
                                 },
@@ -608,6 +622,7 @@ fun SearchDialerScreen(
                                     .pointerInput(Unit) {
                                         detectTapGestures(
                                             onTap = {
+                                                Analytics.logSearchKeyboardDel()
                                                 searchQuery.setTextAndPlaceCursorAtEnd(
                                                     searchQuery.text.dropLast(
                                                         1
@@ -807,6 +822,7 @@ fun SwipeableSearchDialerCard(
                             coroutineScope.launch {
                                 val targetOffset = offsetX.value
                                 if (targetOffset >= thresholdPx) {
+                                    Analytics.logSearchSwipeRight()
                                     val customRightAction = getCustomSwipeAction(
                                         context,
                                         contactKey,
@@ -825,6 +841,7 @@ fun SwipeableSearchDialerCard(
                                         onCall(item.number, selectedSimSlot)
                                     }
                                 } else if (targetOffset <= -thresholdPx) {
+                                    Analytics.logSearchSwipeLeft()
                                     val customLeftAction = getCustomSwipeAction(
                                         context,
                                         contactKey,

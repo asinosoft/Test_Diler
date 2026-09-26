@@ -102,6 +102,7 @@ import com.asinosoft.cdm.ui.recents.components.SwipeableCallLogCard
 import com.asinosoft.cdm.ui.recents.components.SwipeableFavoriteContactCard
 import com.asinosoft.cdm.ui.recents.components.UnsavedNumberChoiceDialog
 import com.asinosoft.cdm.ui.theme.SamsungGreen
+import com.asinosoft.cdm.util.Analytics
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -547,6 +548,7 @@ fun RecentsScreen(
                                                 }
                                             },
                                             onDragStart = {
+                                                Analytics.logFavoriteLongClick()
                                                 val idx = favorites.indexOfFirst { it.id == contact.id }
                                                 if (idx != -1) {
                                                     draggingContactId = contact.id

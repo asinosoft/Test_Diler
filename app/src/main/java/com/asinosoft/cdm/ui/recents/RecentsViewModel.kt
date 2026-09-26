@@ -37,6 +37,7 @@ import com.asinosoft.cdm.data.repository.ContactsRepository
 import kotlin.time.Duration.Companion.milliseconds
 import androidx.annotation.StringRes
 import com.asinosoft.cdm.R
+import com.asinosoft.cdm.util.Analytics
 import com.asinosoft.cdm.util.ContactLabelHelper
 
 data class ContactDetailState(
@@ -708,6 +709,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun reorderFavorites(fromIndex: Int, toIndex: Int) {
+        Analytics.logFavoriteSwap()
         val currentTabId = _activeTabId.value
         val allList = _favorites.value.toMutableList()
         val tabContacts = allList.filter { it.tabId == currentTabId }.toMutableList()
@@ -740,6 +742,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun setFavoriteRowsCount(count: Int) {
+        Analytics.logFavoritesCount(count)
         val validCount = count.coerceIn(1, 8)
         if (_favoritesViewMode.value == FavoritesViewMode.LIST) {
             _listRowsCount.value = validCount
@@ -770,6 +773,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun addFavorite(contact: FavoriteContact) {
+        Analytics.logFavoriteAdd(contact.order)
         viewModelScope.launch {
             suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 1_500L
             val contactWithTab = contact.copy(tabId = _activeTabId.value)
@@ -891,6 +895,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun removeFavorite(contact: FavoriteContact) {
+        Analytics.logFavoriteRemove(contact.order)
         viewModelScope.launch {
             suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 1_500L
             _favorites.value = withContext(Dispatchers.IO) {
@@ -909,6 +914,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun openContactDetail(contact: FavoriteContact, initialTab: Int = 0) {
+        Analytics.logFavoriteClick()
         openContactDetailJob?.cancel()
         openContactDetailJob = viewModelScope.launch {
             delay(200.milliseconds)

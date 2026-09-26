@@ -61,6 +61,7 @@ import androidx.core.net.toUri
 import com.asinosoft.cdm.R
 import com.asinosoft.cdm.data.model.FavoriteContact
 import com.asinosoft.cdm.ui.theme.SamsungGreen
+import com.asinosoft.cdm.util.Analytics
 import com.asinosoft.cdm.util.PhoneNumberHelper
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -417,6 +418,7 @@ private fun executeSwipe(
         if (isRight) {
             onCall(fallbackNumber, null)
         } else {
+            Analytics.logActionPhoneSms()
             try {
                 val smsIntent = Intent(Intent.ACTION_SENDTO, "smsto:${Uri.encode(fallbackNumber)}".toUri()).apply {
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK

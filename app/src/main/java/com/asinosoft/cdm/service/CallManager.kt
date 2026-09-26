@@ -7,6 +7,7 @@ import android.telecom.Call
 import android.telecom.CallAudioState
 import android.util.Log
 import com.asinosoft.cdm.MainActivity
+import com.asinosoft.cdm.util.Analytics
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -115,6 +116,14 @@ object CallManager {
         val existingCalls = _calls.value.filter { it.state != Call.STATE_DISCONNECTED }
         val updated = if (!existingCalls.contains(call)) existingCalls + call else existingCalls
         _calls.value = updated
+
+        if (updated.size > 1) {
+            Analytics.logDoubleCall()
+        }
+
+        if (Call.STATE_RINGING == call.state) {
+            Analytics.logIncomingCall()
+        }
 
         if (isConferenceCall(call)) {
             _currentCall.value = call

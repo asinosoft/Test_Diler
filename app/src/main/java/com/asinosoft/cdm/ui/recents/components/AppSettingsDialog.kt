@@ -96,6 +96,7 @@ import com.asinosoft.cdm.ui.components.AdBanner
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.util.AboutSupportHelper
 import com.asinosoft.cdm.util.AboutSupportHelper.PRIVACY_POLICY_URL
+import com.asinosoft.cdm.util.Analytics
 import com.asinosoft.cdm.util.BlockedNumberItem
 import com.asinosoft.cdm.util.BlockedNumbersHelper
 import kotlinx.coroutines.Dispatchers
@@ -131,8 +132,18 @@ fun AppSettingsDialog(
     onReorderTabs: (List<FavoriteTab>) -> Unit = {},
     onDismiss: () -> Unit
 ) {
+    LaunchedEffect(Unit) { Analytics.logActivitySettings() }
+
     var selectedPage by remember { mutableStateOf(SettingsPage.MAIN) }
     var selectedTab by remember { mutableStateOf(SettingsTab.FAVORITES) }
+
+    LaunchedEffect(selectedTab) {
+        when(selectedTab) {
+            SettingsTab.FAVORITES -> Analytics.logSettingsActionTab()
+            SettingsTab.PHONE -> Analytics.logSettingsDialerTab()
+            SettingsTab.ABOUT -> Analytics.logSettingsAboutTab()
+        }
+    }
 
     val handleBack = {
         when (selectedPage) {

@@ -77,6 +77,7 @@ import com.asinosoft.cdm.ui.theme.MissedRed
 import com.asinosoft.cdm.ui.theme.OutgoingBlue
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.ui.theme.SamsungSmsBlue
+import com.asinosoft.cdm.util.Analytics
 import com.asinosoft.cdm.util.PhoneNumberHelper
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -249,6 +250,7 @@ fun SwipeableCallLogCard(
                             coroutineScope.launch {
                                 val finalOffset = drawnOffset
                                 if (finalOffset > thresholdPx) {
+                                    Analytics.logHistorySwipeRight()
                                     if (customRightAction != null) {
                                         executeCustomSwipeAction(
                                             context,
@@ -260,6 +262,7 @@ fun SwipeableCallLogCard(
                                         onCall(item.number)
                                     }
                                 } else if (finalOffset < -thresholdPx) {
+                                    Analytics.logHistorySwipeLeft()
                                     if (customLeftAction != null) {
                                         executeCustomSwipeAction(
                                             context,

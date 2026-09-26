@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1005319896178",
+    "project_id": "cdm-v2",
+    "storage_bucket": "cdm-v2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1005319896178:android:f5abb0e4383405466416eb",
+        "android_client_info": {
+          "package_name": "com.asinosoft.cdm"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBa-Zj6rEX5Q3WUuqnf0ET7mIeRIGzXzDM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      },
+      "admob_app_id": "ca-app-pub-1058320783687363~3513831931"
+    }
+  ],
+  "configuration_version": "1"
+}
