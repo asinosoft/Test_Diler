@@ -54,6 +54,8 @@
     <string name="onboarding_overlay_toast">فعّل Contacts Dialer Messages على هذه الشاشة</string>
     <string name="onboarding_dialer_title">تطبيقات المكالمات</string>
     <string name="onboarding_dialer_subtitle">لإجراء المكالمات واستقبالها كتطبيق الهاتف الافتراضي</string>
+    <string name="onboarding_notification_title">الوصول إلى الإشعارات</string>
+    <string name="onboarding_notification_subtitle">لإخفاء إشعارات النظام للمكالمات الفائتة</string>
     <string name="error_open_settings">تعذر فتح الإعدادات</string>
 
     <!-- Dates -->

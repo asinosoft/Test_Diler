@@ -54,6 +54,8 @@
     <string name="onboarding_overlay_toast">この画面で連絡先・ダイヤラー・メッセージを有効にしてください</string>
     <string name="onboarding_dialer_title">通話アプリ</string>
     <string name="onboarding_dialer_subtitle">デフォルトの電話アプリとして通話の発信と着信を行うため</string>
+    <string name="onboarding_notification_title">通知へのアクセス</string>
+    <string name="onboarding_notification_subtitle">システムの不在着信通知を非表示にするため</string>
     <string name="error_open_settings">設定を開けませんでした</string>
 
     <!-- Dates -->

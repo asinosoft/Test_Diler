@@ -54,6 +54,8 @@
     <string name="onboarding_overlay_toast">请在此屏幕启用 Contacts Dialer Messages</string>
     <string name="onboarding_dialer_title">通话应用</string>
     <string name="onboarding_dialer_subtitle">作为默认电话应用拨打和接听电话</string>
+    <string name="onboarding_notification_title">通知访问权限</string>
+    <string name="onboarding_notification_subtitle">用于隐藏系统未接来电通知</string>
     <string name="error_open_settings">无法打开设置</string>
 
     <!-- Dates -->

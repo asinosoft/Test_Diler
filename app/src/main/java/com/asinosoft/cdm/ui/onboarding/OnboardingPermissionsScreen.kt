@@ -44,7 +44,8 @@ import com.asinosoft.cdm.ui.theme.SamsungGreen
 enum class OnboardingPermissionStep {
     DIALER,
     RUNTIME,
-    OVERLAY
+    OVERLAY,
+    NOTIFICATION
 }
 
 @Composable
@@ -52,14 +53,17 @@ fun OnboardingPermissionsScreen(
     isDialerGranted: Boolean,
     isRuntimeGranted: Boolean,
     isOverlayGranted: Boolean,
+    isNotificationGranted: Boolean,
     highlightedStep: OnboardingPermissionStep?,
     onRequestDialerRole: () -> Unit,
     onRequestRuntimePermissions: () -> Unit,
     onRequestOverlayPermission: () -> Unit,
+    onRequestNotificationAccess: () -> Unit,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val allGranted = isDialerGranted && isRuntimeGranted && isOverlayGranted
+    val allGranted =
+        isDialerGranted && isRuntimeGranted && isOverlayGranted && isNotificationGranted
 
     Column(
         modifier = modifier
@@ -143,6 +147,17 @@ fun OnboardingPermissionsScreen(
                 isHighlighted = highlightedStep == OnboardingPermissionStep.OVERLAY,
                 onClick = onRequestOverlayPermission
             )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            PermissionBlock(
+                title = stringResource(R.string.onboarding_notification_title),
+                subtitle = stringResource(R.string.onboarding_notification_subtitle),
+                details = emptyList(),
+                isGranted = isNotificationGranted,
+                isHighlighted = highlightedStep == OnboardingPermissionStep.NOTIFICATION,
+                onClick = onRequestNotificationAccess
+            )
         }
 
         Button(
@@ -151,6 +166,7 @@ fun OnboardingPermissionsScreen(
                     !isDialerGranted -> onRequestDialerRole()
                     !isRuntimeGranted -> onRequestRuntimePermissions()
                     !isOverlayGranted -> onRequestOverlayPermission()
+                    !isNotificationGranted -> onRequestNotificationAccess()
                     else -> onContinue()
                 }
             },

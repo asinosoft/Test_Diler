@@ -54,6 +54,8 @@
     <string name="onboarding_overlay_toast">Attiva Contacts Dialer Messages in questa schermata</string>
     <string name="onboarding_dialer_title">App per le chiamate</string>
     <string name="onboarding_dialer_subtitle">Per effettuare e ricevere chiamate come app telefono predefinita</string>
+    <string name="onboarding_notification_title">Accesso alle notifiche</string>
+    <string name="onboarding_notification_subtitle">Per nascondere le notifiche di sistema delle chiamate perse</string>
     <string name="error_open_settings">Impossibile aprire le impostazioni</string>
 
     <!-- Dates -->

@@ -51,6 +51,8 @@
     <string name="onboarding_overlay_toast">Включите Contacts Dialer Messages на этом экране</string>
     <string name="onboarding_dialer_title">Приложения для вызовов</string>
     <string name="onboarding_dialer_subtitle">Чтобы принимать и совершать звонки как основное приложение телефона</string>
+    <string name="onboarding_notification_title">Доступ к уведомлениям</string>
+    <string name="onboarding_notification_subtitle">Для скрытия системных уведомлений о пропущенных вызовах</string>
     <string name="error_open_settings">Не удалось открыть настройки</string>
 
     <string name="date_today">Сегодня</string>

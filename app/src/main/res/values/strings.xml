@@ -54,6 +54,8 @@
     <string name="onboarding_overlay_toast">Enable Contacts Dialer Messages on this screen</string>
     <string name="onboarding_dialer_title">Call apps</string>
     <string name="onboarding_dialer_subtitle">To make and receive calls as the default phone app</string>
+    <string name="onboarding_notification_title">Notification access</string>
+    <string name="onboarding_notification_subtitle">To hide system missed-call notifications</string>
     <string name="error_open_settings">Couldn\'t open settings</string>
 
     <!-- Dates -->

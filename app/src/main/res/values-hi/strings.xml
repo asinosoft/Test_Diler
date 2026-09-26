@@ -54,6 +54,8 @@
     <string name="onboarding_overlay_toast">इस स्क्रीन पर Contacts Dialer Messages चालू करें</string>
     <string name="onboarding_dialer_title">कॉल ऐप्स</string>
     <string name="onboarding_dialer_subtitle">डिफ़ॉल्ट फ़ोन ऐप के रूप में कॉल करने और प्राप्त करने के लिए</string>
+    <string name="onboarding_notification_title">सूचना पहुँच</string>
+    <string name="onboarding_notification_subtitle">सिस्टम की छूटी कॉल सूचनाएँ छिपाने के लिए</string>
     <string name="error_open_settings">सेटिंग नहीं खोल सके</string>
 
     <!-- Dates -->

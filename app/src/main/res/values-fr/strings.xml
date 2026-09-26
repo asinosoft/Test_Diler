@@ -54,6 +54,8 @@
     <string name="onboarding_overlay_toast">Activez Contacts Dialer Messages sur cet écran</string>
     <string name="onboarding_dialer_title">Applications d\'appels</string>
     <string name="onboarding_dialer_subtitle">Pour passer et recevoir des appels en tant qu\'appli téléphone par défaut</string>
+    <string name="onboarding_notification_title">Accès aux notifications</string>
+    <string name="onboarding_notification_subtitle">Pour masquer les notifications système d\'appels manqués</string>
     <string name="error_open_settings">Impossible d\'ouvrir les paramètres</string>
 
     <!-- Dates -->

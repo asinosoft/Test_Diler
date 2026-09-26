@@ -3,6 +3,7 @@ package com.asinosoft.cdm
 import android.Manifest
 import android.app.NotificationManager
 import android.app.role.RoleManager
+import android.content.ComponentName
 import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.ActivityInfo
@@ -41,6 +42,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.asinosoft.cdm.data.model.FavoriteContact
+import com.asinosoft.cdm.service.MissedCallNotificationListener
 import com.asinosoft.cdm.ui.onboarding.OnboardingFavoritesSetupScreen
 import com.asinosoft.cdm.ui.onboarding.OnboardingPermissionStep
 import com.asinosoft.cdm.ui.onboarding.OnboardingPermissionsScreen
@@ -90,12 +92,18 @@ class MainActivity : ComponentActivity() {
                 var isOverlayGranted by remember {
                     mutableStateOf(Settings.canDrawOverlays(this))
                 }
+                var isNotificationGranted by remember {
+                    mutableStateOf(MissedCallNotificationListener.isEnabled(this))
+                }
                 // Only leave the permissions UI when everything was already OK at launch,
                 // or when the user presses «Дальше» with all items granted.
                 // Dialer role may auto-grant runtime/overlay — don't skip the screen for that.
                 var permissionsUiCompleted by remember {
                     mutableStateOf(
-                        isDialerGranted && isRuntimeGranted && isOverlayGranted
+                        isDialerGranted &&
+                            isRuntimeGranted &&
+                            isOverlayGranted &&
+                            isNotificationGranted
                     )
                 }
                 var highlightedStep by remember {
@@ -106,6 +114,8 @@ class MainActivity : ComponentActivity() {
                     isDialerGranted = isDefaultDialer()
                     isRuntimeGranted = areRuntimePermissionsGranted()
                     isOverlayGranted = Settings.canDrawOverlays(this@MainActivity)
+                    isNotificationGranted =
+                        MissedCallNotificationListener.isEnabled(this@MainActivity)
                 }
 
                 LaunchedEffect(Unit) {
@@ -117,6 +127,7 @@ class MainActivity : ComponentActivity() {
                         !isDialerGranted -> OnboardingPermissionStep.DIALER
                         !isRuntimeGranted -> OnboardingPermissionStep.RUNTIME
                         !isOverlayGranted -> OnboardingPermissionStep.OVERLAY
+                        !isNotificationGranted -> OnboardingPermissionStep.NOTIFICATION
                         else -> null
                     }
                 }
@@ -136,6 +147,13 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val overlayLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.StartActivityForResult()
+                ) {
+                    refreshPermissionFlags()
+                    nextHighlightAfterChange()
+                }
+
+                val notificationLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.StartActivityForResult()
                 ) {
                     refreshPermissionFlags()
@@ -189,6 +207,24 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
+                fun openNotificationAccessSettings() {
+                    highlightedStep = OnboardingPermissionStep.NOTIFICATION
+                    Toast.makeText(
+                        context,
+                        getString(R.string.onboarding_overlay_toast),
+                        Toast.LENGTH_LONG
+                    ).show()
+                    try {
+                        notificationLauncher.launch(createNotificationListenerSettingsIntent())
+                    } catch (_: Exception) {
+                        Toast.makeText(
+                            context,
+                            getString(R.string.error_open_settings),
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+
                 fun requestDialer() {
                     highlightedStep = OnboardingPermissionStep.DIALER
                     val launched = requestDefaultDialerRole(roleLauncher)
@@ -213,13 +249,19 @@ class MainActivity : ComponentActivity() {
                                 isDialerGranted = isDialerGranted,
                                 isRuntimeGranted = isRuntimeGranted,
                                 isOverlayGranted = isOverlayGranted,
+                                isNotificationGranted = isNotificationGranted,
                                 highlightedStep = highlightedStep,
                                 onRequestDialerRole = { requestDialer() },
                                 onRequestRuntimePermissions = { requestRuntime() },
                                 onRequestOverlayPermission = { openOverlaySettings() },
+                                onRequestNotificationAccess = { openNotificationAccessSettings() },
                                 onContinue = {
                                     refreshPermissionFlags()
-                                    if (isDialerGranted && isRuntimeGranted && isOverlayGranted) {
+                                    if (isDialerGranted &&
+                                        isRuntimeGranted &&
+                                        isOverlayGranted &&
+                                        isNotificationGranted
+                                    ) {
                                         highlightedStep = null
                                         permissionsUiCompleted = true
                                     } else {
@@ -285,6 +327,20 @@ class MainActivity : ComponentActivity() {
             }
         } catch (_: Exception) {
             false
+        }
+    }
+
+    private fun createNotificationListenerSettingsIntent(): Intent {
+        val componentFlat =
+            ComponentName(this, MissedCallNotificationListener::class.java).flattenToString()
+        return Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS).apply {
+            val fragmentKey = ":settings:fragment_args_key"
+            putExtra(fragmentKey, componentFlat)
+            putExtra(
+                ":settings:show_fragment_args",
+                Bundle().apply { putString(fragmentKey, componentFlat) }
+            )
+            putExtra("android.provider.extra.APP_PACKAGE", packageName)
         }
     }
 
@@ -369,6 +425,11 @@ class MainActivity : ComponentActivity() {
                 @Suppress("MissingPermission")
                 telecomManager?.cancelMissedCallsNotification()
             }
+        } catch (_: Exception) {
+        }
+
+        try {
+            MissedCallNotificationListener.cancelActiveIfConnected()
         } catch (_: Exception) {
         }
 
