@@ -887,6 +887,7 @@ fun RecentsScreen(
                 UnsavedNumberFlowStep.CreateNew -> {
                     CallLogAddContactDialog(
                         phoneNumber = flow.phoneNumber,
+                        initialPhoto = flow.photo,
                         onSave = { name, phones, emails, birthday, photo ->
                             viewModel.saveNewContactFromCallLog(
                                 phoneNumber = flow.phoneNumber,
@@ -897,7 +898,10 @@ fun RecentsScreen(
                                 photoBitmap = photo
                             )
                         },
-                        onDismiss = { viewModel.unsavedNumberBackToChoose() }
+                        onDismiss = {
+                            if (flow.photo != null) viewModel.closeUnsavedNumberContactFlow()
+                            else viewModel.unsavedNumberBackToChoose()
+                        }
                     )
                 }
 
@@ -959,6 +963,12 @@ fun RecentsScreen(
                 },
                 onSetContactPhoto = { contact, photo -> viewModel.setContactPhoto(contact, photo) },
                 onDeleteContact = { viewModel.deleteContact(it) },
+                unsavedCallLogItem = detailState.unsavedCallLogItem,
+                onSaveUnsavedNumber = { viewModel.saveUnsavedNumberFromDetail(detailState.contact.number) },
+                onUnsavedPhotoPicked = { photo ->
+                    viewModel.createContactWithPhotoFromDetail(detailState.contact.number, photo)
+                },
+                onDeleteCallLogEntry = { viewModel.deleteCallLogEntryFromDetail(it) },
                 onAddTab = { name ->
                     viewModel.addTab(name)
                     viewModel.tabs.value.lastOrNull() ?: FavoriteTab("default", name)

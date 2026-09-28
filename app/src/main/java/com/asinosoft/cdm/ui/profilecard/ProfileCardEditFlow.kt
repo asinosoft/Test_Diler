@@ -157,7 +157,9 @@ fun ProfileCardEditFlow(
     onCardChanged: (ProfileCard?) -> Unit,
     onAvatarChanged: (Bitmap) -> Unit,
     onAvatarRemoved: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
+    /** When set, a photo picked for the empty "Picture" tile is returned square-cropped instead of opening the editor. */
+    onImagePicked: ((Bitmap) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -254,6 +256,15 @@ fun ProfileCardEditFlow(
                     addBase = null
                     addTarget = null
                     applyToEmptyPage(base, if (isVideo) ProfileMediaTarget.CARD else target, media, preview)
+                }
+                onImagePicked != null && !isVideo && tile == ProfileMediaTarget.IMAGE -> {
+                    val square = cropSquare(
+                        preview.asAndroidBitmap(),
+                        media.copy(scale = 1f, offsetX = 0f, offsetY = 0f)
+                    )
+                    File(media.mediaPath).delete()
+                    close()
+                    onImagePicked(square)
                 }
                 isVideo -> openEditor(ProfileMediaTarget.CARD, media, preview, listOf(ProfileMediaTarget.CARD))
                 tile == ProfileMediaTarget.IMAGE ->

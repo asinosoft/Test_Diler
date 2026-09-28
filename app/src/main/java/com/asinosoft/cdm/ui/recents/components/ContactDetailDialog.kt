@@ -79,6 +79,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FolderSpecial
@@ -262,6 +263,11 @@ fun ContactDetailDialog(
     ) -> Unit = { _, updated, _, _, _, _, _ -> onUpdateContact(updated) },
     onSetContactPhoto: (FavoriteContact, Bitmap?) -> Unit = { _, _ -> },
     onDeleteContact: (FavoriteContact) -> Unit = {},
+    /** Set when the number has no saved contact: the menu offers Save and deletes the call-log row. */
+    unsavedCallLogItem: CallLogItem? = null,
+    onSaveUnsavedNumber: () -> Unit = {},
+    onUnsavedPhotoPicked: (Bitmap) -> Unit = {},
+    onDeleteCallLogEntry: (CallLogItem) -> Unit = {},
     onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", it) }
 ) {
     LaunchedEffect(contact) { Analytics.logActivityContact() }
@@ -1012,6 +1018,16 @@ fun ContactDetailDialog(
                             onDismissRequest = { topMenuExpanded = false },
                             alignEnd = true
                         ) {
+                            if (unsavedCallLogItem != null) {
+                                OneUiPopupMenuItem(
+                                    icon = Icons.Default.PersonAdd,
+                                    label = stringResource(R.string.action_save),
+                                    onClick = {
+                                        topMenuExpanded = false
+                                        onSaveUnsavedNumber()
+                                    }
+                                )
+                            }
                             OneUiPopupMenuItem(
                                 icon = Icons.Default.Share,
                                 label = stringResource(R.string.action_share),
@@ -1020,14 +1036,16 @@ fun ContactDetailDialog(
                                     showShareFormatDialog = true
                                 }
                             )
-                            OneUiPopupMenuItem(
-                                icon = Icons.Default.Edit,
-                                label = stringResource(R.string.action_edit),
-                                onClick = {
-                                    topMenuExpanded = false
-                                    showEditContactDialog = true
-                                }
-                            )
+                            if (unsavedCallLogItem == null) {
+                                OneUiPopupMenuItem(
+                                    icon = Icons.Default.Edit,
+                                    label = stringResource(R.string.action_edit),
+                                    onClick = {
+                                        topMenuExpanded = false
+                                        showEditContactDialog = true
+                                    }
+                                )
+                            }
                             OneUiPopupMenuDivider()
                             OneUiPopupMenuItem(
                                 icon = Icons.Default.Delete,
@@ -1043,7 +1061,40 @@ fun ContactDetailDialog(
                 }
             }
 
-            if (showDeleteConfirmDialog) {
+            if (showDeleteConfirmDialog && unsavedCallLogItem != null) {
+                AlertDialog(
+                    onDismissRequest = { showDeleteConfirmDialog = false },
+                    title = {
+                        Text(
+                            text = stringResource(R.string.call_log_delete_title),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp
+                        )
+                    },
+                    text = {
+                        Text(text = PhoneNumberHelper.format(unsavedCallLogItem.number), fontSize = 15.sp)
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                showDeleteConfirmDialog = false
+                                onDeleteCallLogEntry(unsavedCallLogItem)
+                            }
+                        ) {
+                            Text(
+                                text = stringResource(R.string.call_log_delete_one),
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                            Text(stringResource(R.string.action_cancel))
+                        }
+                    }
+                )
+            } else if (showDeleteConfirmDialog) {
                 AlertDialog(
                     onDismissRequest = { showDeleteConfirmDialog = false },
                     title = {
@@ -1103,7 +1154,8 @@ fun ContactDetailDialog(
                     avatarBitmap = null
                     onSetContactPhoto(contact, null)
                 },
-                onClose = { photoEditTile = null }
+                onClose = { photoEditTile = null },
+                onImagePicked = if (unsavedCallLogItem != null) onUnsavedPhotoPicked else null
             )
 
             if (showEditContactDialog) {
@@ -5370,6 +5422,7 @@ fun UnsavedNumberChoiceDialog(
 @Composable
 fun CallLogAddContactDialog(
     phoneNumber: String,
+    initialPhoto: Bitmap? = null,
     onSave: (
         displayName: String,
         phones: List<ContactsWriteRepository.PhoneEntry>,
@@ -5395,6 +5448,7 @@ fun CallLogAddContactDialog(
         importantDatesList = emptyList(),
         messengerAccountsList = emptyList(),
         avatarBitmap = null,
+        newAvatarBitmap = remember(initialPhoto) { initialPhoto?.asImageBitmap() },
         context = context,
         isNewContact = true,
         onSave = { newName, newPhones, newEmails, newBirthday, _, _, _, newBitmap, _ ->
@@ -5659,6 +5713,8 @@ private fun EditContactDialog(
     importantDatesList: List<ContactImportantDate> = emptyList(),
     messengerAccountsList: List<MessengerAccount>,
     avatarBitmap: ImageBitmap?,
+    /** Picture chosen before the dialog opened; shown in the tile and written on Save. */
+    newAvatarBitmap: ImageBitmap? = null,
     context: Context,
     isNewContact: Boolean = false,
     onSave: (
@@ -5682,9 +5738,9 @@ private fun EditContactDialog(
     var isEditingBirthday by remember { mutableStateOf(birthdayInfo != null) }
 
     val customImportantDates = remember { importantDatesList.toMutableStateList() }
-    var currentAvatarBitmap by remember { mutableStateOf(avatarBitmap) }
+    var currentAvatarBitmap by remember { mutableStateOf(newAvatarBitmap ?: avatarBitmap) }
     /** Avatar picked in this dialog; written to the system contacts only on Save. */
-    var pendingAvatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    var pendingAvatarBitmap by remember { mutableStateOf(newAvatarBitmap) }
     var avatarRemoved by remember { mutableStateOf(false) }
 
     val editableMessengers = remember { messengerAccountsList.toMutableStateList() }

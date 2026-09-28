@@ -44,7 +44,9 @@ import com.asinosoft.cdm.util.ContactLabelHelper
 data class ContactDetailState(
     val contact: FavoriteContact,
     val initialTab: Int = 0,
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+    /** Call-log row the detail was opened from when its number has no saved contact. */
+    val unsavedCallLogItem: CallLogItem? = null
 )
 
 enum class CallTypeFilter(@StringRes val titleRes: Int) {
@@ -62,7 +64,9 @@ enum class SimFilter(@StringRes val titleRes: Int) {
 
 data class UnsavedNumberFlowState(
     val phoneNumber: String,
-    val step: UnsavedNumberFlowStep
+    val step: UnsavedNumberFlowStep,
+    /** Picture preselected for the new contact. */
+    val photo: android.graphics.Bitmap? = null
 )
 
 sealed class UnsavedNumberFlowStep {
@@ -925,7 +929,11 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun openContactDetail(contact: FavoriteContact, initialTab: Int = 0) {
+    fun openContactDetail(
+        contact: FavoriteContact,
+        initialTab: Int = 0,
+        unsavedCallLogItem: CallLogItem? = null
+    ) {
         Analytics.logFavoriteClick()
         openContactDetailJob?.cancel()
         openContactDetailJob = viewModelScope.launch {
@@ -933,7 +941,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             val isFav = withContext(Dispatchers.IO) {
                 favoritesRepository.isFavorite(contact)
             }
-            _contactDetailToShow.value = ContactDetailState(contact, initialTab, isFav)
+            _contactDetailToShow.value = ContactDetailState(contact, initialTab, isFav, unsavedCallLogItem)
         }
     }
 
@@ -961,11 +969,34 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     if (initialTab == 0) {
                         openUnsavedNumberContactFlow(item.number)
                     } else {
-                        openContactDetail(contactFromCallLogItem(item.copy(name = null)), initialTab)
+                        val unsaved = item.copy(name = null, photoUri = null)
+                        openContactDetail(contactFromCallLogItem(unsaved), initialTab, unsaved)
                     }
                 }
             }
         }
+    }
+
+    /** "Save" in the detail of an unsaved number: hand over to the save-number flow. */
+    fun saveUnsavedNumberFromDetail(phoneNumber: String) {
+        closeContactDetail()
+        openUnsavedNumberContactFlow(phoneNumber)
+    }
+
+    /** A picture picked in the detail of an unsaved number starts a new contact with it. */
+    fun createContactWithPhotoFromDetail(phoneNumber: String, photo: android.graphics.Bitmap) {
+        if (phoneNumber.isBlank()) return
+        closeContactDetail()
+        _unsavedNumberFlow.value = UnsavedNumberFlowState(
+            phoneNumber = phoneNumber,
+            step = UnsavedNumberFlowStep.CreateNew,
+            photo = photo
+        )
+    }
+
+    fun deleteCallLogEntryFromDetail(item: CallLogItem) {
+        closeContactDetail()
+        deleteCallLogGroup(item)
     }
 
     fun openUnsavedNumberContactFlow(phoneNumber: String) {
