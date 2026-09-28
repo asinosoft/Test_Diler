@@ -377,8 +377,7 @@ fun InCallScreen(
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
                 .padding(top = 48.dp, bottom = 42.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // Top Section: Multiple Calls List (only when both are connected) OR Single Call Info
             if (showMultiCallList) {
@@ -731,74 +730,77 @@ fun InCallScreen(
                             }
                         }
                     }
-
-                    // 3 Quick Action Buttons placed directly under "Вызов завершен"
-                    if (isCallDisconnected) {
-                        Spacer(modifier = Modifier.height(68.dp))
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            // Button 1: Call (Swipe Right Action)
-                            InCallPostCallActionButton(
-                                icon = rightVisuals.icon,
-                                label = rightVisuals.label,
-                                containerColor = rightVisuals.backgroundColor,
-                                onClick = {
-                                    onFinish()
-                                    if (swipeRightAction != null) {
-                                        executeCustomSwipeAction(
-                                            context = context,
-                                            action = swipeRightAction,
-                                            onCall = { num, sim -> startCallFromInCallScreen(context, num, sim) },
-                                            onSms = { num -> startSmsFromInCallScreen(context, num) }
-                                        )
-                                    } else {
-                                        startCallFromInCallScreen(context, rawNumber, null)
-                                    }
-                                }
-                            )
-
-                            // Button 2: Message/Messenger (Swipe Left Action)
-                            InCallPostCallActionButton(
-                                icon = leftVisuals.icon,
-                                iconBitmap = leftVisuals.iconBitmap,
-                                label = leftVisuals.label,
-                                containerColor = leftVisuals.backgroundColor,
-                                onClick = {
-                                    onFinish()
-                                    if (swipeLeftAction != null) {
-                                        executeCustomSwipeAction(
-                                            context = context,
-                                            action = swipeLeftAction,
-                                            onCall = { num, sim -> startCallFromInCallScreen(context, num, sim) },
-                                            onSms = { num -> startSmsFromInCallScreen(context, num) }
-                                        )
-                                    } else {
-                                        startSmsFromInCallScreen(context, rawNumber)
-                                    }
-                                }
-                            )
-
-                            // Button 3: Info -> opens ContactDetailDialog on Contact Tab (tab 0)
-                            InCallPostCallActionButton(
-                                icon = Icons.Default.Person,
-                                label = stringResource(R.string.incall_action_info),
-                                containerColor = Color.White.copy(alpha = 0.15f),
-                                onClick = {
-                                    onFinish()
-                                    openContactInApp(context, rawNumber, contactName, contactId)
-                                }
-                            )
-                        }
-                    }
                 }
             }
 
-            // Middle Section: Samsung One UI 3x2 Action Button Grid
+            Spacer(modifier = Modifier.weight(1f))
+
+            // Post-call actions take the place of the end call button at the bottom
+            if (isCallDisconnected) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Button 1: Call (Swipe Right Action)
+                    InCallPostCallActionButton(
+                        icon = rightVisuals.icon,
+                        label = rightVisuals.label,
+                        containerColor = rightVisuals.backgroundColor,
+                        onClick = {
+                            onFinish()
+                            if (swipeRightAction != null) {
+                                executeCustomSwipeAction(
+                                    context = context,
+                                    action = swipeRightAction,
+                                    onCall = { num, sim -> startCallFromInCallScreen(context, num, sim) },
+                                    onSms = { num -> startSmsFromInCallScreen(context, num) }
+                                )
+                            } else {
+                                startCallFromInCallScreen(context, rawNumber, null)
+                            }
+                        }
+                    )
+
+                    // Button 2: Message/Messenger (Swipe Left Action)
+                    InCallPostCallActionButton(
+                        icon = leftVisuals.icon,
+                        iconBitmap = leftVisuals.iconBitmap,
+                        label = leftVisuals.label,
+                        containerColor = leftVisuals.backgroundColor,
+                        onClick = {
+                            onFinish()
+                            if (swipeLeftAction != null) {
+                                executeCustomSwipeAction(
+                                    context = context,
+                                    action = swipeLeftAction,
+                                    onCall = { num, sim -> startCallFromInCallScreen(context, num, sim) },
+                                    onSms = { num -> startSmsFromInCallScreen(context, num) }
+                                )
+                            } else {
+                                startSmsFromInCallScreen(context, rawNumber)
+                            }
+                        }
+                    )
+
+                    // Button 3: Info -> opens ContactDetailDialog on Contact Tab (tab 0)
+                    InCallPostCallActionButton(
+                        icon = Icons.Default.Person,
+                        label = stringResource(R.string.incall_action_info),
+                        containerColor = Color.White.copy(alpha = 0.15f),
+                        onClick = {
+                            onFinish()
+                            openContactInApp(context, rawNumber, contactName, contactId)
+                        }
+                    )
+                }
+                // Same height as the action grid above the 76dp end call button
+                Spacer(modifier = Modifier.height(112.dp))
+            }
+
+            // Action grid sits right above the bottom buttons, as in One UI
             if ((callState == Call.STATE_ACTIVE || callState == Call.STATE_DIALING || isHold) && !isCallDisconnected) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
@@ -909,8 +911,7 @@ fun InCallScreen(
                         )
                     }
                 }
-            } else {
-                Spacer(modifier = Modifier.height(100.dp))
+                Spacer(modifier = Modifier.height(36.dp))
             }
 
             // Bottom Section: Answer / Decline / End Call Buttons
