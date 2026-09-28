@@ -181,7 +181,7 @@ fun LoopingVideo(
 ) {
     key(path) {
         var rendered by remember { mutableStateOf(false) }
-        val player = remember { LoopingVideoPlayer(path) { rendered = true } }
+        val player = remember { LoopingVideoPlayer(path) { rendered = it } }
         DisposableEffect(player) { onDispose { player.release() } }
         SideEffect {
             player.onPosition = onPosition
@@ -203,7 +203,6 @@ fun LoopingVideo(
                         surfaceTextureListener = player
                     }
                 },
-                update = { it.isOpaque = rendered },
                 modifier = Modifier.matchParentSize()
             )
         }
@@ -242,8 +241,10 @@ suspend fun loadVideoStrip(path: String, frameCount: Int, frameHeightPx: Int): V
  */
 private class LoopingVideoPlayer(
     private val path: String,
-    private val onFirstFrame: () -> Unit
+    /** true once a frame actually reached the TextureView, false again when its surface is recreated. */
+    private val onRenderedChange: (Boolean) -> Unit
 ) : TextureView.SurfaceTextureListener {
+    private var frameShown = false
     private val handler = Handler(Looper.getMainLooper())
     private var player: MediaPlayer? = null
     private var surface: Surface? = null
@@ -321,6 +322,8 @@ private class LoopingVideoPlayer(
 
     override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
         release()
+        frameShown = false
+        onRenderedChange(false)
         this.texture = texture
         val target = Surface(texture).also { surface = it }
         player = try {
@@ -343,10 +346,6 @@ private class LoopingVideoPlayer(
                     if (playing) mp.start()
                     scheduleTick()
                 }
-                setOnInfoListener { mp, what, _ ->
-                    if (mp === player && what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) onFirstFrame()
-                    false
-                }
                 setOnCompletionListener { mp ->
                     if (mp === player && playing && !mp.isLooping) {
                         seek(startMs)
@@ -367,7 +366,12 @@ private class LoopingVideoPlayer(
 
     override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) = Unit
 
-    override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
+    override fun onSurfaceTextureUpdated(texture: SurfaceTexture) {
+        if (!frameShown && prepared) {
+            frameShown = true
+            onRenderedChange(true)
+        }
+    }
 
     private fun seek(ms: Long) {
         val mp = player ?: return

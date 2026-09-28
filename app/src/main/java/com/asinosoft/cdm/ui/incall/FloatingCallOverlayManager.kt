@@ -278,9 +278,12 @@ private fun FloatingIncomingCallOverlayContent(
         return
     }
 
-    var contactId by remember { mutableStateOf<String?>(null) }
-    var contactName by remember { mutableStateOf<String?>(null) }
+    val cachedCaller = remember(call.rawNumber) { CallerLookup.cached(call.rawNumber) }
+    var contactId by remember { mutableStateOf(cachedCaller?.contactId) }
+    var contactName by remember { mutableStateOf(cachedCaller?.name) }
     var contactPhotoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    var lookupDone by remember { mutableStateOf(cachedCaller != null) }
+    val telecomName = CallerLookup.telecomContactName(activeCall)
 
     LaunchedEffect(call.rawNumber) {
         if (call.rawNumber.isNotBlank()) {
@@ -288,6 +291,7 @@ private fun FloatingIncomingCallOverlayContent(
                 val result = lookupOverlayContactInfo(context, call.rawNumber)
                 contactId = result.contactId
                 contactName = result.name
+                lookupDone = true
 
                 if (!result.photoUri.isNullOrEmpty()) {
                     try {
@@ -360,10 +364,11 @@ private fun FloatingIncomingCallOverlayContent(
 
     val isDark = isSystemInDarkTheme()
     val finalName = contactName
-        ?: if (call.displayName.isNotBlank() && call.displayName != call.rawNumber) {
-            call.displayName
-        } else {
-            stringResource(R.string.incall_unknown_number)
+        ?: telecomName
+        ?: when {
+            call.displayName.isNotBlank() && call.displayName != call.rawNumber -> call.displayName
+            !lookupDone && call.rawNumber.isNotBlank() -> PhoneNumberHelper.format(call.rawNumber)
+            else -> stringResource(R.string.incall_unknown_number)
         }
 
     val quickReplies = remember {
@@ -928,42 +933,5 @@ private data class OverlayContactLookupResult(
 private suspend fun lookupOverlayContactInfo(
     context: Context,
     phoneNumber: String
-): OverlayContactLookupResult = withContext(Dispatchers.IO) {
-    if (phoneNumber.isBlank()) return@withContext OverlayContactLookupResult(null, null, null)
-    try {
-        val uri = Uri.withAppendedPath(
-            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
-            Uri.encode(phoneNumber)
-        )
-        val projection = arrayOf(
-            ContactsContract.PhoneLookup._ID,
-            ContactsContract.PhoneLookup.DISPLAY_NAME,
-            ContactsContract.PhoneLookup.PHOTO_URI,
-            ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI
-        )
-        val cursor = context.contentResolver.query(uri, projection, null, null, null)
-        var contactId: String? = null
-        var contactName: String? = null
-        var contactPhotoUri: String? = null
-
-        cursor?.use { c ->
-            if (c.moveToFirst()) {
-                val idIndex = c.getColumnIndex(ContactsContract.PhoneLookup._ID)
-                val nameIndex = c.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
-                val fullPhotoIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
-                val thumbPhotoIndex =
-                    c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI)
-
-                if (idIndex != -1) contactId = c.getString(idIndex)
-                if (nameIndex != -1) contactName = c.getString(nameIndex)
-                if (fullPhotoIndex != -1) contactPhotoUri = c.getString(fullPhotoIndex)
-                if (contactPhotoUri.isNullOrEmpty() && thumbPhotoIndex != -1) {
-                    contactPhotoUri = c.getString(thumbPhotoIndex)
-                }
-            }
-        }
-        OverlayContactLookupResult(contactName, contactPhotoUri, contactId)
-    } catch (_: Exception) {
-        OverlayContactLookupResult(null, null, null)
-    }
-}
+): OverlayContactLookupResult =
+    CallerLookup.lookup(context, phoneNumber).let { OverlayContactLookupResult(it.name, it.photoUri, it.contactId) }

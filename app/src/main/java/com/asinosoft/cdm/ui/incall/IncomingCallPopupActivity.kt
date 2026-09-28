@@ -187,14 +187,17 @@ private fun IncomingCallPopupScreen(
 
     val call by remember(activeCall) { derivedStateOf { CallState.fromSystemCall(activeCall as Call, context) } }
 
-    var contactName by remember { mutableStateOf<String?>(null) }
+    var contactName by remember { mutableStateOf(CallerLookup.cached(call.rawNumber)?.name) }
     var contactPhotoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    var lookupDone by remember { mutableStateOf(contactName != null) }
+    val telecomName = CallerLookup.telecomContactName(activeCall)
 
     LaunchedEffect(call) {
         if (call.rawNumber.isNotBlank()) {
             withContext(Dispatchers.IO) {
                 val result = lookupContactInfo(context, call.rawNumber)
                 contactName = result.name
+                lookupDone = true
 
                 if (!result.photoUri.isNullOrEmpty()) {
                     try {
@@ -267,10 +270,11 @@ private fun IncomingCallPopupScreen(
 
     val isDark = isSystemInDarkTheme()
     val finalName = contactName
-        ?: if (call.displayName.isNotBlank() && call.displayName != call.rawNumber) {
-            call.displayName
-        } else {
-            stringResource(R.string.incall_unknown_number)
+        ?: telecomName
+        ?: when {
+            call.displayName.isNotBlank() && call.displayName != call.rawNumber -> call.displayName
+            !lookupDone && call.rawNumber.isNotBlank() -> PhoneNumberHelper.format(call.rawNumber)
+            else -> stringResource(R.string.incall_unknown_number)
         }
 
     Box(
@@ -645,38 +649,5 @@ private data class PopupContactLookupResult(
 private suspend fun lookupContactInfo(
     context: Context,
     phoneNumber: String
-): PopupContactLookupResult = withContext(Dispatchers.IO) {
-    if (phoneNumber.isBlank()) return@withContext PopupContactLookupResult(null, null)
-    try {
-        val uri = Uri.withAppendedPath(
-            ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
-            Uri.encode(phoneNumber)
-        )
-        val projection = arrayOf(
-            ContactsContract.PhoneLookup.DISPLAY_NAME,
-            ContactsContract.PhoneLookup.PHOTO_URI,
-            ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI
-        )
-        val cursor = context.contentResolver.query(uri, projection, null, null, null)
-        var contactName: String? = null
-        var contactPhotoUri: String? = null
-
-        cursor?.use { c ->
-            if (c.moveToFirst()) {
-                val nameIndex = c.getColumnIndex(ContactsContract.PhoneLookup.DISPLAY_NAME)
-                val fullPhotoIndex = c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_URI)
-                val thumbPhotoIndex =
-                    c.getColumnIndex(ContactsContract.PhoneLookup.PHOTO_THUMBNAIL_URI)
-
-                if (nameIndex != -1) contactName = c.getString(nameIndex)
-                if (fullPhotoIndex != -1) contactPhotoUri = c.getString(fullPhotoIndex)
-                if (contactPhotoUri.isNullOrEmpty() && thumbPhotoIndex != -1) {
-                    contactPhotoUri = c.getString(thumbPhotoIndex)
-                }
-            }
-        }
-        PopupContactLookupResult(contactName, contactPhotoUri)
-    } catch (_: Exception) {
-        PopupContactLookupResult(null, null)
-    }
-}
+): PopupContactLookupResult =
+    CallerLookup.lookup(context, phoneNumber).let { PopupContactLookupResult(it.name, it.photoUri) }
