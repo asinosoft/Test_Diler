@@ -189,6 +189,7 @@ import com.asinosoft.cdm.data.repository.ContactsWriteRepository
 import com.asinosoft.cdm.data.repository.ProfileCard
 import com.asinosoft.cdm.data.repository.ProfileCardRepository
 import com.asinosoft.cdm.ui.profilecard.ProfileCardEditFlow
+import com.asinosoft.cdm.ui.profilecard.ProfileCardMedia
 import com.asinosoft.cdm.ui.profilecard.ProfileMediaTarget
 import com.asinosoft.cdm.ui.components.AdBanner
 import com.asinosoft.cdm.ui.components.FloatingStickyDateHeader
@@ -5469,8 +5470,9 @@ fun CallLogAddToExistingContactDialog(
 
 @Composable
 private fun ContactMediaTiles(
+    card: ProfileCard?,
     cardPreview: ImageBitmap?,
-    isVideoCard: Boolean,
+    videoPlaying: Boolean,
     avatarBitmap: ImageBitmap?,
     contactName: String,
     onCardClick: () -> Unit,
@@ -5482,24 +5484,23 @@ private fun ContactMediaTiles(
             shape = RoundedCornerShape(18.dp),
             onClick = onCardClick
         ) {
-            cardPreview?.let {
-                Image(
-                    bitmap = it,
-                    contentDescription = stringResource(R.string.profile_card_title),
+            if (card?.isVideo == true) {
+                ProfileCardMedia(
+                    card = card,
+                    bitmap = cardPreview,
                     modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    dimmed = false,
+                    videoPlaying = videoPlaying
                 )
-            }
-            if (isVideoCard) {
-                Icon(
-                    imageVector = Icons.Default.Videocam,
-                    contentDescription = null,
-                    tint = Color.White,
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(6.dp)
-                        .size(18.dp)
-                )
+            } else {
+                cardPreview?.let {
+                    Image(
+                        bitmap = it,
+                        contentDescription = stringResource(R.string.profile_card_title),
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Crop
+                    )
+                }
             }
         }
         ProfileMediaTile(
@@ -5679,8 +5680,9 @@ private fun EditContactDialog(
             ) {
                 // 1. PROFILE CARD + ROUND PICTURE
                 ContactMediaTiles(
+                    card = profileCard,
                     cardPreview = profileCardPreview,
-                    isVideoCard = profileCard?.isVideo == true,
+                    videoPlaying = profileMediaTile == null,
                     avatarBitmap = currentAvatarBitmap,
                     contactName = contact.name,
                     onCardClick = { profileMediaTile = ProfileMediaTarget.CARD },
