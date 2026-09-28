@@ -19,6 +19,7 @@ import com.asinosoft.cdm.data.model.FavoriteTab
 import com.asinosoft.cdm.data.repository.CallLogRepository
 import com.asinosoft.cdm.data.repository.ContactsWriteRepository
 import com.asinosoft.cdm.data.repository.FavoritesRepository
+import com.asinosoft.cdm.ui.recents.components.AvatarBitmapCache
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -821,7 +822,8 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         phones: List<ContactsWriteRepository.PhoneEntry>,
         emails: List<ContactsWriteRepository.EmailEntry>,
         birthdayDateString: String?,
-        photoBitmap: android.graphics.Bitmap?
+        photoBitmap: android.graphics.Bitmap?,
+        removePhoto: Boolean = false
     ) {
         viewModelScope.launch {
             suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 2_500L
@@ -834,9 +836,11 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     phones = phones,
                     emails = emails,
                     birthdayDateString = birthdayDateString,
-                    photoBitmap = photoBitmap
+                    photoBitmap = photoBitmap,
+                    removePhoto = removePhoto
                 )
             }
+            if (photoBitmap != null || removePhoto) AvatarBitmapCache.clear()
 
             _favorites.value = withContext(Dispatchers.IO) {
                 favoritesRepository.updateFavorite(updated)
@@ -974,7 +978,8 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         phones: List<ContactsWriteRepository.PhoneEntry>,
         emails: List<ContactsWriteRepository.EmailEntry>,
         birthdayDateString: String?,
-        photoBitmap: android.graphics.Bitmap?
+        photoBitmap: android.graphics.Bitmap?,
+        removePhoto: Boolean = false
     ) {
         viewModelScope.launch {
             if (ContextCompat.checkSelfPermission(
@@ -996,9 +1001,11 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     phones = phones,
                     emails = emails,
                     birthdayDateString = birthdayDateString,
-                    photoBitmap = photoBitmap
+                    photoBitmap = photoBitmap,
+                    removePhoto = removePhoto
                 )
             }
+            if (photoBitmap != null || removePhoto) AvatarBitmapCache.clear()
 
             if (!saved) {
                 showToast(R.string.error_save_contact)

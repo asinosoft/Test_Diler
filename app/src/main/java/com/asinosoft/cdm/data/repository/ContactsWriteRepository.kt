@@ -432,7 +432,8 @@ class ContactsWriteRepository(private val context: Context) {
         phones: List<PhoneEntry>,
         emails: List<EmailEntry>,
         birthdayDateString: String?,
-        photoBitmap: Bitmap?
+        photoBitmap: Bitmap?,
+        removePhoto: Boolean = false
     ): Boolean = withContext(Dispatchers.IO) {
         val contactId = resolveContactId(contact)
         if (contactId == null) {
@@ -552,18 +553,30 @@ class ContactsWriteRepository(private val context: Context) {
             }
 
             context.contentResolver.applyBatch(ContactsContract.AUTHORITY, ops)
-
-            if (photoBitmap != null) {
-                writeContactPhoto(rawContactId, photoBitmap)
-            }
-            nameOk
         } catch (e: SecurityException) {
             Log.w(TAG, "WRITE_CONTACTS missing for update", e)
-            nameOk
         } catch (e: Exception) {
             Log.w(TAG, "updateContactDetails extras failed (name may still be ok)", e)
-            nameOk
         }
+
+        try {
+            when {
+                photoBitmap != null -> writeContactPhoto(rawContactId, photoBitmap)
+                removePhoto -> deleteContactPhoto(contactId)
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "updateContactDetails photo failed", e)
+        }
+        nameOk
+    }
+
+    /** Removes photo rows from every raw contact so the aggregated contact has no photo left. */
+    private fun deleteContactPhoto(contactId: Long) {
+        context.contentResolver.delete(
+            ContactsContract.Data.CONTENT_URI,
+            "${ContactsContract.Data.CONTACT_ID}=? AND ${ContactsContract.Data.MIMETYPE}=?",
+            arrayOf(contactId.toString(), ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE)
+        )
     }
 
     private fun updateDisplayName(
@@ -738,27 +751,46 @@ class ContactsWriteRepository(private val context: Context) {
         }
     }
 
-    private fun writeContactPhoto(rawContactId: Long, bitmap: Bitmap) {
+    private fun writeContactPhoto(rawContactId: Long, bitmap: Bitmap): Boolean {
         val bytes = ByteArrayOutputStream().use { out ->
             bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
             out.toByteArray()
         }
-        val photoUri = Uri.withAppendedPath(
+        val displayPhotoUri = Uri.withAppendedPath(
             ContentUris.withAppendedId(ContactsContract.RawContacts.CONTENT_URI, rawContactId),
-            ContactsContract.Contacts.Photo.CONTENT_DIRECTORY
+            ContactsContract.RawContacts.DisplayPhoto.CONTENT_DIRECTORY
         )
-        context.contentResolver.openOutputStream(photoUri)?.use { it.write(bytes) }
-            ?: run {
-                val values = ContentValues().apply {
-                    put(ContactsContract.Data.RAW_CONTACT_ID, rawContactId)
-                    put(
-                        ContactsContract.Data.MIMETYPE,
-                        ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE
-                    )
-                    put(ContactsContract.CommonDataKinds.Photo.PHOTO, bytes)
-                }
-                context.contentResolver.insert(ContactsContract.Data.CONTENT_URI, values)
+        val written = try {
+            context.contentResolver.openAssetFileDescriptor(displayPhotoUri, "rw")
+                ?.use { fd -> fd.createOutputStream().use { it.write(bytes) } } != null
+        } catch (e: Exception) {
+            Log.w(TAG, "display photo write failed, falling back to data row", e)
+            false
+        }
+        return written || writePhotoDataRow(rawContactId, bytes)
+    }
+
+    private fun writePhotoDataRow(rawContactId: Long, bytes: ByteArray): Boolean = try {
+        val values = ContentValues().apply {
+            put(ContactsContract.CommonDataKinds.Photo.PHOTO, bytes)
+            put(ContactsContract.Data.IS_SUPER_PRIMARY, 1)
+        }
+        val updated = context.contentResolver.update(
+            ContactsContract.Data.CONTENT_URI,
+            values,
+            "${ContactsContract.Data.RAW_CONTACT_ID}=? AND ${ContactsContract.Data.MIMETYPE}=?",
+            arrayOf(rawContactId.toString(), ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE)
+        )
+        updated > 0 || context.contentResolver.insert(
+            ContactsContract.Data.CONTENT_URI,
+            values.apply {
+                put(ContactsContract.Data.RAW_CONTACT_ID, rawContactId)
+                put(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE)
             }
+        ) != null
+    } catch (e: Exception) {
+        Log.w(TAG, "photo data row write failed", e)
+        false
     }
 
     private fun contactExists(contactId: Long): Boolean {

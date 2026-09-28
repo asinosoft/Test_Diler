@@ -51,6 +51,13 @@ internal object AvatarBitmapCache {
         imageCache.put(key, bitmap.asImageBitmap())
     }
 
+    /** Photo URIs stay the same after a contact photo change, so cached bitmaps must be dropped. */
+    @Synchronized
+    fun clear() {
+        cache.evictAll()
+        imageCache.evictAll()
+    }
+
     suspend fun <T> withDecodeSlot(block: suspend () -> T): T {
         while (true) {
             val acquired = decodeMutex.withLock {

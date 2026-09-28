@@ -36,11 +36,13 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -134,6 +136,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -183,6 +186,10 @@ import com.asinosoft.cdm.data.repository.CallLogRepository
 import com.asinosoft.cdm.data.repository.ContactRingtoneManager
 import com.asinosoft.cdm.data.repository.ContactsRepository
 import com.asinosoft.cdm.data.repository.ContactsWriteRepository
+import com.asinosoft.cdm.data.repository.ProfileCard
+import com.asinosoft.cdm.data.repository.ProfileCardRepository
+import com.asinosoft.cdm.ui.profilecard.ProfileCardEditFlow
+import com.asinosoft.cdm.ui.profilecard.ProfileMediaTarget
 import com.asinosoft.cdm.ui.components.AdBanner
 import com.asinosoft.cdm.ui.components.FloatingStickyDateHeader
 import com.asinosoft.cdm.ui.components.Header
@@ -245,8 +252,9 @@ fun ContactDetailDialog(
         phones: List<ContactsWriteRepository.PhoneEntry>,
         emails: List<ContactsWriteRepository.EmailEntry>,
         birthdayDateString: String?,
-        photoBitmap: Bitmap?
-    ) -> Unit = { _, updated, _, _, _, _ -> onUpdateContact(updated) },
+        photoBitmap: Bitmap?,
+        removePhoto: Boolean
+    ) -> Unit = { _, updated, _, _, _, _, _ -> onUpdateContact(updated) },
     onDeleteContact: (FavoriteContact) -> Unit = {},
     onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", it) }
 ) {
@@ -1031,7 +1039,7 @@ fun ContactDetailDialog(
                     messengerAccountsList = messengerAccountsList,
                     avatarBitmap = avatarBitmap,
                     context = context,
-                    onSave = { newName, newPhones, newEmails, newBirthday, newImportantDates, updatedMessengers, hiddenSet, newBitmap ->
+                    onSave = { newName, newPhones, newEmails, newBirthday, newImportantDates, updatedMessengers, hiddenSet, newBitmap, removeAvatar ->
                         val updatedContact = contact.copy(
                             name = newName,
                             number = newPhones.firstOrNull()?.number ?: contact.number
@@ -1043,6 +1051,8 @@ fun ContactDetailDialog(
                         messengerAccountsList = updatedMessengers
                         if (newBitmap != null) {
                             avatarBitmap = newBitmap
+                        } else if (removeAvatar) {
+                            avatarBitmap = null
                         }
                         saveHiddenMessengers(context, getContactCustomKey(contact), hiddenSet)
                         saveCustomMessengerLinks(
@@ -1066,7 +1076,8 @@ fun ContactDetailDialog(
                                 ContactsWriteRepository.EmailEntry(it.email, it.label)
                             },
                             newBirthday?.dateString,
-                            newBitmap?.asAndroidBitmap()
+                            newBitmap?.asAndroidBitmap(),
+                            removeAvatar
                         )
                         showEditContactDialog = false
                     },
@@ -5309,7 +5320,7 @@ fun CallLogAddContactDialog(
         avatarBitmap = null,
         context = context,
         isNewContact = true,
-        onSave = { newName, newPhones, newEmails, newBirthday, _, _, _, newBitmap ->
+        onSave = { newName, newPhones, newEmails, newBirthday, _, _, _, newBitmap, _ ->
             onSave(
                 newName,
                 newPhones.map { ContactsWriteRepository.PhoneEntry(it.number, it.label) },
@@ -5332,7 +5343,8 @@ fun CallLogAddToExistingContactDialog(
         phones: List<ContactsWriteRepository.PhoneEntry>,
         emails: List<ContactsWriteRepository.EmailEntry>,
         birthdayDateString: String?,
-        photoBitmap: Bitmap?
+        photoBitmap: Bitmap?,
+        removePhoto: Boolean
     ) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -5424,7 +5436,7 @@ fun CallLogAddToExistingContactDialog(
         messengerAccountsList = messengerAccountsList,
         avatarBitmap = avatarBitmap,
         context = context,
-        onSave = { newName, newPhones, newEmails, newBirthday, newImportantDates, updatedMessengers, hiddenSet, newBitmap ->
+        onSave = { newName, newPhones, newEmails, newBirthday, newImportantDates, updatedMessengers, hiddenSet, newBitmap, removeAvatar ->
             val updatedContact = contact.copy(
                 name = newName,
                 number = newPhones.firstOrNull()?.number ?: contact.number
@@ -5447,11 +5459,118 @@ fun CallLogAddToExistingContactDialog(
                 newPhones.map { ContactsWriteRepository.PhoneEntry(it.number, it.label) },
                 newEmails.map { ContactsWriteRepository.EmailEntry(it.email, it.label) },
                 newBirthday?.dateString,
-                newBitmap?.asAndroidBitmap()
+                newBitmap?.asAndroidBitmap(),
+                removeAvatar
             )
         },
         onDismiss = onDismiss
     )
+}
+
+@Composable
+private fun ContactMediaTiles(
+    cardPreview: ImageBitmap?,
+    isVideoCard: Boolean,
+    avatarBitmap: ImageBitmap?,
+    contactName: String,
+    onCardClick: () -> Unit,
+    onImageClick: () -> Unit
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(28.dp)) {
+        ProfileMediaTile(
+            label = stringResource(R.string.profile_card_title),
+            shape = RoundedCornerShape(18.dp),
+            onClick = onCardClick
+        ) {
+            cardPreview?.let {
+                Image(
+                    bitmap = it,
+                    contentDescription = stringResource(R.string.profile_card_title),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            }
+            if (isVideoCard) {
+                Icon(
+                    imageVector = Icons.Default.Videocam,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(6.dp)
+                        .size(18.dp)
+                )
+            }
+        }
+        ProfileMediaTile(
+            label = stringResource(R.string.profile_image_title),
+            shape = CircleShape,
+            onClick = onImageClick
+        ) {
+            if (avatarBitmap != null) {
+                Image(
+                    bitmap = avatarBitmap,
+                    contentDescription = stringResource(R.string.contact_photo_cd),
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop
+                )
+            } else if (contactName.isNotBlank()) {
+                val avatarBgColor = remember(contactName) {
+                    val colors = listOf(
+                        Color(0xFFE57373), Color(0xFFF06292), Color(0xFFBA68C8),
+                        Color(0xFF9575CD), Color(0xFF7986CB), Color(0xFF64B5F6)
+                    )
+                    colors[(contactName.hashCode() and Int.MAX_VALUE) % colors.size]
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(avatarBgColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = contactName.trim().first().uppercaseChar().toString(),
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 36.sp
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProfileMediaTile(
+    label: String,
+    shape: Shape,
+    onClick: () -> Unit,
+    content: @Composable BoxScope.() -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(86.dp)
+                .clip(shape)
+                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.06f))
+                .border(BorderStroke(1.dp, MaterialTheme.colorScheme.onSurface.copy(alpha = 0.18f)), shape)
+                .clickable(onClick = onClick),
+            content = content
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+            onClick = onClick
+        ) {
+            Text(
+                text = label,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+            )
+        }
+    }
 }
 
 @Composable
@@ -5473,7 +5592,8 @@ private fun EditContactDialog(
         newImportantDates: List<ContactImportantDate>,
         updatedMessengers: List<MessengerAccount>,
         hiddenSet: Set<String>,
-        newAvatarBitmap: ImageBitmap?
+        newAvatarBitmap: ImageBitmap?,
+        removeAvatar: Boolean
     ) -> Unit,
     onDismiss: () -> Unit
 ) {
@@ -5486,6 +5606,9 @@ private fun EditContactDialog(
 
     val customImportantDates = remember { importantDatesList.toMutableStateList() }
     var currentAvatarBitmap by remember { mutableStateOf(avatarBitmap) }
+    /** Avatar picked in this dialog; written to the system contacts only on Save. */
+    var pendingAvatarBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    var avatarRemoved by remember { mutableStateOf(false) }
 
     val editableMessengers = remember { messengerAccountsList.toMutableStateList() }
 
@@ -5502,29 +5625,39 @@ private fun EditContactDialog(
     var showAddMessengerDialogInEdit by remember { mutableStateOf(false) }
     var customLinkToEditIndex by remember { mutableStateOf<Int?>(null) }
 
-    val galleryAvatarLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            try {
-                context.contentResolver.openInputStream(uri)?.use { stream ->
-                    val bitmap = BitmapFactory.decodeStream(stream)
-                    if (bitmap != null) {
-                        currentAvatarBitmap = bitmap.asImageBitmap()
-                        Toast.makeText(
-                            context,
-                            context.getString(R.string.toast_contact_photo_updated),
-                            Toast.LENGTH_SHORT
-                        )
-                            .show()
-                    }
-                }
-            } catch (_: Exception) {
-                Toast.makeText(context, context.getString(R.string.error_load_photo), Toast.LENGTH_SHORT)
-                    .show()
-            }
-        }
+    var savedProfileCard by remember { mutableStateOf<ProfileCard?>(null) }
+    var profileCard by remember { mutableStateOf<ProfileCard?>(null) }
+    var profileCardPreview by remember { mutableStateOf<ImageBitmap?>(null) }
+    var profileMediaTile by remember { mutableStateOf<ProfileMediaTarget?>(null) }
+
+    LaunchedEffect(contact.id) {
+        val numbers = phoneNumbersList.map { it.number } + contact.number
+        val card = withContext(Dispatchers.IO) { ProfileCardRepository.find(context, contact.id, numbers) }
+        savedProfileCard = card
+        profileCard = card
     }
+    LaunchedEffect(profileCard?.mediaPath) {
+        profileCardPreview = profileCard?.let { ProfileCardRepository.loadBitmap(it, 480)?.asImageBitmap() }
+    }
+
+    ProfileCardEditFlow(
+        tile = profileMediaTile,
+        currentCard = profileCard,
+        contactName = nameInput.ifBlank { contact.name },
+        onCardChanged = { profileCard = it },
+        onAvatarChanged = { bitmap ->
+            val image = bitmap.asImageBitmap()
+            currentAvatarBitmap = image
+            pendingAvatarBitmap = image
+            avatarRemoved = false
+        },
+        onAvatarRemoved = {
+            currentAvatarBitmap = null
+            pendingAvatarBitmap = null
+            avatarRemoved = true
+        },
+        onClose = { profileMediaTile = null }
+    )
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -5544,63 +5677,15 @@ private fun EditContactDialog(
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // 1. ROUND AVATAR WITH CAMERA BADGE
-                Box(
-                    modifier = Modifier
-                        .size(86.dp)
-                        .clip(CircleShape)
-                        .clickable { galleryAvatarLauncher.launch("image/*") }
-                ) {
-                    val bitmap = currentAvatarBitmap
-                    if (bitmap != null) {
-                        Image(
-                            bitmap = bitmap,
-                            contentDescription = stringResource(R.string.contact_photo_cd),
-                            modifier = Modifier.fillMaxSize(),
-                            contentScale = ContentScale.Crop
-                        )
-                    } else {
-                        val avatarBgColor = remember(contact.name) {
-                            val colors = listOf(
-                                Color(0xFFE57373), Color(0xFFF06292), Color(0xFFBA68C8),
-                                Color(0xFF9575CD), Color(0xFF7986CB), Color(0xFF64B5F6)
-                            )
-                            val index = (contact.name.hashCode() and Int.MAX_VALUE) % colors.size
-                            colors[index]
-                        }
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .background(avatarBgColor),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = contact.name.trim().firstOrNull()?.uppercaseChar()
-                                    ?.toString() ?: "?",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 36.sp
-                            )
-                        }
-                    }
-
-                    // Camera Badge Overlay
-                    Box(
-                        modifier = Modifier
-                            .size(28.dp)
-                            .align(Alignment.BottomEnd)
-                            .clip(CircleShape)
-                            .background(SamsungGreen),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PhotoCamera,
-                            contentDescription = stringResource(R.string.contact_change_photo_cd),
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    }
-                }
+                // 1. PROFILE CARD + ROUND PICTURE
+                ContactMediaTiles(
+                    cardPreview = profileCardPreview,
+                    isVideoCard = profileCard?.isVideo == true,
+                    avatarBitmap = currentAvatarBitmap,
+                    contactName = contact.name,
+                    onCardClick = { profileMediaTile = ProfileMediaTarget.CARD },
+                    onImageClick = { profileMediaTile = ProfileMediaTarget.IMAGE }
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
@@ -6084,6 +6169,16 @@ private fun EditContactDialog(
                         parseBirthdayString(context, birthdayInput.trim())
                     } else null
 
+                    if (profileCard != savedProfileCard) {
+                        val numbers = cleanPhones.map { it.number }.ifEmpty { listOf(contact.number) }
+                        ProfileCardRepository.saveInBackground(
+                            context,
+                            ProfileCardRepository.keyFor(contact.id, numbers.first()),
+                            profileCard,
+                            numbers
+                        )
+                    }
+
                     onSave(
                         trimmedName,
                         cleanPhones.ifEmpty { phoneNumbersList },
@@ -6092,7 +6187,8 @@ private fun EditContactDialog(
                         customImportantDates,
                         editableMessengers,
                         hiddenSet,
-                        currentAvatarBitmap
+                        pendingAvatarBitmap,
+                        avatarRemoved
                     )
                 }
             ) {

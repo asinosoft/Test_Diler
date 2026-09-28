@@ -461,4 +461,21 @@
     <string name="ringtone_custom_fallback">Пользовательская мелодия</string>
     <string name="cd_add_ringtone">Добавить мелодию</string>
     <string name="birthday_share_line">День рождения: %1$s</string>
+    <string name="profile_card_title">Карта профиля</string>
+    <string name="profile_image_title">Изображение</string>
+    <string name="profile_target_title">Выбор места применения</string>
+    <string name="profile_image_delete">Удалить изображение профиля</string>
+    <string name="profile_source_gallery">Галерея</string>
+    <string name="profile_source_photo">Сделать фото</string>
+    <string name="profile_source_video">Снять видео</string>
+    <string name="profile_card_edit">Изменить карту профиля</string>
+    <string name="profile_card_delete">Удалить карту профиля</string>
+    <string name="profile_text">Текст</string>
+    <string name="profile_text_color">Цвет текста</string>
+    <string name="profile_text_size">Размер текста</string>
+    <string name="profile_effect">Эффект</string>
+    <string name="profile_dim">Затемнение</string>
+    <string name="profile_replace">Заменить</string>
+    <string name="profile_trim">Обрезать</string>
+    <string name="profile_camera_denied">Нужен доступ к камере</string>
 </resources>

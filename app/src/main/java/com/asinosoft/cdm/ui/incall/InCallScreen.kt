@@ -82,6 +82,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -91,6 +92,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -109,20 +111,26 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import com.asinosoft.cdm.MainActivity
 import com.asinosoft.cdm.R
+import com.asinosoft.cdm.data.repository.ProfileCard
+import com.asinosoft.cdm.data.repository.ProfileCardRepository
 import com.asinosoft.cdm.data.repository.QuickRepliesManager
 import com.asinosoft.cdm.service.BluetoothAudioDevice
 import com.asinosoft.cdm.service.CallManager
 import com.asinosoft.cdm.ui.components.SimIcon
+import com.asinosoft.cdm.ui.profilecard.ProfileCardMedia
+import com.asinosoft.cdm.ui.profilecard.profileTextShadow
 import com.asinosoft.cdm.ui.recents.components.executeCustomSwipeAction
 import com.asinosoft.cdm.ui.recents.components.getCustomSwipeAction
 import com.asinosoft.cdm.ui.recents.components.getSwipeBackgroundVisuals
@@ -185,6 +193,8 @@ fun InCallScreen(
     var contactId by remember { mutableStateOf<String?>(null) }
     var contactName by remember { mutableStateOf<String?>(null) }
     var contactPhotoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    var profileCard by remember { mutableStateOf<ProfileCard?>(null) }
+    var profileCardBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
     val displayableCalls = remember(allCalls, activeCall) { CallManager.getDisplayableTopLevelCalls() }
     val incomingWaitingCall = displayableCalls.firstOrNull { it.state == Call.STATE_RINGING && it != activeCall }
@@ -204,11 +214,18 @@ fun InCallScreen(
             contactId = null
             contactName = resources.getString(R.string.incall_conference)
             contactPhotoBitmap = null
+            profileCard = null
         } else if (rawNumber.isNotBlank()) {
             withContext(Dispatchers.IO) {
                 val result = lookupContactInfo(context, rawNumber)
                 contactId = result.contactId
                 contactName = result.name
+
+                val card = ProfileCardRepository.find(context, result.contactId, listOf(rawNumber))
+                profileCardBitmap = card?.takeUnless { it.isVideo }?.let {
+                    ProfileCardRepository.loadBitmap(it, 2560)?.asImageBitmap()
+                }
+                profileCard = card
 
                 if (!result.photoUri.isNullOrEmpty()) {
                     try {
@@ -325,6 +342,23 @@ fun InCallScreen(
                 )
             )
     ) {
+        val card = profileCard
+        val cardTextColor = card?.let { Color(it.textColor) } ?: Color.White
+        val chipColor = if (card != null) Color.Black.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.12f)
+        if (card != null) {
+            ProfileCardMedia(card, profileCardBitmap, Modifier.fillMaxSize())
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            0.5f to Color.Transparent,
+                            1f to Color.Black.copy(alpha = 0.5f)
+                        )
+                    )
+            )
+        }
+        CompositionLocalProvider(LocalOverMediaBackdrop provides (card != null)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -350,7 +384,9 @@ fun InCallScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     // Large One UI Circular Avatar (170dp)
-                    Surface(
+                    if (card != null) {
+                        Spacer(modifier = Modifier.height(24.dp))
+                    } else Surface(
                         modifier = Modifier
                             .size(170.dp)
                             .clip(CircleShape)
@@ -419,12 +455,14 @@ fun InCallScreen(
 
                     Text(
                         text = formattedName,
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
+                        fontSize = card?.textSizeSp?.sp ?: 28.sp,
+                        lineHeight = card?.let { (it.textSizeSp * 1.2f).sp } ?: TextUnit.Unspecified,
+                        fontWeight = if (card != null) FontWeight.SemiBold else FontWeight.Bold,
+                        color = cardTextColor,
                         textAlign = TextAlign.Center,
                         maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
+                        style = if (card != null) TextStyle(shadow = profileTextShadow(cardTextColor)) else TextStyle.Default
                     )
 
                     // Phone number line with SIM icon in front (without "SIM" text)
@@ -447,9 +485,10 @@ fun InCallScreen(
                                 Text(
                                     text = numberToDisplay,
                                     fontSize = 16.sp,
-                                    color = Color.White.copy(alpha = 0.65f),
+                                    color = cardTextColor.copy(alpha = if (card != null) 0.85f else 0.65f),
                                     textAlign = TextAlign.Center,
-                                    maxLines = 1
+                                    maxLines = 1,
+                                    style = if (card != null) TextStyle(shadow = profileTextShadow(cardTextColor)) else TextStyle.Default
                                 )
                             }
                         }
@@ -472,6 +511,7 @@ fun InCallScreen(
                     Surface(
                         shape = RoundedCornerShape(16.dp),
                         color = when {
+                            card != null && !isHold -> chipColor
                             isCallDisconnected -> Color.White.copy(alpha = 0.12f)
                                 isHold -> Color(0xFFFFB300).copy(alpha = 0.22f)
                             isCallActive -> Color.White.copy(alpha = 0.12f)
@@ -511,7 +551,7 @@ fun InCallScreen(
 
                         Surface(
                             shape = RoundedCornerShape(22.dp),
-                            color = Color.White.copy(alpha = 0.12f),
+                            color = chipColor,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(22.dp))
                                 .clickable { showQuickRepliesDropdown = !showQuickRepliesDropdown }
@@ -900,6 +940,7 @@ fun InCallScreen(
                     }
                 }
             }
+        }
         }
     }
 
@@ -1463,6 +1504,9 @@ private fun SamsungSwipeAnswerDeclineRow(
     }
 }
 
+/** True when the screen shows a profile card photo/video, so controls need darker backing. */
+private val LocalOverMediaBackdrop = staticCompositionLocalOf { false }
+
 @Composable
 private fun InCallActionButton(
     icon: ImageVector? = null,
@@ -1473,6 +1517,7 @@ private fun InCallActionButton(
     onClick: () -> Unit,
     onLabelClick: (() -> Unit)? = null
 ) {
+    val overMedia = LocalOverMediaBackdrop.current
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -1504,7 +1549,11 @@ private fun InCallActionButton(
                     }
                 ),
             shape = CircleShape,
-            color = if (isActive) activeColor else Color.White.copy(alpha = 0.12f),
+            color = when {
+                isActive -> activeColor
+                overMedia -> Color.Black.copy(alpha = 0.35f)
+                else -> Color.White.copy(alpha = 0.12f)
+            },
             shadowElevation = if (isActive) 6.dp else 0.dp
         ) {
             Box(contentAlignment = Alignment.Center) {
@@ -1538,6 +1587,7 @@ private fun InCallActionButton(
             color = if (isActive) activeColor else Color.White.copy(alpha = 0.85f),
             textAlign = TextAlign.Center,
             maxLines = 1,
+            style = if (overMedia) TextStyle(shadow = profileTextShadow(Color.White)) else TextStyle.Default,
             modifier = if (onLabelClick != null) {
                 Modifier.clickable(
                     interactionSource = remember { MutableInteractionSource() },

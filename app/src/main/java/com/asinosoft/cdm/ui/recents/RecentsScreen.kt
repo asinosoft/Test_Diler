@@ -914,14 +914,15 @@ fun RecentsScreen(
                     CallLogAddToExistingContactDialog(
                         contact = step.contact,
                         phoneNumberToAdd = flow.phoneNumber,
-                        onSave = { original, updated, phones, emails, birthday, photo ->
+                        onSave = { original, updated, phones, emails, birthday, photo, removePhoto ->
                             viewModel.saveExistingContactWithNumberFromCallLog(
                                 original = original,
                                 updated = updated,
                                 phones = phones,
                                 emails = emails,
                                 birthdayDateString = birthday,
-                                photoBitmap = photo
+                                photoBitmap = photo,
+                                removePhoto = removePhoto
                             )
                         },
                         onDismiss = { viewModel.unsavedNumberBackToPickExisting() }
@@ -945,14 +946,15 @@ fun RecentsScreen(
                     viewModel.setContactFavorite(contact, favorite)
                 },
                 onUpdateContact = { viewModel.updateFavorite(it) },
-                onSaveEditedContact = { original, updated, phones, emails, birthday, photo ->
+                onSaveEditedContact = { original, updated, phones, emails, birthday, photo, removePhoto ->
                     viewModel.saveEditedContact(
                         original = original,
                         updated = updated,
                         phones = phones,
                         emails = emails,
                         birthdayDateString = birthday,
-                        photoBitmap = photo
+                        photoBitmap = photo,
+                        removePhoto = removePhoto
                     )
                 },
                 onDeleteContact = { viewModel.deleteContact(it) },
