@@ -28,6 +28,7 @@ import java.util.concurrent.Executor
 class CallService : InCallService() {
     lateinit var notification: NotificationManager
     private val ringtonePlayer by lazy { CallRingtonePlayer(this) }
+    private val callAnnouncer by lazy { IncomingCallAnnouncer(this) }
     private var silenceReceiverRegistered = false
     private var availableEndpoints: List<CallEndpoint> = emptyList()
     private val endpointExecutor: Executor
@@ -112,8 +113,7 @@ class CallService : InCallService() {
         val customRingtoneUri = ContactRingtoneManager.getCustomRingtoneForNumber(this, rawNumber)
 
         if (call.state == Call.STATE_RINGING) {
-            ringtonePlayer.start(customRingtoneUri)
-            registerSilenceReceiver()
+            startRinging(customRingtoneUri, rawNumber)
         }
 
         notification.showCallNotification(CallState.fromSystemCall(call, this))
@@ -123,12 +123,10 @@ class CallService : InCallService() {
                 CallManager.updateCallsState()
                 if (state == Call.STATE_RINGING) {
                     wasRinging = true
-                    ringtonePlayer.start(customRingtoneUri)
-                    registerSilenceReceiver()
+                    startRinging(customRingtoneUri, rawNumber)
                 } else if (state == Call.STATE_ACTIVE) {
                     wasAnswered = true
-                    ringtonePlayer.stop()
-                    unregisterSilenceReceiver()
+                    stopRinging()
                     // Stay in Floating window if it is already handling the call
                 } else {
                     unregisterSilenceReceiver()
@@ -136,8 +134,7 @@ class CallService : InCallService() {
 
                 if (state == Call.STATE_DISCONNECTED) {
                     if (CallManager.calls.value.none { it.state == Call.STATE_RINGING }) {
-                        ringtonePlayer.stop()
-                        unregisterSilenceReceiver()
+                        stopRinging()
                     }
                     val topCalls = CallManager.getDisplayableTopLevelCalls()
                     if (topCalls.isEmpty() && CallManager.calls.value.none { it.state != Call.STATE_DISCONNECTED }) {
@@ -602,7 +599,22 @@ class CallService : InCallService() {
     }
 
     fun silenceIncomingRinger() {
+        callAnnouncer.cancel()
         ringtonePlayer.silence()
+    }
+
+    private fun startRinging(customRingtoneUri: String?, rawNumber: String) {
+        ringtonePlayer.start(customRingtoneUri)
+        registerSilenceReceiver()
+        if (hasConnectedBluetoothHeadset()) {
+            callAnnouncer.start(rawNumber, ringtonePlayer)
+        }
+    }
+
+    private fun stopRinging() {
+        callAnnouncer.cancel()
+        ringtonePlayer.stop()
+        unregisterSilenceReceiver()
     }
 
     fun requestAudioRoute(route: Int) {
@@ -642,8 +654,7 @@ class CallService : InCallService() {
         super.onCallRemoved(call)
         CallManager.onCallRemoved(call)
         if (CallManager.calls.value.none { it.state == Call.STATE_RINGING }) {
-            ringtonePlayer.stop()
-            unregisterSilenceReceiver()
+            stopRinging()
         }
         if (CallManager.calls.value.isEmpty()) {
             stopForeground(true)
@@ -652,8 +663,7 @@ class CallService : InCallService() {
 
     override fun onDestroy() {
         super.onDestroy()
-        ringtonePlayer.stop()
-        unregisterSilenceReceiver()
+        stopRinging()
         FloatingCallOverlayManager.hide()
         if (CallManager.inCallService == this) {
             CallManager.inCallService = null
