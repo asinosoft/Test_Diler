@@ -5644,6 +5644,7 @@ private fun EditContactDialog(
     ProfileCardEditFlow(
         tile = profileMediaTile,
         currentCard = profileCard,
+        currentAvatar = currentAvatarBitmap,
         contactName = nameInput.ifBlank { contact.name },
         onCardChanged = { profileCard = it },
         onAvatarChanged = { bitmap ->

@@ -38,6 +38,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Check
@@ -113,12 +114,21 @@ private sealed interface FlowStep {
     data object Source : FlowStep
     data object Loading : FlowStep
     data class ChooseTargets(val media: ProfileCard, val preview: ImageBitmap) : FlowStep
+    /** Editor pages: the card (when [card] != null) and the circular picture (when [avatar] != null). */
     data class Edit(
-        val media: ProfileCard,
-        val preview: ImageBitmap?,
-        val targets: List<ProfileMediaTarget>
+        val card: ProfileCard?,
+        val cardPreview: ImageBitmap?,
+        val avatar: ProfileCard?,
+        val avatarPreview: ImageBitmap?,
+        val initialPage: ProfileMediaTarget,
+        val avatarIsNew: Boolean,
+        /** Freshly imported draft files; deleted unless the card ends up using one. */
+        val newMediaPaths: List<String>
     ) : FlowStep
 }
+
+/** Wraps an existing contact photo so the picture page can pan/zoom it like imported media. */
+private fun ImageBitmap.asAvatarCard() = ProfileCard(mediaPath = "", isVideo = false, mediaWidth = width, mediaHeight = height)
 
 private enum class EditorSheet { TEXT, EFFECT }
 
@@ -141,6 +151,7 @@ private val TEXT_COLORS = listOf(
 fun ProfileCardEditFlow(
     tile: ProfileMediaTarget?,
     currentCard: ProfileCard?,
+    currentAvatar: ImageBitmap?,
     contactName: String,
     onCardChanged: (ProfileCard?) -> Unit,
     onAvatarChanged: (Bitmap) -> Unit,
@@ -157,15 +168,71 @@ fun ProfileCardEditFlow(
     var capturePath by rememberSaveable { mutableStateOf<String?>(null) }
     var pendingCameraVideo by remember { mutableStateOf<Boolean?>(null) }
 
-    LaunchedEffect(tile) { step = if (tile != null) FlowStep.Source else null }
-
     fun close() {
         step = null
         onClose()
     }
 
+    /** Opens the editor with the new media on [targets] and whatever is already set on the other page. */
+    fun openEditor(initialPage: ProfileMediaTarget, newMedia: ProfileCard? = null, newPreview: ImageBitmap? = null, targets: List<ProfileMediaTarget> = emptyList()) {
+        step = FlowStep.Loading
+        scope.launch {
+            val cardFromNew = newMedia != null && ProfileMediaTarget.CARD in targets
+            val avatarFromNew = newMedia != null && ProfileMediaTarget.IMAGE in targets
+            val card = if (cardFromNew) newMedia else currentCard
+            val cardPreview = if (cardFromNew) newPreview else currentCard?.let {
+                ProfileCardRepository.loadBitmap(it, EDITOR_MAX_SIDE)?.asImageBitmap()
+            }
+            step = FlowStep.Edit(
+                card = card,
+                cardPreview = cardPreview,
+                avatar = newMedia?.takeIf { avatarFromNew }?.copy(scale = 1f, offsetX = 0f, offsetY = 0f)
+                    ?: currentAvatar?.asAvatarCard(),
+                avatarPreview = if (avatarFromNew) newPreview else currentAvatar,
+                initialPage = initialPage,
+                avatarIsNew = avatarFromNew,
+                newMediaPaths = listOfNotNull(newMedia?.mediaPath)
+            )
+        }
+    }
+
+    /** Editor snapshot to return to while media for its empty page is being picked. */
+    var addBase by remember { mutableStateOf<FlowStep.Edit?>(null) }
+    var addTarget by remember { mutableStateOf<ProfileMediaTarget?>(null) }
+
+    fun cancelPick() {
+        val base = addBase
+        addBase = null
+        addTarget = null
+        if (base != null) step = base else close()
+    }
+
+    fun applyToEmptyPage(base: FlowStep.Edit, target: ProfileMediaTarget, media: ProfileCard, preview: ImageBitmap) {
+        step = when (target) {
+            ProfileMediaTarget.CARD -> base.copy(card = media, cardPreview = preview)
+            ProfileMediaTarget.IMAGE -> base.copy(
+                avatar = media.copy(scale = 1f, offsetX = 0f, offsetY = 0f),
+                avatarPreview = preview,
+                avatarIsNew = true
+            )
+        }.let { it.copy(initialPage = target, newMediaPaths = it.newMediaPaths + media.mediaPath) }
+    }
+
+    LaunchedEffect(tile) {
+        val hasContent = when (tile) {
+            ProfileMediaTarget.CARD -> currentCard != null
+            ProfileMediaTarget.IMAGE -> currentAvatar != null
+            null -> false
+        }
+        when {
+            tile == null -> step = null
+            hasContent -> openEditor(initialPage = tile!!)
+            else -> step = FlowStep.Source
+        }
+    }
+
     fun handlePicked(uri: Uri?, isVideo: Boolean) {
-        if (uri == null) return close()
+        if (uri == null) return cancelPick()
         step = FlowStep.Loading
         scope.launch {
             val media = ProfileCardRepository.importMedia(context, uri, isVideo)
@@ -175,13 +242,20 @@ fun ProfileCardEditFlow(
                 capturePath = null
             }
             val preview = media?.let { ProfileCardRepository.loadBitmap(it, EDITOR_MAX_SIDE)?.asImageBitmap() }
-            step = when {
+            val base = addBase
+            val target = addTarget
+            when {
                 media == null || preview == null -> {
                     Toast.makeText(context, R.string.error_load_photo, Toast.LENGTH_SHORT).show()
-                    null.also { onClose() }
+                    cancelPick()
                 }
-                isVideo -> FlowStep.Edit(media, preview, listOf(ProfileMediaTarget.CARD))
-                else -> FlowStep.ChooseTargets(media, preview)
+                base != null && target != null -> {
+                    addBase = null
+                    addTarget = null
+                    applyToEmptyPage(base, if (isVideo) ProfileMediaTarget.CARD else target, media, preview)
+                }
+                isVideo -> openEditor(ProfileMediaTarget.CARD, media, preview, listOf(ProfileMediaTarget.CARD))
+                else -> step = FlowStep.ChooseTargets(media, preview)
             }
         }
     }
@@ -213,7 +287,7 @@ fun ProfileCardEditFlow(
             launchCamera(video)
         } else {
             Toast.makeText(context, R.string.profile_camera_denied, Toast.LENGTH_SHORT).show()
-            close()
+            cancelPick()
         }
     }
 
@@ -230,30 +304,25 @@ fun ProfileCardEditFlow(
     }
 
     when (val current = step) {
-        FlowStep.Source -> MediaSourceSheet(
-            canEditCard = tile == ProfileMediaTarget.CARD && currentCard != null,
-            onGallery = {
-                step = null
-                galleryLauncher.launch(
-                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
-                )
-            },
-            onTakePhoto = { requestCamera(video = false) },
-            onRecordVideo = { requestCamera(video = true) },
-            onEditCard = {
-                val card = currentCard ?: return@MediaSourceSheet
-                step = FlowStep.Loading
-                scope.launch {
-                    val preview = ProfileCardRepository.loadBitmap(card, EDITOR_MAX_SIDE)?.asImageBitmap()
-                    step = FlowStep.Edit(card, preview, listOf(ProfileMediaTarget.CARD))
-                }
-            },
-            onDeleteCard = {
-                onCardChanged(null)
-                close()
-            },
-            onDismiss = ::close
-        )
+        FlowStep.Source -> {
+            // The circular picture can't be a video
+            val imageOnly = (addTarget ?: tile) == ProfileMediaTarget.IMAGE
+            MediaSourceSheet(
+                allowVideo = !imageOnly,
+                onGallery = {
+                    step = null
+                    galleryLauncher.launch(
+                        PickVisualMediaRequest(
+                            if (imageOnly) ActivityResultContracts.PickVisualMedia.ImageOnly
+                            else ActivityResultContracts.PickVisualMedia.ImageAndVideo
+                        )
+                    )
+                },
+                onTakePhoto = { requestCamera(video = false) },
+                onRecordVideo = { requestCamera(video = true) },
+                onDismiss = ::cancelPick
+            )
+        }
 
         FlowStep.Loading -> Dialog(onDismissRequest = {}) {
             CircularProgressIndicator(color = SamsungGreen)
@@ -261,7 +330,7 @@ fun ProfileCardEditFlow(
 
         is FlowStep.ChooseTargets -> TargetSheet(
             preview = current.preview,
-            onConfirm = { targets -> step = FlowStep.Edit(current.media, current.preview, targets) },
+            onConfirm = { targets -> openEditor(targets.firstOrNull() ?: ProfileMediaTarget.CARD, current.media, current.preview, targets) },
             onDismiss = {
                 File(current.media.mediaPath).delete()
                 close()
@@ -269,15 +338,13 @@ fun ProfileCardEditFlow(
         )
 
         is FlowStep.Edit -> ProfileCardEditor(
-            media = current.media,
-            preview = current.preview,
-            targets = current.targets,
+            edit = current,
             contactName = contactName,
             screenAspect = screenAspect,
             onDone = { card, avatar ->
-                card?.let(onCardChanged)
+                if (card != null && card != currentCard) onCardChanged(card)
                 avatar?.let(onAvatarChanged)
-                if (card == null && current.media != currentCard) File(current.media.mediaPath).delete()
+                current.newMediaPaths.filter { it != card?.mediaPath }.forEach { File(it).delete() }
                 close()
             },
             onDelete = { target ->
@@ -285,10 +352,14 @@ fun ProfileCardEditFlow(
                     ProfileMediaTarget.CARD -> onCardChanged(null)
                     ProfileMediaTarget.IMAGE -> onAvatarRemoved()
                 }
-                if (current.media != currentCard) File(current.media.mediaPath).delete()
+                current.newMediaPaths.forEach { File(it).delete() }
                 close()
             },
-            onReplace = { step = FlowStep.Source },
+            onAdd = { target, snapshot ->
+                addBase = snapshot
+                addTarget = target
+                step = FlowStep.Source
+            },
             onDismiss = ::close
         )
 
@@ -299,27 +370,18 @@ fun ProfileCardEditFlow(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MediaSourceSheet(
-    canEditCard: Boolean,
+    allowVideo: Boolean,
     onGallery: () -> Unit,
     onTakePhoto: () -> Unit,
     onRecordVideo: () -> Unit,
-    onEditCard: () -> Unit,
-    onDeleteCard: () -> Unit,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(Modifier.padding(bottom = 16.dp)) {
             SourceRow(Icons.Default.PhotoLibrary, stringResource(R.string.profile_source_gallery), onClick = onGallery)
             SourceRow(Icons.Default.PhotoCamera, stringResource(R.string.profile_source_photo), onClick = onTakePhoto)
-            SourceRow(Icons.Default.Videocam, stringResource(R.string.profile_source_video), onClick = onRecordVideo)
-            if (canEditCard) {
-                SourceRow(Icons.Default.Edit, stringResource(R.string.profile_card_edit), onClick = onEditCard)
-                SourceRow(
-                    Icons.Default.Delete,
-                    stringResource(R.string.profile_card_delete),
-                    tint = MaterialTheme.colorScheme.error,
-                    onClick = onDeleteCard
-                )
+            if (allowVideo) {
+                SourceRow(Icons.Default.Videocam, stringResource(R.string.profile_source_video), onClick = onRecordVideo)
             }
         }
     }
@@ -448,19 +510,33 @@ private fun TargetOption(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProfileCardEditor(
-    media: ProfileCard,
-    preview: ImageBitmap?,
-    targets: List<ProfileMediaTarget>,
+    edit: FlowStep.Edit,
     contactName: String,
     screenAspect: Float,
     onDone: (card: ProfileCard?, avatar: Bitmap?) -> Unit,
     onDelete: (ProfileMediaTarget) -> Unit,
-    onReplace: () -> Unit,
+    onAdd: (target: ProfileMediaTarget, snapshot: FlowStep.Edit) -> Unit,
     onDismiss: () -> Unit
 ) {
-    val cardState = remember(media) { mutableStateOf(media) }
-    val avatarState = remember(media) { mutableStateOf(media.copy(scale = 1f, offsetX = 0f, offsetY = 0f)) }
-    val pagerState = rememberPagerState { targets.size }
+    val targets = ProfileMediaTarget.entries
+    // An empty page shows the "+" button, so its state only needs a placeholder value.
+    val placeholder = edit.card ?: edit.avatar ?: return
+    val cardState = remember(edit) { mutableStateOf(edit.card ?: placeholder) }
+    val avatarState = remember(edit) { mutableStateOf(edit.avatar ?: placeholder) }
+    fun hasContent(target: ProfileMediaTarget) = when (target) {
+        ProfileMediaTarget.CARD -> edit.card != null
+        ProfileMediaTarget.IMAGE -> edit.avatar != null
+    }
+    fun snapshot() = edit.copy(
+        card = edit.card?.let { cardState.value },
+        avatar = edit.avatar?.let { avatarState.value }
+    )
+    val pagerState = rememberPagerState(initialPage = targets.indexOf(edit.initialPage).coerceAtLeast(0)) { targets.size }
+    val preview = if (targets.getOrNull(pagerState.currentPage) == ProfileMediaTarget.IMAGE) {
+        edit.avatarPreview ?: edit.cardPreview
+    } else {
+        edit.cardPreview ?: edit.avatarPreview
+    }
     var sheet by remember { mutableStateOf<EditorSheet?>(null) }
     val currentTarget = targets[pagerState.currentPage.coerceIn(targets.indices)]
     val scope = rememberCoroutineScope()
@@ -516,10 +592,12 @@ private fun ProfileCardEditor(
                     Spacer(Modifier.weight(1f))
                     TextButton(
                         onClick = {
-                            val avatar = if (ProfileMediaTarget.IMAGE in targets) {
-                                preview?.let { cropSquare(it.asAndroidBitmap(), avatarState.value) }
+                            val avatarChanged = edit.avatar != null &&
+                                    (edit.avatarIsNew || avatarState.value != edit.avatar)
+                            val avatar = if (avatarChanged) {
+                                edit.avatarPreview?.let { cropSquare(it.asAndroidBitmap(), avatarState.value) }
                             } else null
-                            onDone(cardState.value.takeIf { ProfileMediaTarget.CARD in targets }, avatar)
+                            onDone(cardState.value.takeIf { edit.card != null }, avatar)
                         }
                     ) {
                         Text(
@@ -529,10 +607,12 @@ private fun ProfileCardEditor(
                             fontWeight = FontWeight.Bold
                         )
                     }
-                    Box {
+                    Box(Modifier.size(48.dp)) {
                         var menuOpen by remember { mutableStateOf(false) }
-                        IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Default.MoreVert, contentDescription = null, tint = Color.White)
+                        if (hasContent(currentTarget)) {
+                            IconButton(onClick = { menuOpen = true }) {
+                                Icon(Icons.Default.MoreVert, contentDescription = null, tint = Color.White)
+                            }
                         }
                         OneUiPopupMenu(
                             expanded = menuOpen,
@@ -554,17 +634,23 @@ private fun ProfileCardEditor(
                         .weight(1f)
                         .fillMaxWidth()
                 ) { page ->
-                    when (targets[page]) {
-                        ProfileMediaTarget.CARD -> CardPage(
+                    val target = targets[page]
+                    when {
+                        !hasContent(target) -> AddMediaPage(
+                            target = target,
+                            screenAspect = screenAspect,
+                            onClick = { onAdd(target, snapshot()) }
+                        )
+                        target == ProfileMediaTarget.CARD -> CardPage(
                             state = cardState,
-                            preview = preview,
+                            preview = edit.cardPreview,
                             contactName = contactName,
                             screenAspect = screenAspect,
                             videoRange = trimRange ?: (cardState.value.trimStartMs to cardState.value.trimEndMs),
                             videoPlaying = trimRange == null || trimPlaying,
                             onVideoPosition = if (trimRange != null) ({ videoPositionMs = it }) else null
                         )
-                        ProfileMediaTarget.IMAGE -> ImagePage(avatarState, preview)
+                        else -> ImagePage(avatarState, edit.avatarPreview)
                     }
                 }
 
@@ -638,10 +724,11 @@ private fun ProfileCardEditor(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .heightIn(min = 72.dp)
                                 .padding(vertical = 12.dp),
                             horizontalArrangement = Arrangement.SpaceEvenly
                         ) {
-                            if (currentTarget == ProfileMediaTarget.CARD) {
+                            if (currentTarget == ProfileMediaTarget.CARD && hasContent(currentTarget)) {
                                 EditorAction(Icons.Default.TextFields, stringResource(R.string.profile_text)) {
                                     sheet = EditorSheet.TEXT
                                 }
@@ -655,7 +742,11 @@ private fun ProfileCardEditor(
                                     }
                                 }
                             }
-                            EditorAction(Icons.Default.PhotoLibrary, stringResource(R.string.profile_replace), onReplace)
+                            if (hasContent(currentTarget)) {
+                                EditorAction(Icons.Default.PhotoLibrary, stringResource(R.string.profile_replace)) {
+                                    onAdd(currentTarget, snapshot())
+                                }
+                            }
                         }
                     }
                 }
@@ -666,6 +757,49 @@ private fun ProfileCardEditor(
             EditorSheet.TEXT -> TextSheet(cardState) { sheet = null }
             EditorSheet.EFFECT -> EffectSheet(cardState) { sheet = null }
             null -> Unit
+        }
+    }
+}
+
+/** Empty page with a "+" that starts picking media for [target]; keeps the page's frame shape. */
+@Composable
+private fun AddMediaPage(target: ProfileMediaTarget, screenAspect: Float, onClick: () -> Unit) {
+    BoxWithConstraints(
+        Modifier
+            .fillMaxSize()
+            .padding(horizontal = 32.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        val shape = if (target == ProfileMediaTarget.CARD) RoundedCornerShape(28.dp) else CircleShape
+        val frame = if (target == ProfileMediaTarget.CARD) {
+            Modifier.aspectRatio(screenAspect, matchHeightConstraintsFirst = true)
+        } else {
+            Modifier.size(minOf(maxWidth, maxHeight) * 0.82f)
+        }
+        Box(
+            contentAlignment = Alignment.Center,
+            modifier = frame
+                .clip(shape)
+                .background(Color.White.copy(alpha = 0.08f))
+                .border(BorderStroke(1.5.dp, Color.White.copy(alpha = 0.35f)), shape)
+                .clickable(onClick = onClick)
+        ) {
+            Box(
+                contentAlignment = Alignment.Center,
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(CircleShape)
+                    .background(Color.White.copy(alpha = 0.18f))
+            ) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = stringResource(
+                        if (target == ProfileMediaTarget.CARD) R.string.profile_card_title else R.string.profile_image_title
+                    ),
+                    tint = Color.White,
+                    modifier = Modifier.size(40.dp)
+                )
+            }
         }
     }
 }
