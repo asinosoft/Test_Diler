@@ -155,6 +155,8 @@
     <string name="incall_state_dialing">Вызов…</string>
     <string name="incall_state_connecting">Соединение…</string>
     <string name="incall_state_disconnecting">Завершение…</string>
+    <string name="incall_state_select_account">Выберите SIM</string>
+    <string name="incall_sim_slot">SIM %d</string>
     <string name="incall_action_message">Сообщение</string>
     <string name="incall_action_info">Инфо</string>
     <string name="incall_action_add">Добавить</string>

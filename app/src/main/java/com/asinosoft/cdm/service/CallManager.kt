@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.telecom.Call
 import android.telecom.CallAudioState
+import android.telecom.PhoneAccountHandle
 import android.util.Log
 import com.asinosoft.cdm.MainActivity
 import com.asinosoft.cdm.util.Analytics
@@ -138,8 +139,25 @@ object CallManager {
 
         if (_currentCall.value == null || _currentCall.value?.state == Call.STATE_DISCONNECTED) {
             _currentCall.value = call
-        } else if (call.state == Call.STATE_RINGING || call.state == Call.STATE_DIALING || call.state == Call.STATE_CONNECTING || call.state == Call.STATE_ACTIVE) {
+        } else if (call.state == Call.STATE_RINGING ||
+            call.state == Call.STATE_DIALING ||
+            call.state == Call.STATE_CONNECTING ||
+            call.state == Call.STATE_SELECT_PHONE_ACCOUNT ||
+            call.state == Call.STATE_ACTIVE
+        ) {
             _currentCall.value = call
+        }
+    }
+
+    fun selectPhoneAccount(handle: PhoneAccountHandle, setDefault: Boolean = false) {
+        selectPhoneAccount(_currentCall.value, handle, setDefault)
+    }
+
+    fun selectPhoneAccount(call: Call?, handle: PhoneAccountHandle, setDefault: Boolean = false) {
+        try {
+            call?.phoneAccountSelected(handle, setDefault)
+        } catch (e: Exception) {
+            Log.w("call", "Failed to select phone account", e)
         }
     }
 

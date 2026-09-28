@@ -143,6 +143,8 @@
     <string name="incall_state_dialing">전화 거는 중…</string>
     <string name="incall_state_connecting">연결 중…</string>
     <string name="incall_state_disconnecting">종료 중…</string>
+    <string name="incall_state_select_account">SIM 선택</string>
+    <string name="incall_sim_slot">SIM %d</string>
     <string name="incall_action_message">메시지</string>
     <string name="incall_action_info">정보</string>
     <string name="incall_action_add">추가</string>

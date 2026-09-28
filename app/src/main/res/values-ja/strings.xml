@@ -143,6 +143,8 @@
     <string name="incall_state_dialing">発信中…</string>
     <string name="incall_state_connecting">接続中…</string>
     <string name="incall_state_disconnecting">終了中…</string>
+    <string name="incall_state_select_account">SIMを選択</string>
+    <string name="incall_sim_slot">SIM %d</string>
     <string name="incall_action_message">メッセージ</string>
     <string name="incall_action_info">情報</string>
     <string name="incall_action_add">追加</string>

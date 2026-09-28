@@ -144,6 +144,8 @@
     <string name="incall_state_dialing">कॉल हो रही है…</string>
     <string name="incall_state_connecting">कनेक्ट हो रहा है…</string>
     <string name="incall_state_disconnecting">समाप्त हो रहा है…</string>
+    <string name="incall_state_select_account">SIM चुनें</string>
+    <string name="incall_sim_slot">SIM %d</string>
     <string name="incall_action_message">संदेश</string>
     <string name="incall_action_info">जानकारी</string>
     <string name="incall_action_add">जोड़ें</string>

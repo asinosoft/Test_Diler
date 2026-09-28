@@ -137,7 +137,9 @@ import com.asinosoft.cdm.ui.recents.components.getSwipeBackgroundVisuals
 import com.asinosoft.cdm.ui.theme.MissedRed
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.ui.theme.SamsungSmsBlue
+import com.asinosoft.cdm.util.PhoneAccountHelper
 import com.asinosoft.cdm.util.PhoneNumberHelper
+import com.asinosoft.cdm.util.SelectablePhoneAccount
 import com.asinosoft.cdm.util.rememberActiveSimCount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -205,6 +207,8 @@ fun InCallScreen(
     val hasLiveCall = displayableCalls.any { it.state != Call.STATE_DISCONNECTED && it.state != Call.STATE_DISCONNECTING }
     val isCallDisconnected = displayableCalls.isEmpty() || !hasLiveCall
     val isCallActive = (callState == Call.STATE_ACTIVE) && !isCallDisconnected
+    val isSelectingPhoneAccount = callState == Call.STATE_SELECT_PHONE_ACCOUNT && !isCallDisconnected
+    var phoneAccounts by remember { mutableStateOf<List<SelectablePhoneAccount>>(emptyList()) }
 
     val showMultiCallList = displayableCalls.size >= 2 &&
             incomingWaitingCall == null &&
@@ -267,11 +271,23 @@ fun InCallScreen(
         val callback = object : Call.Callback() {
             override fun onStateChanged(call: Call, state: Int) {
                 callState = state
+                if (state == Call.STATE_SELECT_PHONE_ACCOUNT) {
+                    phoneAccounts = PhoneAccountHelper(context).getSelectableAccounts(call)
+                }
+            }
+
+            override fun onDetailsChanged(call: Call, details: Call.Details?) {
+                if (call.state == Call.STATE_SELECT_PHONE_ACCOUNT) {
+                    phoneAccounts = PhoneAccountHelper(context).getSelectableAccounts(call)
+                }
             }
         }
 
         current.registerCallback(callback)
         callState = current.state
+        if (current.state == Call.STATE_SELECT_PHONE_ACCOUNT) {
+            phoneAccounts = PhoneAccountHelper(context).getSelectableAccounts(current)
+        }
 
         onDispose {
             current.unregisterCallback(callback)
@@ -282,7 +298,7 @@ fun InCallScreen(
     LaunchedEffect(isCallDisconnected) {
         if (isCallDisconnected) {
             callState = Call.STATE_DISCONNECTED
-            delay(2000L)
+            delay(2000L.milliseconds)
             onFinish()
         }
     }
@@ -484,7 +500,7 @@ fun InCallScreen(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.Center
                         ) {
-                            if (activeSimCount > 1) {
+                            if (activeSimCount > 1 && !isSelectingPhoneAccount) {
                                 SimIcon(simNumber = simNumber, size = 15.dp)
                                 Spacer(modifier = Modifier.width(6.dp))
                             }
@@ -516,6 +532,7 @@ fun InCallScreen(
                         Call.STATE_DIALING -> stringResource(R.string.incall_state_dialing)
                         Call.STATE_CONNECTING -> stringResource(R.string.incall_state_connecting)
                         Call.STATE_DISCONNECTING -> stringResource(R.string.incall_state_disconnecting)
+                        Call.STATE_SELECT_PHONE_ACCOUNT -> stringResource(R.string.incall_state_select_account)
                         Call.STATE_ACTIVE -> formatDuration(durationSeconds)
                         else -> "..."
                     }
@@ -800,8 +817,17 @@ fun InCallScreen(
                 Spacer(modifier = Modifier.height(112.dp))
             }
 
+            // Middle Section: SIM picker, action grid, or spacer
+            if (isSelectingPhoneAccount) {
+                PhoneAccountPicker(
+                    accounts = phoneAccounts,
+                    onSelect = { account ->
+                        CallManager.selectPhoneAccount(activeCall, account.handle)
+                    }
+                )
+            }
             // Action grid sits right above the bottom buttons, as in One UI
-            if ((callState == Call.STATE_ACTIVE || callState == Call.STATE_DIALING || isHold) && !isCallDisconnected) {
+            else if ((callState == Call.STATE_ACTIVE || callState == Call.STATE_DIALING || isHold) && !isCallDisconnected) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -995,6 +1021,59 @@ fun InCallScreen(
             },
             onDismiss = { showBluetoothMenu = false }
         )
+    }
+}
+
+@Composable
+private fun PhoneAccountPicker(
+    accounts: List<SelectablePhoneAccount>,
+    onSelect: (SelectablePhoneAccount) -> Unit
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        accounts.forEach { account ->
+            Surface(
+                shape = RoundedCornerShape(18.dp),
+                color = Color.White.copy(alpha = 0.12f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(18.dp))
+                    .clickable { onSelect(account) }
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    SimIcon(simNumber = account.simNumber, size = 28.dp)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.incall_sim_slot, account.simNumber),
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White
+                        )
+                        val fallbackLabel = "SIM ${account.simNumber}"
+                        if (account.label.isNotBlank() &&
+                            !account.label.equals(fallbackLabel, ignoreCase = true)
+                        ) {
+                            Text(
+                                text = account.label,
+                                fontSize = 13.sp,
+                                color = Color.White.copy(alpha = 0.65f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 

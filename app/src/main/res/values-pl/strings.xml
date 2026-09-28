@@ -146,6 +146,8 @@
     <string name="incall_state_dialing">Łączenie…</string>
     <string name="incall_state_connecting">Nawiązywanie połączenia…</string>
     <string name="incall_state_disconnecting">Kończenie…</string>
+    <string name="incall_state_select_account">Wybierz SIM</string>
+    <string name="incall_sim_slot">SIM %d</string>
     <string name="incall_action_message">Wiadomość</string>
     <string name="incall_action_info">Info</string>
     <string name="incall_action_add">Dodaj</string>

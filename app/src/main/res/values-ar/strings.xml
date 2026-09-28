@@ -148,6 +148,8 @@
     <string name="incall_state_dialing">جارٍ الاتصال…</string>
     <string name="incall_state_connecting">جارٍ الاتصال…</string>
     <string name="incall_state_disconnecting">جارٍ الإنهاء…</string>
+    <string name="incall_state_select_account">اختر شريحة SIM</string>
+    <string name="incall_sim_slot">SIM %d</string>
     <string name="incall_action_message">رسالة</string>
     <string name="incall_action_info">معلومات</string>
     <string name="incall_action_add">إضافة</string>
