@@ -260,6 +260,7 @@
     <string name="contact_swipe_default_call">डिफ़ॉल्ट कॉल</string>
     <string name="contact_swipe_default_sms">डिफ़ॉल्ट SMS</string>
     <string name="contact_ringtone">रिंगटोन</string>
+    <string name="contact_call_screen">कॉल स्क्रीन</string>
     <string name="contact_add_to_home">होम स्क्रीन पर जोड़ें</string>
     <string name="contact_block">संपर्क ब्लॉक करें</string>
     <string name="contact_blocked">संपर्क ब्लॉक है</string>

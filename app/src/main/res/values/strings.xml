@@ -285,6 +285,7 @@
     <string name="contact_swipe_default_call">Default call</string>
     <string name="contact_swipe_default_sms">Default SMS</string>
     <string name="contact_ringtone">Ringtone</string>
+    <string name="contact_call_screen">Call screen</string>
     <string name="contact_add_to_home">Add to Home screen</string>
     <string name="contact_block">Block contact</string>
     <string name="contact_blocked">Contact blocked</string>

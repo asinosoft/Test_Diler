@@ -264,6 +264,7 @@
     <string name="contact_swipe_default_call">المكالمة الافتراضية</string>
     <string name="contact_swipe_default_sms">SMS الافتراضي</string>
     <string name="contact_ringtone">نغمة الرنين</string>
+    <string name="contact_call_screen">شاشة المكالمة</string>
     <string name="contact_add_to_home">إضافة إلى الشاشة الرئيسية</string>
     <string name="contact_block">حظر جهة الاتصال</string>
     <string name="contact_blocked">تم حظر جهة الاتصال</string>

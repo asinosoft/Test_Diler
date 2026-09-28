@@ -259,6 +259,7 @@
     <string name="contact_swipe_default_call">默认通话</string>
     <string name="contact_swipe_default_sms">默认短信</string>
     <string name="contact_ringtone">铃声</string>
+    <string name="contact_call_screen">通话界面</string>
     <string name="contact_add_to_home">添加到主屏幕</string>
     <string name="contact_block">屏蔽联系人</string>
     <string name="contact_blocked">联系人已屏蔽</string>

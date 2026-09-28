@@ -260,6 +260,7 @@
     <string name="contact_swipe_default_call">Chiamata predefinita</string>
     <string name="contact_swipe_default_sms">SMS predefinito</string>
     <string name="contact_ringtone">Suoneria</string>
+    <string name="contact_call_screen">Schermata di chiamata</string>
     <string name="contact_add_to_home">Aggiungi alla schermata Home</string>
     <string name="contact_block">Blocca contatto</string>
     <string name="contact_blocked">Contatto bloccato</string>

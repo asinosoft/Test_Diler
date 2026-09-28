@@ -80,6 +80,7 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.PhoneInTalk
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Event
 import androidx.compose.material.icons.filled.FolderSpecial
@@ -789,7 +790,10 @@ fun ContactDetailDialog(
                                                 avatarBitmap = avatarBitmap,
                                                 onToggleFavorite = onToggleFavorite,
                                                 onUpdateContact = onUpdateContact,
-                                                onAddTab = onAddTab
+                                                onAddTab = onAddTab,
+                                                onOpenCallScreen = {
+                                                    photoEditTile = ProfileMediaTarget.CARD
+                                                }
                                             )
                                             Spacer(modifier = Modifier.height(40.dp))
                                         }
@@ -1155,7 +1159,8 @@ fun ContactDetailDialog(
                     onSetContactPhoto(contact, null)
                 },
                 onClose = { photoEditTile = null },
-                onImagePicked = if (unsavedCallLogItem != null) onUnsavedPhotoPicked else null
+                onImagePicked = if (unsavedCallLogItem != null) onUnsavedPhotoPicked else null,
+                openEditorWhenEmpty = photoEditTile == ProfileMediaTarget.CARD
             )
 
             if (showEditContactDialog) {
@@ -2318,7 +2323,8 @@ private fun SettingsTabContent(
     avatarBitmap: ImageBitmap?,
     onToggleFavorite: (FavoriteContact, Boolean) -> Unit,
     onUpdateContact: (FavoriteContact) -> Unit,
-    onAddTab: (String) -> FavoriteTab
+    onAddTab: (String) -> FavoriteTab,
+    onOpenCallScreen: () -> Unit = {}
 ) {
     var isFavorite by remember(contact.id, contact.number, isFavoriteInitial) {
         mutableStateOf(isFavoriteInitial)
@@ -2781,6 +2787,18 @@ private fun SettingsTabContent(
                     onClick = {
                         showRingtonePickerDialog = true
                     }
+                )
+
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    thickness = 1.dp,
+                    modifier = Modifier.padding(horizontal = 16.dp)
+                )
+
+                OptionRow(
+                    icon = Icons.Default.PhoneInTalk,
+                    label = stringResource(R.string.contact_call_screen),
+                    onClick = onOpenCallScreen
                 )
 
                 HorizontalDivider(

@@ -259,6 +259,7 @@
     <string name="contact_swipe_default_call">기본 전화</string>
     <string name="contact_swipe_default_sms">기본 SMS</string>
     <string name="contact_ringtone">벨소리</string>
+    <string name="contact_call_screen">통화 화면</string>
     <string name="contact_add_to_home">홈 화면에 추가</string>
     <string name="contact_block">연락처 차단</string>
     <string name="contact_blocked">연락처가 차단됨</string>

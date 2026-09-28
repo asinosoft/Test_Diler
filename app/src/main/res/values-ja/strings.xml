@@ -259,6 +259,7 @@
     <string name="contact_swipe_default_call">デフォルトの発信</string>
     <string name="contact_swipe_default_sms">デフォルトのSMS</string>
     <string name="contact_ringtone">着信音</string>
+    <string name="contact_call_screen">通話画面</string>
     <string name="contact_add_to_home">ホーム画面に追加</string>
     <string name="contact_block">連絡先をブロック</string>
     <string name="contact_blocked">連絡先をブロックしました</string>

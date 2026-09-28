@@ -114,7 +114,13 @@ enum class ProfileMediaTarget { CARD, IMAGE }
 private sealed interface FlowStep {
     data object Source : FlowStep
     data object Loading : FlowStep
-    data class ChooseTargets(val media: ProfileCard, val preview: ImageBitmap) : FlowStep
+    /** [base] is the editor to return to when the photo was picked from inside it. */
+    data class ChooseTargets(
+        val media: ProfileCard,
+        val preview: ImageBitmap,
+        val focus: ProfileMediaTarget,
+        val base: Edit? = null
+    ) : FlowStep
     /** Editor pages: the card (when [card] != null) and the circular picture (when [avatar] != null). */
     data class Edit(
         val card: ProfileCard?,
@@ -159,7 +165,9 @@ fun ProfileCardEditFlow(
     onAvatarRemoved: () -> Unit,
     onClose: () -> Unit,
     /** When set, a photo picked for the empty "Picture" tile is returned square-cropped instead of opening the editor. */
-    onImagePicked: ((Bitmap) -> Unit)? = null
+    onImagePicked: ((Bitmap) -> Unit)? = null,
+    /** Open the editor on [tile] even when it is empty (showing its "+") instead of the source picker. */
+    openEditorWhenEmpty: Boolean = false
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -210,15 +218,21 @@ fun ProfileCardEditFlow(
         if (base != null) step = base else close()
     }
 
-    fun applyToEmptyPage(base: FlowStep.Edit, target: ProfileMediaTarget, media: ProfileCard, preview: ImageBitmap) {
-        step = when (target) {
-            ProfileMediaTarget.CARD -> base.copy(card = media, cardPreview = preview)
-            ProfileMediaTarget.IMAGE -> base.copy(
-                avatar = media.copy(scale = 1f, offsetX = 0f, offsetY = 0f),
-                avatarPreview = preview,
-                avatarIsNew = true
-            )
-        }.let { it.copy(initialPage = target, newMediaPaths = it.newMediaPaths + media.mediaPath) }
+    fun applyToEditor(
+        base: FlowStep.Edit,
+        targets: List<ProfileMediaTarget>,
+        page: ProfileMediaTarget,
+        media: ProfileCard,
+        preview: ImageBitmap
+    ) {
+        var edit = base
+        if (ProfileMediaTarget.CARD in targets) edit = edit.copy(card = media, cardPreview = preview)
+        if (ProfileMediaTarget.IMAGE in targets) edit = edit.copy(
+            avatar = media.copy(scale = 1f, offsetX = 0f, offsetY = 0f),
+            avatarPreview = preview,
+            avatarIsNew = true
+        )
+        step = edit.copy(initialPage = page, newMediaPaths = edit.newMediaPaths + media.mediaPath)
     }
 
     LaunchedEffect(tile) {
@@ -229,7 +243,7 @@ fun ProfileCardEditFlow(
         }
         when {
             tile == null -> step = null
-            hasContent -> openEditor(initialPage = tile!!)
+            hasContent || openEditorWhenEmpty -> openEditor(initialPage = tile!!)
             else -> step = FlowStep.Source
         }
     }
@@ -255,7 +269,11 @@ fun ProfileCardEditFlow(
                 base != null && target != null -> {
                     addBase = null
                     addTarget = null
-                    applyToEmptyPage(base, if (isVideo) ProfileMediaTarget.CARD else target, media, preview)
+                    if (isVideo) {
+                        applyToEditor(base, listOf(ProfileMediaTarget.CARD), ProfileMediaTarget.CARD, media, preview)
+                    } else {
+                        step = FlowStep.ChooseTargets(media, preview, focus = target, base = base)
+                    }
                 }
                 onImagePicked != null && !isVideo && tile == ProfileMediaTarget.IMAGE -> {
                     val square = cropSquare(
@@ -267,9 +285,7 @@ fun ProfileCardEditFlow(
                     onImagePicked(square)
                 }
                 isVideo -> openEditor(ProfileMediaTarget.CARD, media, preview, listOf(ProfileMediaTarget.CARD))
-                tile == ProfileMediaTarget.IMAGE ->
-                    openEditor(ProfileMediaTarget.IMAGE, media, preview, listOf(ProfileMediaTarget.IMAGE))
-                else -> step = FlowStep.ChooseTargets(media, preview)
+                else -> step = FlowStep.ChooseTargets(media, preview, focus = tile ?: ProfileMediaTarget.CARD)
             }
         }
     }
@@ -344,10 +360,20 @@ fun ProfileCardEditFlow(
 
         is FlowStep.ChooseTargets -> TargetSheet(
             preview = current.preview,
-            onConfirm = { targets -> openEditor(targets.firstOrNull() ?: ProfileMediaTarget.CARD, current.media, current.preview, targets) },
+            initialTargets = if (current.base != null) setOf(current.focus) else ProfileMediaTarget.entries.toSet(),
+            onConfirm = { targets ->
+                val page = current.focus.takeIf { it in targets } ?: targets.first()
+                val base = current.base
+                if (base != null) {
+                    applyToEditor(base, targets, page, current.media, current.preview)
+                } else {
+                    openEditor(page, current.media, current.preview, targets)
+                }
+            },
             onDismiss = {
                 File(current.media.mediaPath).delete()
-                close()
+                val base = current.base
+                if (base != null) step = base else close()
             }
         )
 
@@ -425,11 +451,12 @@ private fun SourceRow(
 @Composable
 private fun TargetSheet(
     preview: ImageBitmap,
+    initialTargets: Set<ProfileMediaTarget>,
     onConfirm: (List<ProfileMediaTarget>) -> Unit,
     onDismiss: () -> Unit
 ) {
-    var forCard by remember { mutableStateOf(true) }
-    var forImage by remember { mutableStateOf(true) }
+    var forCard by remember { mutableStateOf(ProfileMediaTarget.CARD in initialTargets) }
+    var forImage by remember { mutableStateOf(ProfileMediaTarget.IMAGE in initialTargets) }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -534,7 +561,8 @@ private fun ProfileCardEditor(
 ) {
     val targets = ProfileMediaTarget.entries
     // An empty page shows the "+" button, so its state only needs a placeholder value.
-    val placeholder = edit.card ?: edit.avatar ?: return
+    val placeholder = edit.card ?: edit.avatar
+        ?: ProfileCard(mediaPath = "", isVideo = false, mediaWidth = 1, mediaHeight = 1)
     val cardState = remember(edit) { mutableStateOf(edit.card ?: placeholder) }
     val avatarState = remember(edit) { mutableStateOf(edit.avatar ?: placeholder) }
     fun hasContent(target: ProfileMediaTarget) = when (target) {
