@@ -489,6 +489,8 @@
     <string name="profile_source_video">تسجيل فيديو</string>
     <string name="profile_card_edit">تعديل بطاقة الملف الشخصي</string>
     <string name="profile_card_delete">إزالة بطاقة الملف الشخصي</string>
+    <string name="profile_card_delete_confirm">هل تريد إزالة بطاقة الملف الشخصي؟</string>
+    <string name="profile_image_delete_confirm">هل تريد إزالة صورة الملف الشخصي؟</string>
     <string name="profile_text">النص</string>
     <string name="profile_text_color">لون النص</string>
     <string name="profile_text_size">حجم النص</string>

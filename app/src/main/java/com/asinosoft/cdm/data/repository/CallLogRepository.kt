@@ -308,6 +308,17 @@ class CallLogRepository(private val context: Context) {
         return name
     }
 
+    /** Uncached Contacts lookup; refreshes the name cache so deleted contacts stop resolving. */
+    fun liveDisplayName(phoneNumber: String): String? {
+        if (phoneNumber.isBlank()) return null
+        val key = photoCacheKey(phoneNumber)
+        val name = lookupContactDisplayName(phoneNumber)
+        if (key.isNotEmpty()) {
+            if (name == null) nameCache.remove(key) else nameCache[key] = name
+        }
+        return name
+    }
+
     private fun lookupContactDisplayName(phoneNumber: String): String? {
         for (candidate in numberLookupCandidates(phoneNumber)) {
             try {

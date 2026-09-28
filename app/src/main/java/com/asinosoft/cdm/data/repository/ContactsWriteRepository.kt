@@ -27,10 +27,11 @@ class ContactsWriteRepository(private val context: Context) {
     data class EmailEntry(val address: String, val label: String)
 
     fun resolveContactId(contact: FavoriteContact): Long? {
-        parseNumericId(contact.id)?.let { id ->
+        parseContactId(contact)?.let { id ->
             if (contactExists(id)) return id
         }
-        return lookupContactIdByNumber(contact.number)
+        return contact.number.takeIf { it.isNotBlank() }?.let(::lookupContactIdByNumber)
+            ?: lookupContactIdByName(contact.name)
     }
 
     /** Sets Android Contacts STARRED flag. Returns resolved contact id or null. */
@@ -570,6 +571,26 @@ class ContactsWriteRepository(private val context: Context) {
         nameOk
     }
 
+    /** Writes [photoBitmap] as the contact photo, or removes the photo when it is null. */
+    suspend fun setContactPhoto(contact: FavoriteContact, photoBitmap: Bitmap?): Boolean =
+        withContext(Dispatchers.IO) {
+            val contactId = resolveContactId(contact) ?: return@withContext false
+            try {
+                if (photoBitmap == null) {
+                    deleteContactPhoto(contactId)
+                    true
+                } else {
+                    val rawContactId = getWritableRawContactId(contactId)
+                        ?: getPrimaryRawContactId(contactId)
+                        ?: return@withContext false
+                    writeContactPhoto(rawContactId, photoBitmap)
+                }
+            } catch (e: Exception) {
+                Log.w(TAG, "setContactPhoto failed", e)
+                false
+            }
+        }
+
     /** Removes photo rows from every raw contact so the aggregated contact has no photo left. */
     private fun deleteContactPhoto(contactId: Long) {
         context.contentResolver.delete(
@@ -956,11 +977,39 @@ class ContactsWriteRepository(private val context: Context) {
         return result.toList()
     }
 
-    private fun parseNumericId(id: String?): Long? {
-        if (id.isNullOrBlank()) return null
-        val raw = id.removePrefix("starred_").removePrefix("fav_contact_")
-            .removePrefix("call_log_")
+    /**
+     * Extracts an Android contact id from app-level ids ("contact_12", "fav_12", "starred_12", "12").
+     * Call-log ids and ids that are really the phone number are rejected, as they would
+     * point at an unrelated contact.
+     */
+    private fun parseContactId(contact: FavoriteContact): Long? {
+        var raw = contact.id
+        while (true) {
+            val prefix = CONTACT_ID_PREFIXES.firstOrNull { raw.startsWith(it) } ?: break
+            raw = raw.removePrefix(prefix)
+        }
+        if (raw.isEmpty() || raw.startsWith("log_") || raw.startsWith("call_log_")) return null
+        if (raw == contact.number.filter(Char::isDigit)) return null
         return raw.toLongOrNull()
+    }
+
+    /** Contact id by exact display name, only when the name is unambiguous. */
+    private fun lookupContactIdByName(name: String): Long? {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return null
+        return try {
+            context.contentResolver.query(
+                ContactsContract.Contacts.CONTENT_URI,
+                arrayOf(ContactsContract.Contacts._ID),
+                "${ContactsContract.Contacts.DISPLAY_NAME_PRIMARY}=?",
+                arrayOf(trimmed),
+                null
+            )?.use { c ->
+                if (c.count == 1 && c.moveToFirst()) c.getLong(0) else null
+            }
+        } catch (_: Exception) {
+            null
+        }
     }
 
     private fun phoneTypeFromLabel(label: String): Int {
@@ -991,5 +1040,6 @@ class ContactsWriteRepository(private val context: Context) {
 
     companion object {
         private const val TAG = "ContactsWrite"
+        private val CONTACT_ID_PREFIXES = listOf("fav_contact_", "fav_", "starred_", "contact_")
     }
 }

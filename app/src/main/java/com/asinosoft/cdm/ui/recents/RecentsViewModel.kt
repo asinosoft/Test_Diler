@@ -853,6 +853,14 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /** Replaces the contact photo, or removes it when [photoBitmap] is null. */
+    fun setContactPhoto(contact: FavoriteContact, photoBitmap: android.graphics.Bitmap?) {
+        viewModelScope.launch {
+            contactsWriteRepository.setContactPhoto(contact, photoBitmap)
+            AvatarBitmapCache.clear()
+        }
+    }
+
     fun setContactFavorite(contact: FavoriteContact, favorite: Boolean) {
         if (favorite) addFavorite(contact) else removeFavorite(contact)
     }
@@ -929,8 +937,35 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /**
+     * The call-log row name may be stale (e.g. the contact was just deleted), so the live
+     * Contacts name decides: a number without a contact opens as unsaved.
+     */
     fun openContactDetailFromCallLog(item: CallLogItem, initialTab: Int = 1) {
-        openContactDetail(contactFromCallLogItem(item), initialTab = initialTab)
+        viewModelScope.launch {
+            val liveName = withContext(Dispatchers.IO) { repository.liveDisplayName(item.number) }
+            val isFavorite = _favorites.value.any { fav ->
+                val key = phoneMatchKey(fav.number)
+                key != null && key == phoneMatchKey(item.number)
+            }
+            when {
+                liveName != null || isFavorite ->
+                    openContactDetail(contactFromCallLogItem(item.copy(name = liveName ?: item.name)), initialTab)
+                else -> {
+                    if (item.name != null) {
+                        clearCallLogNames(listOf(item.number))
+                        withContext(Dispatchers.IO) {
+                            contactsWriteRepository.clearCallLogCachedName(listOf(item.number))
+                        }
+                    }
+                    if (initialTab == 0) {
+                        openUnsavedNumberContactFlow(item.number)
+                    } else {
+                        openContactDetail(contactFromCallLogItem(item.copy(name = null)), initialTab)
+                    }
+                }
+            }
+        }
     }
 
     fun openUnsavedNumberContactFlow(phoneNumber: String) {

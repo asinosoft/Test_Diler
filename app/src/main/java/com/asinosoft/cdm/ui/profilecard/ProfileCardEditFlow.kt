@@ -61,6 +61,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -255,6 +256,8 @@ fun ProfileCardEditFlow(
                     applyToEmptyPage(base, if (isVideo) ProfileMediaTarget.CARD else target, media, preview)
                 }
                 isVideo -> openEditor(ProfileMediaTarget.CARD, media, preview, listOf(ProfileMediaTarget.CARD))
+                tile == ProfileMediaTarget.IMAGE ->
+                    openEditor(ProfileMediaTarget.IMAGE, media, preview, listOf(ProfileMediaTarget.IMAGE))
                 else -> step = FlowStep.ChooseTargets(media, preview)
             }
         }
@@ -609,6 +612,7 @@ private fun ProfileCardEditor(
                     }
                     Box(Modifier.size(48.dp)) {
                         var menuOpen by remember { mutableStateOf(false) }
+                        var confirmTarget by remember { mutableStateOf<ProfileMediaTarget?>(null) }
                         if (hasContent(currentTarget)) {
                             IconButton(onClick = { menuOpen = true }) {
                                 Icon(Icons.Default.MoreVert, contentDescription = null, tint = Color.White)
@@ -621,9 +625,23 @@ private fun ProfileCardEditor(
                                 stringResource(
                                     if (currentTarget == ProfileMediaTarget.CARD) R.string.profile_card_delete
                                     else R.string.profile_image_delete
-                                ) to { onDelete(currentTarget) }
+                                ) to { confirmTarget = currentTarget }
                             )
                         )
+                        confirmTarget?.let { target ->
+                            OneUiConfirmDialog(
+                                title = stringResource(
+                                    if (target == ProfileMediaTarget.CARD) R.string.profile_card_delete_confirm
+                                    else R.string.profile_image_delete_confirm
+                                ),
+                                confirmText = stringResource(R.string.action_delete),
+                                onConfirm = {
+                                    confirmTarget = null
+                                    onDelete(target)
+                                },
+                                onDismiss = { confirmTarget = null }
+                            )
+                        }
                     }
                 }
 
@@ -979,6 +997,55 @@ private fun EffectSheet(state: MutableState<ProfileCard>, onDismiss: () -> Unit)
                 valueRange = 0f..0.7f,
                 colors = SliderDefaults.colors(thumbColor = SamsungGreen, activeTrackColor = SamsungGreen)
             )
+        }
+    }
+}
+
+/** Samsung One UI style confirmation: rounded sheet, centered title, flat text buttons split by a divider. */
+@Composable
+private fun OneUiConfirmDialog(
+    title: String,
+    confirmText: String,
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    val dark = isSystemInDarkTheme()
+    val textColor = if (dark) Color(0xFFFAFAFA) else Color(0xFF1A1A1A)
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = RoundedCornerShape(26.dp),
+            color = if (dark) Color(0xFF252525) else Color.White,
+            shadowElevation = 12.dp
+        ) {
+            Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 24.dp, bottom = 12.dp)) {
+                Text(
+                    text = title,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = textColor,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(Modifier.height(20.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.action_cancel), fontSize = 16.sp, color = textColor)
+                    }
+                    Box(
+                        Modifier
+                            .width(1.dp)
+                            .height(20.dp)
+                            .background(textColor.copy(alpha = 0.15f))
+                    )
+                    TextButton(onClick = onConfirm, modifier = Modifier.weight(1f)) {
+                        Text(
+                            confirmText,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFE53935)
+                        )
+                    }
+                }
+            }
         }
     }
 }

@@ -470,6 +470,8 @@
     <string name="profile_source_video">Снять видео</string>
     <string name="profile_card_edit">Изменить карту профиля</string>
     <string name="profile_card_delete">Удалить карту профиля</string>
+    <string name="profile_card_delete_confirm">Удалить карту профиля?</string>
+    <string name="profile_image_delete_confirm">Удалить изображение профиля?</string>
     <string name="profile_text">Текст</string>
     <string name="profile_text_color">Цвет текста</string>
     <string name="profile_text_size">Размер текста</string>

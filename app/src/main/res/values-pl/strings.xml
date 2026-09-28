@@ -487,6 +487,8 @@
     <string name="profile_source_video">Nagraj wideo</string>
     <string name="profile_card_edit">Edytuj kartę profilu</string>
     <string name="profile_card_delete">Usuń kartę profilu</string>
+    <string name="profile_card_delete_confirm">Usunąć kartę profilu?</string>
+    <string name="profile_image_delete_confirm">Usunąć zdjęcie profilowe?</string>
     <string name="profile_text">Tekst</string>
     <string name="profile_text_color">Kolor tekstu</string>
     <string name="profile_text_size">Rozmiar tekstu</string>

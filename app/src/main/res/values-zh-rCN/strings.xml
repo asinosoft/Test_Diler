@@ -484,6 +484,8 @@
     <string name="profile_source_video">录制视频</string>
     <string name="profile_card_edit">编辑个人资料卡</string>
     <string name="profile_card_delete">删除个人资料卡</string>
+    <string name="profile_card_delete_confirm">要删除个人资料卡吗？</string>
+    <string name="profile_image_delete_confirm">要删除个人资料图片吗？</string>
     <string name="profile_text">文字</string>
     <string name="profile_text_color">文字颜色</string>
     <string name="profile_text_size">文字大小</string>

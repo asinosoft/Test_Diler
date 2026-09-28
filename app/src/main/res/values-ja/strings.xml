@@ -484,6 +484,8 @@
     <string name="profile_source_video">動画を撮る</string>
     <string name="profile_card_edit">プロフィールカードを編集</string>
     <string name="profile_card_delete">プロフィールカードを削除</string>
+    <string name="profile_card_delete_confirm">プロフィールカードを削除しますか？</string>
+    <string name="profile_image_delete_confirm">プロフィール画像を削除しますか？</string>
     <string name="profile_text">テキスト</string>
     <string name="profile_text_color">文字の色</string>
     <string name="profile_text_size">文字のサイズ</string>

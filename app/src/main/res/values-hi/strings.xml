@@ -485,6 +485,8 @@
     <string name="profile_source_video">वीडियो रिकॉर्ड करें</string>
     <string name="profile_card_edit">प्रोफ़ाइल कार्ड संपादित करें</string>
     <string name="profile_card_delete">प्रोफ़ाइल कार्ड हटाएँ</string>
+    <string name="profile_card_delete_confirm">प्रोफ़ाइल कार्ड हटाएँ?</string>
+    <string name="profile_image_delete_confirm">प्रोफ़ाइल चित्र हटाएँ?</string>
     <string name="profile_text">टेक्स्ट</string>
     <string name="profile_text_color">टेक्स्ट का रंग</string>
     <string name="profile_text_size">टेक्स्ट का आकार</string>

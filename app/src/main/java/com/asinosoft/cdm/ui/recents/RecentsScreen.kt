@@ -957,6 +957,7 @@ fun RecentsScreen(
                         removePhoto = removePhoto
                     )
                 },
+                onSetContactPhoto = { contact, photo -> viewModel.setContactPhoto(contact, photo) },
                 onDeleteContact = { viewModel.deleteContact(it) },
                 onAddTab = { name ->
                     viewModel.addTab(name)

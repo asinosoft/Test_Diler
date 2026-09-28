@@ -484,6 +484,8 @@
     <string name="profile_source_video">동영상 촬영</string>
     <string name="profile_card_edit">프로필 카드 편집</string>
     <string name="profile_card_delete">프로필 카드 삭제</string>
+    <string name="profile_card_delete_confirm">프로필 카드를 삭제할까요?</string>
+    <string name="profile_image_delete_confirm">프로필 사진을 삭제할까요?</string>
     <string name="profile_text">텍스트</string>
     <string name="profile_text_color">글자 색상</string>
     <string name="profile_text_size">글자 크기</string>

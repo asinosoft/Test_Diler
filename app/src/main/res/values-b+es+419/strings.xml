@@ -485,6 +485,8 @@
     <string name="profile_source_video">Grabar video</string>
     <string name="profile_card_edit">Editar tarjeta de perfil</string>
     <string name="profile_card_delete">Quitar tarjeta de perfil</string>
+    <string name="profile_card_delete_confirm">¿Quitar la tarjeta de perfil?</string>
+    <string name="profile_image_delete_confirm">¿Quitar la imagen de perfil?</string>
     <string name="profile_text">Texto</string>
     <string name="profile_text_color">Color del texto</string>
     <string name="profile_text_size">Tamaño del texto</string>

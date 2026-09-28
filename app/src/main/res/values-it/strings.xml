@@ -485,6 +485,8 @@
     <string name="profile_source_video">Registra video</string>
     <string name="profile_card_edit">Modifica scheda profilo</string>
     <string name="profile_card_delete">Rimuovi scheda profilo</string>
+    <string name="profile_card_delete_confirm">Rimuovere la scheda profilo?</string>
+    <string name="profile_image_delete_confirm">Rimuovere l\'immagine del profilo?</string>
     <string name="profile_text">Testo</string>
     <string name="profile_text_color">Colore del testo</string>
     <string name="profile_text_size">Dimensione del testo</string>

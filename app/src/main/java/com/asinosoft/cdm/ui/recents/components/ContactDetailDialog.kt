@@ -50,6 +50,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -86,6 +87,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.AddAPhoto
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCodeScanner
@@ -125,6 +127,8 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -256,6 +260,7 @@ fun ContactDetailDialog(
         photoBitmap: Bitmap?,
         removePhoto: Boolean
     ) -> Unit = { _, updated, _, _, _, _, _ -> onUpdateContact(updated) },
+    onSetContactPhoto: (FavoriteContact, Bitmap?) -> Unit = { _, _ -> },
     onDeleteContact: (FavoriteContact) -> Unit = {},
     onAddTab: (String) -> FavoriteTab = { FavoriteTab("default", it) }
 ) {
@@ -263,6 +268,8 @@ fun ContactDetailDialog(
 
     val context = LocalContext.current
     var avatarBitmap by remember(contact.photoUri) { mutableStateOf<ImageBitmap?>(null) }
+    var photoEditTile by remember { mutableStateOf<ProfileMediaTarget?>(null) }
+    var profileCard by remember(contact.id) { mutableStateOf<ProfileCard?>(null) }
     var phoneNumbersList by remember(contact) {
         mutableStateOf(
             listOf(
@@ -343,6 +350,15 @@ fun ContactDetailDialog(
             // Load custom important dates
             importantDatesList =
                 getImportantDates(context, getContactCustomKey(contact), contact.number)
+        }
+    }
+
+    val profileCardNumbers = remember(contact.number, phoneNumbersList) {
+        (listOf(contact.number) + phoneNumbersList.map { it.number }).filter { it.isNotBlank() }.distinct()
+    }
+    LaunchedEffect(contact.id, profileCardNumbers) {
+        profileCard = withContext(Dispatchers.IO) {
+            ProfileCardRepository.find(context, contact.id, profileCardNumbers)
         }
     }
 
@@ -439,6 +455,36 @@ fun ContactDetailDialog(
         var totalHorizontalDrag by remember { mutableFloatStateOf(0f) }
         var swipeConsumed by remember { mutableStateOf(false) }
 
+        // The list must stay scrollable enough to hold the collapsed header on any tab:
+        // the tab header gets a viewport-high minimum, and the history list (whose rows live
+        // outside the header) gets tail space sized by its rows only, so the header's
+        // animated resize during tab switches can never force the list to scroll back.
+        val viewportDp = LocalWindowInfo.current.containerDpSize.height
+        val viewportPx = with(density) { viewportDp.roundToPx() }
+        val showHistoryRows = selectedTab == 1 && !isLoadingHistory && historyLogs.isNotEmpty()
+        val currentShowHistoryRows by rememberUpdatedState(showHistoryRows)
+        var historyFillerPx by remember { mutableIntStateOf(viewportPx) }
+        LaunchedEffect(listState, viewportPx) {
+            snapshotFlow { listState.layoutInfo }.collect { info ->
+                val filler = info.visibleItemsInfo.find { it.key == "bottom_filler" }
+                historyFillerPx = when {
+                    !currentShowHistoryRows -> viewportPx
+                    filler == null -> 0
+                    else -> {
+                        val rowsTop = info.visibleItemsInfo.firstOrNull { it.index >= 2 }?.offset
+                            ?: filler.offset
+                        (viewportPx - (filler.offset - rowsTop)).coerceAtLeast(0)
+                    }
+                }
+            }
+        }
+
+        fun selectTab(tab: Int) {
+            if (tab == selectedTab) return
+            if (listState.firstVisibleItemIndex > 0) listState.requestScrollToItem(1)
+            selectedTab = tab
+        }
+
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -465,7 +511,7 @@ fun ContactDetailDialog(
                                     // Swipe left -> next tab
                                     if (selectedTab < 2) {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        selectedTab++
+                                        selectTab(selectedTab + 1)
                                         swipeConsumed = true
                                         change.consume()
                                     }
@@ -473,7 +519,7 @@ fun ContactDetailDialog(
                                     // Swipe right -> previous tab
                                     if (selectedTab > 0) {
                                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        selectedTab--
+                                        selectTab(selectedTab - 1)
                                         swipeConsumed = true
                                         change.consume()
                                     }
@@ -514,6 +560,7 @@ fun ContactDetailDialog(
                             .fillMaxWidth()
                             .height(heroHeight.dp)
                             .background(avatarBgColor)
+                            .clickable { photoEditTile = ProfileMediaTarget.IMAGE }
                     ) {
                         val bitmap = avatarBitmap
                         if (bitmap != null) {
@@ -537,14 +584,11 @@ fun ContactDetailDialog(
                                     ),
                                 contentAlignment = Alignment.Center
                             ) {
-                                val initial =
-                                    contact.name.trim().firstOrNull()?.uppercaseChar()?.toString()
-                                        ?: "?"
-                                Text(
-                                    text = initial,
-                                    color = Color.White,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 80.sp
+                                Icon(
+                                    imageVector = Icons.Default.AddAPhoto,
+                                    contentDescription = stringResource(R.string.profile_source_photo),
+                                    tint = Color.White.copy(alpha = 0.9f),
+                                    modifier = Modifier.size(72.dp)
                                 )
                             }
                         }
@@ -552,16 +596,30 @@ fun ContactDetailDialog(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(100.dp)
+                                .height(140.dp)
                                 .align(Alignment.BottomCenter)
                                 .background(
                                     Brush.verticalGradient(
                                         colors = listOf(
                                             Color.Transparent,
-                                            Color.Black.copy(alpha = 0.4f)
+                                            Color.Black.copy(alpha = 0.55f)
                                         )
                                     )
                                 )
+                        )
+
+                        Text(
+                            text = contact.name,
+                            fontSize = 26.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            textAlign = TextAlign.Start,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier
+                                .align(Alignment.BottomStart)
+                                .fillMaxWidth()
+                                .padding(start = 20.dp, end = 20.dp, bottom = 40.dp)
                         )
                     }
                 }
@@ -570,6 +628,7 @@ fun ContactDetailDialog(
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
+                            .heightIn(min = if (showHistoryRows) 0.dp else viewportDp)
                             .offset(y = (-24).dp),
                         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
                         color = MaterialTheme.colorScheme.background
@@ -585,22 +644,9 @@ fun ContactDetailDialog(
                                 ),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
-                            Text(
-                                text = contact.name,
-                                fontSize = 26.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground,
-                                textAlign = TextAlign.Center,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-
-                            Spacer(modifier = Modifier.height(16.dp))
-
                             FloatingTabBar(
                                 selectedTab = selectedTab,
-                                onTabSelected = { selectedTab = it }
+                                onTabSelected = ::selectTab
                             )
 
                             Spacer(modifier = Modifier.height(16.dp))
@@ -874,6 +920,11 @@ fun ContactDetailDialog(
                         Spacer(modifier = Modifier.height(40.dp))
                     }
                 }
+
+                item(key = "bottom_filler") {
+                    val fillerPx = if (showHistoryRows) historyFillerPx else 0
+                    Spacer(modifier = Modifier.height(with(density) { fillerPx.toDp() }))
+                }
             }
 
             if (selectedTab == 1) {
@@ -1029,6 +1080,31 @@ fun ContactDetailDialog(
                     }
                 )
             }
+
+            ProfileCardEditFlow(
+                tile = photoEditTile,
+                currentCard = profileCard,
+                currentAvatar = avatarBitmap,
+                contactName = contact.name,
+                onCardChanged = { card ->
+                    profileCard = card
+                    ProfileCardRepository.saveInBackground(
+                        context,
+                        ProfileCardRepository.keyFor(contact.id, profileCardNumbers.firstOrNull().orEmpty()),
+                        card,
+                        profileCardNumbers
+                    )
+                },
+                onAvatarChanged = { bitmap ->
+                    avatarBitmap = bitmap.asImageBitmap()
+                    onSetContactPhoto(contact, bitmap)
+                },
+                onAvatarRemoved = {
+                    avatarBitmap = null
+                    onSetContactPhoto(contact, null)
+                },
+                onClose = { photoEditTile = null }
+            )
 
             if (showEditContactDialog) {
                 EditContactDialog(
