@@ -24,8 +24,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
@@ -42,6 +45,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.asinosoft.cdm.data.repository.ProfileCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -78,6 +83,7 @@ fun ProfileCardMedia(
         if (card.isVideo) {
             LoopingVideo(
                 path = card.mediaPath,
+                poster = bitmap,
                 modifier = mediaModifier,
                 startMs = videoRange.first,
                 endMs = videoRange.second,
@@ -160,28 +166,47 @@ fun profileTextShadow(textColor: Color): Shadow {
 
 /**
  * Plays [path] between [startMs] and [endMs] (0 = end of file) in a loop.
+ * [poster] stays visible until the first video frame is rendered.
  * When paused, range changes seek so the frame under the dragged trim handle is shown.
  */
 @Composable
 fun LoopingVideo(
     path: String,
     modifier: Modifier = Modifier,
+    poster: ImageBitmap? = null,
     startMs: Long = 0L,
     endMs: Long = 0L,
     playing: Boolean = true,
     onPosition: ((Long) -> Unit)? = null
 ) {
     key(path) {
-        val player = remember { LoopingVideoPlayer(path) }
+        var rendered by remember { mutableStateOf(false) }
+        val player = remember { LoopingVideoPlayer(path) { rendered = true } }
         DisposableEffect(player) { onDispose { player.release() } }
         SideEffect {
             player.onPosition = onPosition
             player.configure(startMs, endMs, playing)
         }
-        AndroidView(
-            factory = { context -> TextureView(context).apply { surfaceTextureListener = player } },
-            modifier = modifier
-        )
+        Box(modifier) {
+            if (!rendered && poster != null) {
+                Image(
+                    bitmap = poster,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize()
+                )
+            }
+            AndroidView(
+                factory = { context ->
+                    TextureView(context).apply {
+                        isOpaque = false
+                        surfaceTextureListener = player
+                    }
+                },
+                update = { it.isOpaque = rendered },
+                modifier = Modifier.matchParentSize()
+            )
+        }
     }
 }
 
@@ -211,55 +236,92 @@ suspend fun loadVideoStrip(path: String, frameCount: Int, frameHeightPx: Int): V
         }
     }
 
-/** Muted playback so the card never competes with the ringtone. */
-private class LoopingVideoPlayer(private val path: String) : TextureView.SurfaceTextureListener {
+/**
+ * Muted playback so the card never competes with the ringtone.
+ * MediaPlayer release can block for a noticeable time, so it runs off the main thread.
+ */
+private class LoopingVideoPlayer(
+    private val path: String,
+    private val onFirstFrame: () -> Unit
+) : TextureView.SurfaceTextureListener {
     private val handler = Handler(Looper.getMainLooper())
     private var player: MediaPlayer? = null
     private var surface: Surface? = null
+    private var texture: SurfaceTexture? = null
     private var prepared = false
+    private var durationMs = 0L
     private var startMs = 0L
     private var endMs = 0L
     private var playing = true
     var onPosition: ((Long) -> Unit)? = null
 
-    private val ticker = object : Runnable {
-        override fun run() {
-            val mp = player
-            if (mp != null && prepared) {
-                val position = mp.currentPosition.toLong()
-                if (playing && endMs > 0 && position >= endMs) {
-                    seek(startMs)
-                    onPosition?.invoke(startMs)
-                } else {
-                    onPosition?.invoke(position)
-                }
-            }
-            handler.postDelayed(this, TICK_MS)
+    /** Trim end that actually cuts the clip; 0 when the clip plays to the file end. */
+    private val effectiveEnd: Long
+        get() = endMs.takeIf { it > 0 && (durationMs <= 0 || it < durationMs - END_TOLERANCE_MS) } ?: 0L
+
+    private val ticker = Runnable { tick() }
+    private var tickPending = false
+
+    private fun tick() {
+        tickPending = false
+        val mp = player?.takeIf { prepared } ?: return
+        val position = mp.currentPosition.toLong()
+        val end = effectiveEnd
+        if (playing && end > 0 && position >= end) {
+            seek(startMs)
+            onPosition?.invoke(startMs)
+        } else {
+            onPosition?.invoke(position)
         }
+        scheduleTick(position)
+    }
+
+    /** Polls often only while someone shows the position; otherwise wakes up right before the trim end. */
+    private fun scheduleTick(position: Long = player?.takeIf { prepared }?.currentPosition?.toLong() ?: 0L) {
+        handler.removeCallbacks(ticker)
+        tickPending = false
+        if (!prepared) return
+        val end = effectiveEnd
+        val delay = when {
+            onPosition != null -> TICK_MS
+            playing && end > 0 -> (end - position).coerceIn(MIN_TICK_MS, MAX_TICK_MS)
+            else -> return
+        }
+        tickPending = true
+        handler.postDelayed(ticker, delay)
     }
 
     fun configure(start: Long, end: Long, play: Boolean) {
         val startChanged = start != startMs
         val endChanged = end != endMs
+        val playChanged = play != playing
         startMs = start
         endMs = end
         playing = play
         val mp = player?.takeIf { prepared } ?: return
+        if (!startChanged && !endChanged && !playChanged) {
+            if (onPosition != null && !tickPending) scheduleTick()
+            return
+        }
+        mp.isLooping = startMs == 0L && effectiveEnd == 0L
         when {
             startChanged -> seek(start)
             endChanged && !play && end > 0 -> seek(end)
         }
         if (play && !mp.isPlaying) {
             val position = mp.currentPosition.toLong()
-            if (position < startMs || (endMs > 0 && position >= endMs)) seek(startMs)
+            val cut = effectiveEnd
+            if (position < startMs || (cut > 0 && position >= cut)) seek(startMs)
             mp.start()
         } else if (!play && mp.isPlaying) {
             mp.pause()
         }
+        scheduleTick()
     }
 
     override fun onSurfaceTextureAvailable(texture: SurfaceTexture, width: Int, height: Int) {
         release()
+        this.texture = texture
         val target = Surface(texture).also { surface = it }
         player = try {
             MediaPlayer().apply {
@@ -273,13 +335,20 @@ private class LoopingVideoPlayer(private val path: String) : TextureView.Surface
                 setSurface(target)
                 setVolume(0f, 0f)
                 setOnPreparedListener { mp ->
+                    if (mp !== player) return@setOnPreparedListener
                     prepared = true
-                    seek(startMs)
+                    durationMs = mp.duration.toLong()
+                    mp.isLooping = startMs == 0L && effectiveEnd == 0L
+                    if (startMs > 0) seek(startMs)
                     if (playing) mp.start()
-                    handler.post(ticker)
+                    scheduleTick()
+                }
+                setOnInfoListener { mp, what, _ ->
+                    if (mp === player && what == MediaPlayer.MEDIA_INFO_VIDEO_RENDERING_START) onFirstFrame()
+                    false
                 }
                 setOnCompletionListener { mp ->
-                    if (playing) {
+                    if (mp === player && playing && !mp.isLooping) {
                         seek(startMs)
                         mp.start()
                     }
@@ -293,7 +362,7 @@ private class LoopingVideoPlayer(private val path: String) : TextureView.Surface
 
     override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
         release()
-        return true
+        return false
     }
 
     override fun onSurfaceTextureSizeChanged(texture: SurfaceTexture, width: Int, height: Int) = Unit
@@ -311,14 +380,27 @@ private class LoopingVideoPlayer(private val path: String) : TextureView.Surface
 
     fun release() {
         handler.removeCallbacks(ticker)
+        tickPending = false
         prepared = false
-        player?.release()
+        val mp = player
+        val target = surface
+        val tex = texture
         player = null
-        surface?.release()
         surface = null
+        texture = null
+        if (mp == null && target == null && tex == null) return
+        releaseExecutor.execute {
+            runCatching { mp?.release() }
+            target?.release()
+            tex?.release()
+        }
     }
 
     private companion object {
         const val TICK_MS = 50L
+        const val MIN_TICK_MS = 10L
+        const val MAX_TICK_MS = 1000L
+        const val END_TOLERANCE_MS = 150L
+        val releaseExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     }
 }

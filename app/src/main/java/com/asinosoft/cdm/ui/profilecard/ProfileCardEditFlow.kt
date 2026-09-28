@@ -697,7 +697,7 @@ private fun CardPage(
             val ratio = constraints.maxHeight / windowHeight.toFloat()
             ProfileCardMedia(
                 card = card,
-                bitmap = preview.takeUnless { card.isVideo },
+                bitmap = preview,
                 modifier = Modifier.fillMaxSize(),
                 videoRange = videoRange,
                 videoPlaying = videoPlaying,

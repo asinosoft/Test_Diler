@@ -209,23 +209,34 @@ fun InCallScreen(
             !isCallDisconnected &&
             displayableCalls.all { it.state == Call.STATE_ACTIVE || it.state == Call.STATE_HOLDING }
 
+    // Card lookup by number does not need the contacts query, so the background shows up immediately.
+    LaunchedEffect(rawNumber, isConference, contactId) {
+        if (isConference || rawNumber.isBlank()) {
+            profileCard = null
+            return@LaunchedEffect
+        }
+        val card = withContext(Dispatchers.IO) {
+            ProfileCardRepository.find(context, contactId, listOf(rawNumber))
+        }
+        if (card == null && contactId == null) return@LaunchedEffect
+        if (card != profileCard) {
+            profileCardBitmap = card?.let {
+                withContext(Dispatchers.IO) { ProfileCardRepository.loadBitmap(it, 2560)?.asImageBitmap() }
+            }
+            profileCard = card
+        }
+    }
+
     LaunchedEffect(rawNumber, isConference) {
         if (isConference) {
             contactId = null
             contactName = resources.getString(R.string.incall_conference)
             contactPhotoBitmap = null
-            profileCard = null
         } else if (rawNumber.isNotBlank()) {
             withContext(Dispatchers.IO) {
                 val result = lookupContactInfo(context, rawNumber)
                 contactId = result.contactId
                 contactName = result.name
-
-                val card = ProfileCardRepository.find(context, result.contactId, listOf(rawNumber))
-                profileCardBitmap = card?.takeUnless { it.isVideo }?.let {
-                    ProfileCardRepository.loadBitmap(it, 2560)?.asImageBitmap()
-                }
-                profileCard = card
 
                 if (!result.photoUri.isNullOrEmpty()) {
                     try {

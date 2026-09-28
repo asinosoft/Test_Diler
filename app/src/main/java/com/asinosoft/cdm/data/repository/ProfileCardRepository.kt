@@ -52,6 +52,7 @@ object ProfileCardRepository {
     private const val DRAFT_DIR = "profile_card_draft"
     private const val CAPTURE_DIR = "camera"
     private const val MAX_IMAGE_SIDE = 2560
+    private const val POSTER_MAX_SIDE = 1280
 
     private val backgroundScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -84,6 +85,11 @@ object ProfileCardRepository {
 
             if (previous != null && previous.mediaPath != stored?.mediaPath) {
                 File(previous.mediaPath).delete()
+                posterFile(previous.mediaPath).delete()
+            }
+            if (stored?.isVideo == true) {
+                posterFile(stored.mediaPath).delete()
+                runCatching { loadPoster(stored, POSTER_MAX_SIDE)?.recycle() }
             }
             prefs.edit {
                 prefs.all.keys
@@ -116,21 +122,37 @@ object ProfileCardRepository {
             }
         }
 
+    /** The picture itself, or for a video its first (trimmed) frame, cached as a poster next to the file. */
     suspend fun loadBitmap(card: ProfileCard, maxSide: Int): Bitmap? = withContext(Dispatchers.IO) {
         try {
-            if (card.isVideo) {
-                videoFrame(card.mediaPath)
-            } else {
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-                BitmapFactory.decodeFile(card.mediaPath, bounds)
-                val options = BitmapFactory.Options().apply {
-                    inSampleSize = sampleSize(bounds.outWidth, bounds.outHeight, maxSide)
-                }
-                BitmapFactory.decodeFile(card.mediaPath, options)
-            }
+            if (card.isVideo) loadPoster(card, maxSide) else decodeSampled(card.mediaPath, maxSide)
         } catch (_: Exception) {
             null
         }
+    }
+
+    private fun loadPoster(card: ProfileCard, maxSide: Int): Bitmap? {
+        val poster = posterFile(card.mediaPath)
+        if (poster.exists()) decodeSampled(poster.path, maxSide)?.let { return it }
+        val frame = videoFrame(card.mediaPath, card.trimStartMs) ?: return null
+        val scale = POSTER_MAX_SIDE.toFloat() / max(frame.width, frame.height)
+        val scaled = if (scale < 1f) {
+            Bitmap.createScaledBitmap(frame, (frame.width * scale).toInt(), (frame.height * scale).toInt(), true)
+                .also { if (it !== frame) frame.recycle() }
+        } else frame
+        runCatching { poster.outputStream().use { scaled.compress(Bitmap.CompressFormat.JPEG, 85, it) } }
+        return scaled
+    }
+
+    private fun posterFile(mediaPath: String) = File("$mediaPath.poster.jpg")
+
+    private fun decodeSampled(path: String, maxSide: Int): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sampleSize(bounds.outWidth, bounds.outHeight, maxSide)
+        }
+        return BitmapFactory.decodeFile(path, options)
     }
 
     /** Picks white or dark text depending on how bright the upper part of the picture is. */
@@ -226,11 +248,11 @@ object ProfileCardRepository {
             .also { if (it !== bitmap) bitmap.recycle() }
     }
 
-    private fun videoFrame(path: String): Bitmap? {
+    private fun videoFrame(path: String, atMs: Long): Bitmap? {
         val retriever = MediaMetadataRetriever()
         return try {
             retriever.setDataSource(path)
-            retriever.getFrameAtTime(0)
+            retriever.getFrameAtTime(atMs * 1000L, MediaMetadataRetriever.OPTION_CLOSEST)
         } finally {
             retriever.release()
         }
