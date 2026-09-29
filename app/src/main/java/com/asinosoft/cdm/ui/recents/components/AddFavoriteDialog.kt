@@ -78,6 +78,8 @@ fun AddFavoriteDialog(
             contactsList.filter {
                 it.name.contains(searchQuery, ignoreCase = true) ||
                         it.number.contains(searchQuery, ignoreCase = true)
+            }.sortedBy {
+                if (0 == it.name.indexOf(searchQuery, ignoreCase = true)) "" else it.name
             }
         }
     }
@@ -168,10 +170,7 @@ fun AddFavoriteDialog(
                     contentPadding = PaddingValues(bottom = 24.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(
-                        items = filteredContacts,
-                        key = { it.id }
-                    ) { item ->
+                    items(filteredContacts) { item ->
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
