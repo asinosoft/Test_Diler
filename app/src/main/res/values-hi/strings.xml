@@ -479,8 +479,8 @@
     <string name="ringtone_custom_fallback">कस्टम रिंगटोन</string>
     <string name="cd_add_ringtone">रिंगटोन जोड़ें</string>
     <string name="birthday_share_line">जन्मदिन: %1$s</string>
-    <string name="profile_card_title">प्रोफ़ाइल कार्ड</string>
-    <string name="profile_image_title">चित्र</string>
+    <string name="profile_card_title">कॉल स्क्रीन</string>
+    <string name="profile_image_title">संपर्क फ़ोटो</string>
     <string name="profile_target_title">कहाँ लागू करें चुनें</string>
     <string name="profile_image_delete">प्रोफ़ाइल चित्र हटाएँ</string>
     <string name="profile_source_gallery">गैलरी</string>

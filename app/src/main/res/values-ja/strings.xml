@@ -478,8 +478,8 @@
     <string name="ringtone_custom_fallback">カスタム着信音</string>
     <string name="cd_add_ringtone">着信音を追加</string>
     <string name="birthday_share_line">誕生日: %1$s</string>
-    <string name="profile_card_title">プロフィールカード</string>
-    <string name="profile_image_title">画像</string>
+    <string name="profile_card_title">通話画面</string>
+    <string name="profile_image_title">連絡先の写真</string>
     <string name="profile_target_title">適用先を選択</string>
     <string name="profile_image_delete">プロフィール画像を削除</string>
     <string name="profile_source_gallery">ギャラリー</string>

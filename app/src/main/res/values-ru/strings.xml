@@ -464,8 +464,8 @@
     <string name="ringtone_custom_fallback">Пользовательская мелодия</string>
     <string name="cd_add_ringtone">Добавить мелодию</string>
     <string name="birthday_share_line">День рождения: %1$s</string>
-    <string name="profile_card_title">Карта профиля</string>
-    <string name="profile_image_title">Изображение</string>
+    <string name="profile_card_title">Окно звонка</string>
+    <string name="profile_image_title">Фото контакта</string>
     <string name="profile_target_title">Выбор места применения</string>
     <string name="profile_image_delete">Удалить изображение профиля</string>
     <string name="profile_source_gallery">Галерея</string>

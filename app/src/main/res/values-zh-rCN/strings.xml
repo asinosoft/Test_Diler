@@ -478,8 +478,8 @@
     <string name="ringtone_custom_fallback">自定义铃声</string>
     <string name="cd_add_ringtone">添加铃声</string>
     <string name="birthday_share_line">生日:%1$s</string>
-    <string name="profile_card_title">个人资料卡</string>
-    <string name="profile_image_title">头像</string>
+    <string name="profile_card_title">通话界面</string>
+    <string name="profile_image_title">联系人照片</string>
     <string name="profile_target_title">选择应用位置</string>
     <string name="profile_image_delete">删除个人资料图片</string>
     <string name="profile_source_gallery">图库</string>

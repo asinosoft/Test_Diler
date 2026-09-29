@@ -479,8 +479,8 @@
     <string name="ringtone_custom_fallback">Eigener Klingelton</string>
     <string name="cd_add_ringtone">Klingelton hinzufügen</string>
     <string name="birthday_share_line">Geburtstag: %1$s</string>
-    <string name="profile_card_title">Profilkarte</string>
-    <string name="profile_image_title">Bild</string>
+    <string name="profile_card_title">Anrufbildschirm</string>
+    <string name="profile_image_title">Kontaktfoto</string>
     <string name="profile_target_title">Verwendung auswählen</string>
     <string name="profile_image_delete">Profilbild entfernen</string>
     <string name="profile_source_gallery">Galerie</string>

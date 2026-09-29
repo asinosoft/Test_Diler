@@ -478,8 +478,8 @@
     <string name="ringtone_custom_fallback">사용자 지정 벨소리</string>
     <string name="cd_add_ringtone">벨소리 추가</string>
     <string name="birthday_share_line">생일: %1$s</string>
-    <string name="profile_card_title">프로필 카드</string>
-    <string name="profile_image_title">사진</string>
+    <string name="profile_card_title">통화 화면</string>
+    <string name="profile_image_title">연락처 사진</string>
     <string name="profile_target_title">적용할 위치 선택</string>
     <string name="profile_image_delete">프로필 사진 삭제</string>
     <string name="profile_source_gallery">갤러리</string>

@@ -479,8 +479,8 @@
     <string name="ringtone_custom_fallback">Toque personalizado</string>
     <string name="cd_add_ringtone">Adicionar toque</string>
     <string name="birthday_share_line">Aniversário: %1$s</string>
-    <string name="profile_card_title">Cartão de perfil</string>
-    <string name="profile_image_title">Imagem</string>
+    <string name="profile_card_title">Tela de chamada</string>
+    <string name="profile_image_title">Foto do contato</string>
     <string name="profile_target_title">Escolha onde aplicar</string>
     <string name="profile_image_delete">Remover imagem do perfil</string>
     <string name="profile_source_gallery">Galeria</string>

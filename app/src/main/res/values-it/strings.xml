@@ -479,8 +479,8 @@
     <string name="ringtone_custom_fallback">Suoneria personalizzata</string>
     <string name="cd_add_ringtone">Aggiungi suoneria</string>
     <string name="birthday_share_line">Compleanno: %1$s</string>
-    <string name="profile_card_title">Scheda profilo</string>
-    <string name="profile_image_title">Immagine</string>
+    <string name="profile_card_title">Schermata di chiamata</string>
+    <string name="profile_image_title">Foto del contatto</string>
     <string name="profile_target_title">Scegli dove applicare</string>
     <string name="profile_image_delete">Rimuovi immagine del profilo</string>
     <string name="profile_source_gallery">Galleria</string>

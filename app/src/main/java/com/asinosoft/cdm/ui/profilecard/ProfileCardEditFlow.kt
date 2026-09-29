@@ -631,7 +631,20 @@ private fun ProfileCardEditor(
                             tint = Color.White
                         )
                     }
-                    Spacer(Modifier.weight(1f))
+                    Text(
+                        text = stringResource(
+                            if (currentTarget == ProfileMediaTarget.CARD) R.string.profile_card_title
+                            else R.string.profile_image_title
+                        ),
+                        color = Color.White,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(start = 4.dp)
+                    )
                     TextButton(
                         onClick = {
                             val avatarChanged = edit.avatar != null &&

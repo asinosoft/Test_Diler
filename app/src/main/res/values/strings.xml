@@ -479,8 +479,8 @@
     <string name="ringtone_custom_fallback">Custom ringtone</string>
     <string name="cd_add_ringtone">Add ringtone</string>
     <string name="birthday_share_line">Birthday: %1$s</string>
-    <string name="profile_card_title">Profile card</string>
-    <string name="profile_image_title">Picture</string>
+    <string name="profile_card_title">Call screen</string>
+    <string name="profile_image_title">Contact photo</string>
     <string name="profile_target_title">Choose where to apply</string>
     <string name="profile_image_delete">Remove profile picture</string>
     <string name="profile_source_gallery">Gallery</string>

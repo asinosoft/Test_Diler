@@ -481,8 +481,8 @@
     <string name="ringtone_custom_fallback">Własny dzwonek</string>
     <string name="cd_add_ringtone">Dodaj dzwonek</string>
     <string name="birthday_share_line">Urodziny: %1$s</string>
-    <string name="profile_card_title">Karta profilu</string>
-    <string name="profile_image_title">Obraz</string>
+    <string name="profile_card_title">Ekran połączenia</string>
+    <string name="profile_image_title">Zdjęcie kontaktu</string>
     <string name="profile_target_title">Wybierz, gdzie zastosować</string>
     <string name="profile_image_delete">Usuń zdjęcie profilowe</string>
     <string name="profile_source_gallery">Galeria</string>

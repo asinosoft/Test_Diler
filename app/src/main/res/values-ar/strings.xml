@@ -483,8 +483,8 @@
     <string name="ringtone_custom_fallback">نغمة رنين مخصصة</string>
     <string name="cd_add_ringtone">إضافة نغمة رنين</string>
     <string name="birthday_share_line">عيد الميلاد: %1$s</string>
-    <string name="profile_card_title">بطاقة الملف الشخصي</string>
-    <string name="profile_image_title">الصورة</string>
+    <string name="profile_card_title">شاشة المكالمة</string>
+    <string name="profile_image_title">صورة جهة الاتصال</string>
     <string name="profile_target_title">اختر مكان التطبيق</string>
     <string name="profile_image_delete">إزالة صورة الملف الشخصي</string>
     <string name="profile_source_gallery">المعرض</string>
