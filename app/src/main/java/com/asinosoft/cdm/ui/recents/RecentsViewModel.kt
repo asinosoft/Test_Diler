@@ -40,6 +40,9 @@ import androidx.annotation.StringRes
 import com.asinosoft.cdm.R
 import com.asinosoft.cdm.util.Analytics
 import com.asinosoft.cdm.util.ContactLabelHelper
+import com.google.firebase.Firebase
+import com.google.firebase.analytics.analytics
+import kotlinx.coroutines.flow.first
 
 data class ContactDetailState(
     val contact: FavoriteContact,
@@ -560,7 +563,19 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             try {
                 val contacts = contactsRepository.getContacts()
                 val favorites = favoritesRepository.getFavorites()
-                
+
+                Firebase.analytics.setUserProperty("contacts_count", contacts.size.toString())
+                Firebase.analytics.setUserProperty("favorites_count", favorites.size.toString())
+                Firebase.analytics.setUserProperty("contacts_with_avatar", contacts.count { it.photoUri != null }.toString())
+                Firebase.analytics.setUserProperty("favorites_with_avatar", favorites.count { it.photoUri != null }.toString())
+                Firebase.analytics.setUserProperty("favorites_format", _favoritesViewMode.first().name)
+                Firebase.analytics.setUserProperty("rou_count",
+                    when(_favoritesViewMode.first()) {
+                        FavoritesViewMode.LIST -> _listRowsCount
+                        FavoritesViewMode.GRID -> _gridRowsCount
+                    }.first().toString()
+                )
+
                 withContext(Dispatchers.Main) {
                     _contacts.value = contacts
                     _favorites.value = favorites
@@ -756,11 +771,13 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             _gridRowsCount.value = validCount
             prefs.edit { putInt("favorite_rows_count_grid", validCount) }
         }
+        Firebase.analytics.setUserProperty("favorites_count", count.toString())
     }
 
     fun setFavoritesViewMode(mode: FavoritesViewMode) {
         _favoritesViewMode.value = mode
         prefs.edit { putString("favorites_view_mode", mode.storageKey) }
+        Firebase.analytics.setUserProperty("favorites_format", mode.name)
     }
 
     fun openAppSettings() {
