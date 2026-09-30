@@ -16,6 +16,7 @@ firebaseAnalyticsKtx = "22.5.0"
 firebaseBom = "34.19.0"
 firebaseConfigKtx = "22.1.2"
 googleServices = "4.5.0"
+coreSplashscreen = "1.2.0"
 
 [libraries]
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "camera" }
@@ -44,6 +45,7 @@ firebase-analytics-ktx = { group = "com.google.firebase", name = "firebase-analy
 firebase-bom = { group = "com.google.firebase", name = "firebase-bom", version.ref = "firebaseBom" }
 firebase-config-ktx = { group = "com.google.firebase", name = "firebase-config-ktx", version.ref = "firebaseConfigKtx" }
 google-services = { group = "com.google.gms", name = "google-services", version.ref = "googleServices" }
+androidx-core-splashscreen = { group = "androidx.core", name = "core-splashscreen", version.ref = "coreSplashscreen" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

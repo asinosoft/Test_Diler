@@ -22,6 +22,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -37,10 +38,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.core.content.edit
 import androidx.core.net.toUri
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.asinosoft.cdm.data.model.FavoriteContact
 import com.asinosoft.cdm.service.MissedCallNotificationListener
 import com.asinosoft.cdm.ui.onboarding.OnboardingFavoritesSetupScreen
@@ -56,7 +57,7 @@ import com.asinosoft.cdm.util.PhoneNumberHelper
 
 class MainActivity : ComponentActivity() {
 
-    private var mainViewModel: RecentsViewModel? = null
+    private val viewModel: RecentsViewModel by viewModels()
 
     private val requiredPermissions = arrayOf(
         Manifest.permission.READ_CALL_LOG,
@@ -68,6 +69,8 @@ class MainActivity : ComponentActivity() {
     )
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
+
         super.onCreate(savedInstanceState)
         com.asinosoft.cdm.util.AppLifecycleTracker.init(application)
         com.asinosoft.cdm.util.ActiveSimCount.ensureObserving(this)
@@ -76,8 +79,6 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             DialerTheme {
-                val viewModel: RecentsViewModel = viewModel()
-                mainViewModel = viewModel
                 val context = LocalContext.current
                 val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -436,7 +437,7 @@ class MainActivity : ComponentActivity() {
                 number = numberExtra,
                 photoUri = null
             )
-            mainViewModel?.openContactDetail(contact, initialTab = 0)
+            viewModel.openContactDetail(contact, initialTab = 0)
             return
         }
 
@@ -447,7 +448,7 @@ class MainActivity : ComponentActivity() {
             if (scheme == "tel" || scheme == "sip") {
                 val rawNumber = data.schemeSpecificPart.orEmpty()
                 if (rawNumber.isNotBlank()) {
-                    mainViewModel?.openSearchDialer(rawNumber)
+                    viewModel.openSearchDialer(rawNumber)
                     return
                 }
             }
