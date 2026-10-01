@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.Message
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Block
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
@@ -80,6 +81,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.LinkAnnotation
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.TextLinkStyles
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withLink
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -97,6 +106,8 @@ import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.util.AboutSupportHelper
 import com.asinosoft.cdm.util.AboutSupportHelper.PRIVACY_POLICY_URL
 import com.asinosoft.cdm.util.Analytics
+import com.asinosoft.cdm.util.OemShellGuide
+import com.asinosoft.cdm.util.OemShellHelper
 import com.asinosoft.cdm.util.BlockedNumberItem
 import com.asinosoft.cdm.util.BlockedNumbersHelper
 import kotlinx.coroutines.Dispatchers
@@ -108,6 +119,7 @@ private enum class SettingsPage(val titleRes: Int) {
     MAIN(R.string.settings_title),
     QUICK_REPLIES(R.string.quick_replies_screen_title),
     BLOCKED_CONTACTS(R.string.settings_blocked_contacts_title),
+    PERMISSIONS_HELP(R.string.settings_permissions_help_title),
     LICENSES(R.string.about_licenses_title),
     PRIVACY_POLICY(R.string.about_privacy_title)
 }
@@ -148,11 +160,9 @@ fun AppSettingsDialog(
     val handleBack = {
         when (selectedPage) {
             SettingsPage.MAIN -> onDismiss()
-            SettingsPage.QUICK_REPLIES -> {
-                selectedPage = SettingsPage.MAIN
-                selectedTab = SettingsTab.PHONE
-            }
-            SettingsPage.BLOCKED_CONTACTS -> {
+            SettingsPage.QUICK_REPLIES,
+            SettingsPage.BLOCKED_CONTACTS,
+            SettingsPage.PERMISSIONS_HELP -> {
                 selectedPage = SettingsPage.MAIN
                 selectedTab = SettingsTab.PHONE
             }
@@ -253,6 +263,17 @@ fun AppSettingsDialog(
 
                     SettingsPage.BLOCKED_CONTACTS -> {
                         BlockedContactsPage()
+                    }
+
+                    SettingsPage.PERMISSIONS_HELP -> {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .verticalScroll(rememberScrollState())
+                                .padding(bottom = 16.dp)
+                        ) {
+                            PermissionsHelpPage()
+                        }
                     }
 
                     SettingsPage.LICENSES -> {
@@ -454,10 +475,22 @@ private fun MainPage(
 private fun PhoneSettingsTab(
     onGotoPage: (SettingsPage) -> Unit = {},
 ) {
+    val hasPermissionsHelp = remember { OemShellHelper.detectGuide().isRequired }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (hasPermissionsHelp) {
+            PhoneSettingsNavCard(
+                icon = Icons.Default.AdminPanelSettings,
+                title = stringResource(R.string.settings_permissions_help_title),
+                subtitle = stringResource(R.string.settings_permissions_help_subtitle),
+                trailingIcon = Icons.AutoMirrored.Filled.ArrowForward,
+                onClick = { onGotoPage(SettingsPage.PERMISSIONS_HELP) }
+            )
+        }
+
         PhoneSettingsNavCard(
             icon = Icons.Default.Block,
             title = stringResource(R.string.settings_blocked_contacts_title),
@@ -533,6 +566,92 @@ private fun PhoneSettingsNavCard(
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 modifier = Modifier.size(20.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun PermissionsHelpPage() {
+    val context = LocalContext.current
+    val guide = remember { OemShellHelper.detectGuide() }
+    val shellName = remember(guide) {
+        when (guide) {
+            OemShellGuide.MIUI -> if (OemShellHelper.isHyperOs()) "HyperOS" else "MIUI"
+            OemShellGuide.HUAWEI -> "Huawei / Honor"
+            OemShellGuide.OPPO -> "OPPO / realme / OnePlus"
+            OemShellGuide.VIVO -> "vivo / iQOO"
+            OemShellGuide.NONE -> ""
+        }
+    }
+    val (autostartRes, popupsRes, batteryRes) = when (guide) {
+        OemShellGuide.HUAWEI -> Triple(
+            R.string.settings_permissions_help_item_huawei_autostart,
+            R.string.settings_permissions_help_item_huawei_popups,
+            R.string.settings_permissions_help_item_huawei_battery
+        )
+        OemShellGuide.OPPO -> Triple(
+            R.string.settings_permissions_help_item_autostart_list,
+            R.string.settings_permissions_help_item_oppo_popups,
+            R.string.settings_permissions_help_item_oppo_battery
+        )
+        OemShellGuide.VIVO -> Triple(
+            R.string.settings_permissions_help_item_autostart_list,
+            R.string.settings_permissions_help_item_vivo_popups,
+            R.string.settings_permissions_help_item_vivo_battery
+        )
+        else -> Triple(
+            R.string.settings_permissions_help_item_autostart,
+            R.string.settings_permissions_help_item_popups,
+            R.string.settings_permissions_help_item_battery
+        )
+    }
+    val helpItems = listOf<Pair<Int, () -> Unit>>(
+        autostartRes to { OemShellHelper.openAutostartSettings(context) },
+        popupsRes to { OemShellHelper.openSpecialPermissionsSettings(context) },
+        batteryRes to { OemShellHelper.openBatterySettings(context) }
+    )
+    Text(
+        text = stringResource(R.string.settings_permissions_help_header, shellName),
+        fontSize = 17.sp,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onBackground,
+        modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
+    )
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        helpItems.forEach { (res, onTitleClick) ->
+            Row {
+                Text(
+                    text = "•",
+                    fontSize = 15.sp,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(end = 10.dp)
+                )
+                Text(
+                    text = boldMarkup(stringResource(res, shellName), onTitleClick),
+                    fontSize = 15.sp,
+                    lineHeight = 22.sp,
+                    color = MaterialTheme.colorScheme.onBackground
+                )
+            }
+        }
+    }
+}
+
+/** Renders `**text**` fragments in bold; the first one becomes a link when [onTitleClick] is set. */
+private fun boldMarkup(text: String, onTitleClick: (() -> Unit)? = null): AnnotatedString = buildAnnotatedString {
+    val bold = SpanStyle(fontWeight = FontWeight.Bold)
+    text.split("**").forEachIndexed { index, part ->
+        when {
+            index == 1 && onTitleClick != null -> withLink(
+                LinkAnnotation.Clickable(
+                    tag = "title",
+                    styles = TextLinkStyles(
+                        bold.copy(color = SamsungGreen, textDecoration = TextDecoration.Underline)
+                    )
+                ) { onTitleClick() }
+            ) { append(part) }
+            index % 2 == 1 -> withStyle(bold) { append(part) }
+            else -> append(part)
         }
     }
 }

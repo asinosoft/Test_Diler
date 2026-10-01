@@ -1,6 +1,12 @@
 package com.asinosoft.cdm.util
 
+import android.content.ActivityNotFoundException
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.annotation.StringRes
 import com.asinosoft.cdm.R
 
@@ -65,6 +71,93 @@ object OemShellHelper {
     private val huaweiBrands = setOf("huawei", "honor")
     private val oppoBrands = setOf("oppo", "realme", "oneplus")
     private val vivoBrands = setOf("vivo", "iqoo")
+
+    private val autostartComponents = mapOf(
+        OemShellGuide.MIUI to listOf(
+            "com.miui.securitycenter" to "com.miui.permcenter.autostart.AutoStartManagementActivity"
+        ),
+        OemShellGuide.HUAWEI to listOf(
+            "com.huawei.systemmanager" to "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity",
+            "com.huawei.systemmanager" to "com.huawei.systemmanager.optimize.process.ProtectActivity",
+            "com.hihonor.systemmanager" to "com.hihonor.systemmanager.startupmgr.ui.StartupNormalAppListActivity"
+        ),
+        OemShellGuide.OPPO to listOf(
+            "com.coloros.safecenter" to "com.coloros.safecenter.permission.startup.StartupAppListActivity",
+            "com.coloros.safecenter" to "com.coloros.safecenter.startupapp.StartupAppListActivity",
+            "com.oplus.safecenter" to "com.oplus.safecenter.startupapp.StartupAppListActivity"
+        ),
+        OemShellGuide.VIVO to listOf(
+            "com.vivo.permissionmanager" to "com.vivo.permissionmanager.activity.BgStartUpManagerActivity",
+            "com.iqoo.secure" to "com.iqoo.secure.ui.phoneoptimize.BgStartUpManager"
+        )
+    )
+
+    /** Opens the OEM autostart screen, falling back to the app details page. */
+    fun openAutostartSettings(context: Context) {
+        openFirst(
+            context,
+            autostartComponents[detectGuide()].orEmpty().map { (pkg, cls) ->
+                Intent().setComponent(ComponentName(pkg, cls))
+            } + appDetailsIntent(context)
+        )
+    }
+
+    /** MIUI "Other permissions" editor (lock screen, background pop-ups); overlay permission elsewhere. */
+    fun openSpecialPermissionsSettings(context: Context) {
+        val pkgUri = Uri.fromParts("package", context.packageName, null)
+        val miui = if (detectGuide() == OemShellGuide.MIUI) listOf(
+            Intent("miui.intent.action.APP_PERM_EDITOR")
+                .setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
+                .putExtra("extra_pkgname", context.packageName),
+            Intent("miui.intent.action.APP_PERM_EDITOR")
+                .setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.AppPermissionsEditorActivity")
+                .putExtra("extra_pkgname", context.packageName)
+        ) else emptyList()
+        openFirst(
+            context,
+            miui + Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, pkgUri) + appDetailsIntent(context)
+        )
+    }
+
+    /** OEM per-app battery screen; system battery optimization list elsewhere. */
+    fun openBatterySettings(context: Context) {
+        val oem = when (detectGuide()) {
+            OemShellGuide.MIUI -> listOf(
+                Intent()
+                    .setClassName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsConfigActivity")
+                    .putExtra("package_name", context.packageName)
+                    .putExtra("package_label", context.applicationInfo.loadLabel(context.packageManager).toString())
+            )
+            OemShellGuide.OPPO -> listOf(appDetailsIntent(context))
+            OemShellGuide.VIVO -> listOf(
+                Intent().setClassName("com.vivo.abe", "com.vivo.applicationbehaviorengine.ui.ExcessivePowerManagerActivity"),
+                Intent().setClassName("com.iqoo.powersaving", "com.iqoo.powersaving.PowerSavingManagerActivity")
+            )
+            else -> emptyList()
+        }
+        openFirst(
+            context,
+            oem + Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS) + appDetailsIntent(context)
+        )
+    }
+
+    fun isHyperOs(): Boolean = !systemProperty("ro.mi.os.version.name").isNullOrBlank()
+
+    private fun appDetailsIntent(context: Context) =
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
+
+    private fun openFirst(context: Context, intents: List<Intent>) {
+        intents.firstOrNull { tryStart(context, it) }
+    }
+
+    private fun tryStart(context: Context, intent: Intent): Boolean = try {
+        context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        true
+    } catch (_: ActivityNotFoundException) {
+        false
+    } catch (_: SecurityException) {
+        false
+    }
 
     fun detectGuide(): OemShellGuide {
         if (isMiuiFamily()) return OemShellGuide.MIUI
