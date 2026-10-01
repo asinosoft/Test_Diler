@@ -1,9 +1,30 @@
 package com.asinosoft.cdm.util
 
+import android.content.Context
+import android.telephony.TelephonyManager
+import android.util.LruCache
 import com.google.i18n.phonenumbers.PhoneNumberUtil
+import com.google.i18n.phonenumbers.Phonenumber.PhoneNumber
 import java.util.Locale
 
 object PhoneNumberHelper {
+    private val util: PhoneNumberUtil by lazy { PhoneNumberUtil.getInstance() }
+    private val formatCache = LruCache<String, String>(512)
+    private const val FORMATTABLE_CHARS = "+ -().\u00A0"
+
+    @Volatile
+    private var region: String = Locale.getDefault().country.uppercase(Locale.ROOT)
+
+    /** Default region for numbers without a country code: network, then SIM, then locale. */
+    fun init(context: Context) {
+        val tm = context.getSystemService(TelephonyManager::class.java)
+        region = listOfNotNull(tm?.networkCountryIso, tm?.simCountryIso, Locale.getDefault().country)
+            .firstOrNull { it.length == 2 }
+            ?.uppercase(Locale.ROOT)
+            ?: region
+        formatCache.evictAll()
+    }
+
     /** Keeps digits and dialer/USSD symbols needed to place a call. */
     fun sanitizeForDial(raw: String): String =
         raw.filter { ch ->
@@ -14,44 +35,36 @@ object PhoneNumberHelper {
         android.net.Uri.fromParts("tel", sanitizeForDial(rawNumber), null)
 
     fun parse(text: String): String? {
-        return try {
-            val clearNumber = text.filter { it.isDigit() }
-            val parser = PhoneNumberUtil.getInstance()
-            val numberForm = parser.parse(clearNumber, Locale.getDefault().displayCountry)
-            if (parser.isPossibleNumber(numberForm))
-                parser.format(numberForm, PhoneNumberUtil.PhoneNumberFormat.E164)
-            else
-                clearNumber
-        } catch (_: Exception) {
-            null
-        }
+        val number = text.filter { it.isDigit() || it == '+' }
+        if (number.isEmpty()) return null
+        return parseValid(number)?.let { util.format(it, PhoneNumberUtil.PhoneNumberFormat.E164) } ?: number
     }
 
     fun format(rawNumber: String): String {
         if (rawNumber.isBlank()) return rawNumber
+        val number = rawNumber.trim()
+        if (number.any { !it.isDigit() && it !in FORMATTABLE_CHARS }) return number
+        formatCache.get(number)?.let { return it }
+        val formatted = parseValid(number)
+            ?.let { util.format(it, PhoneNumberUtil.PhoneNumberFormat.INTERNATIONAL) }
+            ?: number
+        formatCache.put(number, formatted)
+        return formatted
+    }
 
-        val cleanDigits = buildString(rawNumber.length) {
-            for (c in rawNumber) {
-                if (c.isDigit()) append(c)
-            }
-        }
+    private fun parseValid(number: String): PhoneNumber? =
+        parseValid(number, region) ?: if (isRussianTrunkNumber(number)) parseValid(number, "RU") else null
 
-        if (cleanDigits.length == 11 && (cleanDigits.startsWith("7") || cleanDigits.startsWith("8"))) {
-            val code = cleanDigits.substring(1, 4)
-            val part1 = cleanDigits.substring(4, 7)
-            val part2 = cleanDigits.substring(7, 9)
-            val part3 = cleanDigits.substring(9, 11)
-            return "+7 $code $part1-$part2-$part3"
-        }
+    private fun parseValid(number: String, region: String): PhoneNumber? = try {
+        util.parse(number, region).takeIf { util.isValidNumber(it) }
+    } catch (_: Exception) {
+        null
+    }
 
-        if (cleanDigits.length == 10) {
-            val code = cleanDigits.substring(0, 3)
-            val part1 = cleanDigits.substring(3, 6)
-            val part2 = cleanDigits.substring(6, 8)
-            val part3 = cleanDigits.substring(8, 10)
-            return "+7 $code $part1-$part2-$part3"
-        }
-
-        return rawNumber.trim()
+    /** 11-digit 7XXXXXXXXXX / 8XXXXXXXXXX saved without '+', common in RU/KZ contacts. */
+    private fun isRussianTrunkNumber(number: String): Boolean {
+        if (number.startsWith("+")) return false
+        val digits = number.filter { it.isDigit() }
+        return digits.length == 11 && (digits[0] == '7' || digits[0] == '8')
     }
 }

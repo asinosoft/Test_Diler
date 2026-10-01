@@ -2,12 +2,14 @@ package com.asinosoft.cdm
 
 import android.app.Application
 import android.util.Log
+import com.asinosoft.cdm.util.PhoneNumberHelper
 import com.google.firebase.FirebaseApp
 import com.yandex.mobile.ads.common.YandexAds
 
 class App: Application() {
     override fun onCreate() {
         super.onCreate()
+        PhoneNumberHelper.init(this)
 
         FirebaseApp.initializeApp(this)
         YandexAds.initialize(this) {
