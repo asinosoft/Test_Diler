@@ -403,9 +403,6 @@
     <string name="avatar_unsaved_cd">연락처가 저장되지 않음</string>
     <string name="onboarding_miui_title">MIUI 권한</string>
     <string name="onboarding_miui_subtitle">MIUI에서 올바르게 작동하도록</string>
-    <string name="onboarding_miui_dialog_title">MIUI 권한</string>
-    <string name="onboarding_miui_dialog_message">다음 권한을 켜 주세요:\n1. 잠금 화면에 표시\n2. 팝업 창 표시\n3. 잠금 화면 알림\n4. 자동 시작</string>
-    <string name="onboarding_miui_dialog_ok">확인</string>
     <string name="settings_hint_find_app">목록에서 “%1$s” 앱을 찾아 켜세요</string>
     <string name="settings_permissions_help_title">권한 도움말</string>
     <string name="settings_permissions_help_subtitle">통화 화면이 나타나지 않을 때 활성화하세요.</string>
@@ -423,16 +420,10 @@
     <string name="settings_permissions_help_item_vivo_battery">**백그라운드 고전력 사용 허용:** **‘백그라운드 고전력 소비’**에서 앱을 켜 주세요. 그렇지 않으면 시간이 지나면서 시스템이 앱을 절전 상태로 전환합니다.</string>
     <string name="onboarding_huawei_title">EMUI / HarmonyOS 권한</string>
     <string name="onboarding_huawei_subtitle">Huawei / Honor에서 올바르게 작동하도록</string>
-    <string name="onboarding_huawei_dialog_title">EMUI / HarmonyOS 권한</string>
-    <string name="onboarding_huawei_dialog_message">다음 권한을 켜 주세요:\n1. 자동 시작\n2. 백그라운드에서 실행\n3. 잠금 화면에 표시\n4. 팝업 창 표시</string>
     <string name="onboarding_oppo_title">ColorOS 권한</string>
     <string name="onboarding_oppo_subtitle">OPPO / Realme / OnePlus에서 올바르게 작동하도록</string>
-    <string name="onboarding_oppo_dialog_title">ColorOS 권한</string>
-    <string name="onboarding_oppo_dialog_message">다음 권한을 켜 주세요:\n1. 자동 시작\n2. 백그라운드 활동 허용\n3. 플로팅 창\n4. 잠금 화면 알림</string>
     <string name="onboarding_vivo_title">OriginOS / Funtouch 권한</string>
     <string name="onboarding_vivo_subtitle">vivo / iQOO에서 올바르게 작동하도록</string>
-    <string name="onboarding_vivo_dialog_title">OriginOS / Funtouch 권한</string>
-    <string name="onboarding_vivo_dialog_message">다음 권한을 켜 주세요:\n1. 자동 시작\n2. 백그라운드 전력 소비 허용\n3. 잠금 화면에 표시\n4. 플로팅 창</string>
     <string name="incall_bluetooth_devices">블루투스 기기</string>
     <string name="settings_blocked_contacts_title">차단한 연락처</string>
     <string name="settings_blocked_contacts_subtitle">전화를 걸 수 없는 번호 관리</string>

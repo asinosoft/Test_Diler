@@ -403,9 +403,6 @@
     <string name="avatar_unsaved_cd">联系人未保存</string>
     <string name="onboarding_miui_title">MIUI 权限</string>
     <string name="onboarding_miui_subtitle">确保在 MIUI 上正常运行</string>
-    <string name="onboarding_miui_dialog_title">MIUI 权限</string>
-    <string name="onboarding_miui_dialog_message">请开启以下权限:\n1. 锁屏显示\n2. 显示悬浮窗\n3. 锁屏通知\n4. 自启动</string>
-    <string name="onboarding_miui_dialog_ok">确定</string>
     <string name="settings_hint_find_app">在列表中找到“%1$s”并开启</string>
     <string name="settings_permissions_help_title">权限帮助</string>
     <string name="settings_permissions_help_subtitle">来电界面不显示时，用于开启来电界面。</string>
@@ -423,16 +420,10 @@
     <string name="settings_permissions_help_item_vivo_battery">**允许后台高耗电：** 在**“后台高耗电”**中开启本应用。否则系统迟早会让应用进入休眠。</string>
     <string name="onboarding_huawei_title">EMUI / HarmonyOS 权限</string>
     <string name="onboarding_huawei_subtitle">确保在华为 / 荣耀上正常运行</string>
-    <string name="onboarding_huawei_dialog_title">EMUI / HarmonyOS 权限</string>
-    <string name="onboarding_huawei_dialog_message">请开启以下权限:\n1. 自启动\n2. 后台运行\n3. 锁屏显示\n4. 显示悬浮窗</string>
     <string name="onboarding_oppo_title">ColorOS 权限</string>
     <string name="onboarding_oppo_subtitle">确保在 OPPO / Realme / 一加上正常运行</string>
-    <string name="onboarding_oppo_dialog_title">ColorOS 权限</string>
-    <string name="onboarding_oppo_dialog_message">请开启以下权限:\n1. 自启动\n2. 允许后台活动\n3. 悬浮窗\n4. 锁屏通知</string>
     <string name="onboarding_vivo_title">OriginOS / Funtouch 权限</string>
     <string name="onboarding_vivo_subtitle">确保在 vivo / iQOO 上正常运行</string>
-    <string name="onboarding_vivo_dialog_title">OriginOS / Funtouch 权限</string>
-    <string name="onboarding_vivo_dialog_message">请开启以下权限:\n1. 自启动\n2. 后台高耗电\n3. 锁屏显示\n4. 悬浮窗</string>
     <string name="incall_bluetooth_devices">蓝牙设备</string>
     <string name="settings_blocked_contacts_title">已屏蔽的联系人</string>
     <string name="settings_blocked_contacts_subtitle">管理无法呼叫您的号码</string>

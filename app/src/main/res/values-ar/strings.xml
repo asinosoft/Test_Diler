@@ -408,9 +408,6 @@
     <string name="avatar_unsaved_cd">جهة الاتصال غير محفوظة</string>
     <string name="onboarding_miui_title">أذونات MIUI</string>
     <string name="onboarding_miui_subtitle">للعمل بشكل صحيح على MIUI</string>
-    <string name="onboarding_miui_dialog_title">أذونات MIUI</string>
-    <string name="onboarding_miui_dialog_message">يرجى تفعيل الأذونات:\n1. العرض على شاشة القفل\n2. عرض النوافذ المنبثقة\n3. الإشعارات على شاشة القفل\n4. التشغيل التلقائي</string>
-    <string name="onboarding_miui_dialog_ok">حسنًا</string>
     <string name="settings_hint_find_app">ابحث عن «%1$s» في القائمة وفعّله</string>
     <string name="settings_permissions_help_title">المساعدة في الأذونات</string>
     <string name="settings_permissions_help_subtitle">لتفعيل شاشة المكالمة إذا لم تظهر.</string>
@@ -428,16 +425,10 @@
     <string name="settings_permissions_help_item_vivo_battery">**اسمح باستهلاك عالٍ للطاقة في الخلفية:** فعّل التطبيق في **«استهلاك عالٍ للطاقة في الخلفية»**. وإلا فسيضع النظام التطبيق في وضع السكون مع مرور الوقت.</string>
     <string name="onboarding_huawei_title">أذونات EMUI / HarmonyOS</string>
     <string name="onboarding_huawei_subtitle">للعمل بشكل صحيح على Huawei / Honor</string>
-    <string name="onboarding_huawei_dialog_title">أذونات EMUI / HarmonyOS</string>
-    <string name="onboarding_huawei_dialog_message">يرجى تفعيل الأذونات:\n1. التشغيل التلقائي\n2. التشغيل في الخلفية\n3. العرض على شاشة القفل\n4. عرض النوافذ المنبثقة</string>
     <string name="onboarding_oppo_title">أذونات ColorOS</string>
     <string name="onboarding_oppo_subtitle">للعمل بشكل صحيح على OPPO / Realme / OnePlus</string>
-    <string name="onboarding_oppo_dialog_title">أذونات ColorOS</string>
-    <string name="onboarding_oppo_dialog_message">يرجى تفعيل الأذونات:\n1. التشغيل التلقائي\n2. السماح بالنشاط في الخلفية\n3. النوافذ العائمة\n4. الإشعارات على شاشة القفل</string>
     <string name="onboarding_vivo_title">أذونات OriginOS / Funtouch</string>
     <string name="onboarding_vivo_subtitle">للعمل بشكل صحيح على vivo / iQOO</string>
-    <string name="onboarding_vivo_dialog_title">أذونات OriginOS / Funtouch</string>
-    <string name="onboarding_vivo_dialog_message">يرجى تفعيل الأذونات:\n1. التشغيل التلقائي\n2. استهلاك طاقة مرتفع في الخلفية\n3. العرض على شاشة القفل\n4. النوافذ العائمة</string>
     <string name="incall_bluetooth_devices">أجهزة البلوتوث</string>
     <string name="settings_blocked_contacts_title">جهات الاتصال المحظورة</string>
     <string name="settings_blocked_contacts_subtitle">إدارة الأرقام التي لا يمكنها الاتصال بك</string>

@@ -404,9 +404,6 @@
     <string name="avatar_unsaved_cd">Contatto non salvato</string>
     <string name="onboarding_miui_title">Autorizzazioni MIUI</string>
     <string name="onboarding_miui_subtitle">Per il corretto funzionamento su MIUI</string>
-    <string name="onboarding_miui_dialog_title">Autorizzazioni MIUI</string>
-    <string name="onboarding_miui_dialog_message">Attiva le autorizzazioni:\n1. Mostra nella schermata di blocco\n2. Mostra finestre pop-up\n3. Notifiche nella schermata di blocco\n4. Avvio automatico</string>
-    <string name="onboarding_miui_dialog_ok">OK</string>
     <string name="settings_hint_find_app">Trova «%1$s» nell\'elenco e attivalo</string>
     <string name="settings_permissions_help_title">Aiuto con le autorizzazioni</string>
     <string name="settings_permissions_help_subtitle">Per attivare la schermata di chiamata se non compare.</string>
@@ -424,16 +421,10 @@
     <string name="settings_permissions_help_item_vivo_battery">**Consenti consumo elevato in background:** Attiva l\'app in **«Consumo energetico elevato in background»**. Altrimenti, col tempo, il sistema sospenderà l\'app.</string>
     <string name="onboarding_huawei_title">Autorizzazioni EMUI / HarmonyOS</string>
     <string name="onboarding_huawei_subtitle">Per il corretto funzionamento su Huawei / Honor</string>
-    <string name="onboarding_huawei_dialog_title">Autorizzazioni EMUI / HarmonyOS</string>
-    <string name="onboarding_huawei_dialog_message">Attiva le autorizzazioni:\n1. Avvio automatico\n2. Esecuzione in background\n3. Mostra nella schermata di blocco\n4. Mostra finestre pop-up</string>
     <string name="onboarding_oppo_title">Autorizzazioni ColorOS</string>
     <string name="onboarding_oppo_subtitle">Per il corretto funzionamento su OPPO / Realme / OnePlus</string>
-    <string name="onboarding_oppo_dialog_title">Autorizzazioni ColorOS</string>
-    <string name="onboarding_oppo_dialog_message">Attiva le autorizzazioni:\n1. Avvio automatico\n2. Consenti attività in background\n3. Finestre mobili\n4. Notifiche nella schermata di blocco</string>
     <string name="onboarding_vivo_title">Autorizzazioni OriginOS / Funtouch</string>
     <string name="onboarding_vivo_subtitle">Per il corretto funzionamento su vivo / iQOO</string>
-    <string name="onboarding_vivo_dialog_title">Autorizzazioni OriginOS / Funtouch</string>
-    <string name="onboarding_vivo_dialog_message">Attiva le autorizzazioni:\n1. Avvio automatico\n2. Consumo elevato in background\n3. Mostra nella schermata di blocco\n4. Finestre mobili</string>
     <string name="incall_bluetooth_devices">Dispositivi Bluetooth</string>
     <string name="settings_blocked_contacts_title">Contatti bloccati</string>
     <string name="settings_blocked_contacts_subtitle">Gestisci i numeri che non possono chiamarti</string>

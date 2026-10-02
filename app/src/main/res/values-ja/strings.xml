@@ -403,9 +403,6 @@
     <string name="avatar_unsaved_cd">連絡先は未保存</string>
     <string name="onboarding_miui_title">MIUI の権限</string>
     <string name="onboarding_miui_subtitle">MIUI で正しく動作させるため</string>
-    <string name="onboarding_miui_dialog_title">MIUI の権限</string>
-    <string name="onboarding_miui_dialog_message">次の権限を有効にしてください:\n1. ロック画面に表示\n2. ポップアップウィンドウを表示\n3. ロック画面の通知\n4. 自動起動</string>
-    <string name="onboarding_miui_dialog_ok">OK</string>
     <string name="settings_hint_find_app">リストで「%1$s」を探してオンにしてください</string>
     <string name="settings_permissions_help_title">権限のヘルプ</string>
     <string name="settings_permissions_help_subtitle">通話画面が表示されない場合に有効にします。</string>
@@ -423,16 +420,10 @@
     <string name="settings_permissions_help_item_vivo_battery">**バックグラウンドでの高消費電力を許可する:** **「バックグラウンドでの高消費電力」**でアプリをオンにしてください。そうしないと、やがてシステムがアプリをスリープさせます。</string>
     <string name="onboarding_huawei_title">EMUI / HarmonyOS の権限</string>
     <string name="onboarding_huawei_subtitle">Huawei / Honor で正しく動作させるため</string>
-    <string name="onboarding_huawei_dialog_title">EMUI / HarmonyOS の権限</string>
-    <string name="onboarding_huawei_dialog_message">次の権限を有効にしてください:\n1. 自動起動\n2. バックグラウンドで実行\n3. ロック画面に表示\n4. ポップアップウィンドウを表示</string>
     <string name="onboarding_oppo_title">ColorOS の権限</string>
     <string name="onboarding_oppo_subtitle">OPPO / Realme / OnePlus で正しく動作させるため</string>
-    <string name="onboarding_oppo_dialog_title">ColorOS の権限</string>
-    <string name="onboarding_oppo_dialog_message">次の権限を有効にしてください:\n1. 自動起動\n2. バックグラウンドアクティビティを許可\n3. フローティングウィンドウ\n4. ロック画面の通知</string>
     <string name="onboarding_vivo_title">OriginOS / Funtouch の権限</string>
     <string name="onboarding_vivo_subtitle">vivo / iQOO で正しく動作させるため</string>
-    <string name="onboarding_vivo_dialog_title">OriginOS / Funtouch の権限</string>
-    <string name="onboarding_vivo_dialog_message">次の権限を有効にしてください:\n1. 自動起動\n2. バックグラウンドでの高い電力消費\n3. ロック画面に表示\n4. フローティングウィンドウ</string>
     <string name="incall_bluetooth_devices">Bluetooth デバイス</string>
     <string name="settings_blocked_contacts_title">ブロックした連絡先</string>
     <string name="settings_blocked_contacts_subtitle">着信を拒否する番号を管理</string>

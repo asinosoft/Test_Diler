@@ -404,9 +404,6 @@
     <string name="avatar_unsaved_cd">Contato não salvo</string>
     <string name="onboarding_miui_title">Permissões do MIUI</string>
     <string name="onboarding_miui_subtitle">Para o funcionamento correto no MIUI</string>
-    <string name="onboarding_miui_dialog_title">Permissões do MIUI</string>
-    <string name="onboarding_miui_dialog_message">Ative as permissões:\n1. Mostrar na tela de bloqueio\n2. Exibir janelas pop-up\n3. Notificações na tela de bloqueio\n4. Início automático</string>
-    <string name="onboarding_miui_dialog_ok">OK</string>
     <string name="settings_hint_find_app">Encontre “%1$s” na lista e ative</string>
     <string name="settings_permissions_help_title">Ajuda com permissões</string>
     <string name="settings_permissions_help_subtitle">Para ativar a tela de chamada se ela não aparecer.</string>
@@ -424,16 +421,10 @@
     <string name="settings_permissions_help_item_vivo_battery">**Permita alto consumo em segundo plano:** Ative o app em **“Alto consumo de energia em segundo plano”**. Caso contrário, com o tempo o sistema colocará o app em suspensão.</string>
     <string name="onboarding_huawei_title">Permissões do EMUI / HarmonyOS</string>
     <string name="onboarding_huawei_subtitle">Para o funcionamento correto em Huawei / Honor</string>
-    <string name="onboarding_huawei_dialog_title">Permissões do EMUI / HarmonyOS</string>
-    <string name="onboarding_huawei_dialog_message">Ative as permissões:\n1. Início automático\n2. Executar em segundo plano\n3. Mostrar na tela de bloqueio\n4. Exibir janelas pop-up</string>
     <string name="onboarding_oppo_title">Permissões do ColorOS</string>
     <string name="onboarding_oppo_subtitle">Para o funcionamento correto em OPPO / Realme / OnePlus</string>
-    <string name="onboarding_oppo_dialog_title">Permissões do ColorOS</string>
-    <string name="onboarding_oppo_dialog_message">Ative as permissões:\n1. Início automático\n2. Permitir atividade em segundo plano\n3. Janelas flutuantes\n4. Notificações na tela de bloqueio</string>
     <string name="onboarding_vivo_title">Permissões do OriginOS / Funtouch</string>
     <string name="onboarding_vivo_subtitle">Para o funcionamento correto em vivo / iQOO</string>
-    <string name="onboarding_vivo_dialog_title">Permissões do OriginOS / Funtouch</string>
-    <string name="onboarding_vivo_dialog_message">Ative as permissões:\n1. Início automático\n2. Alto consumo em segundo plano\n3. Mostrar na tela de bloqueio\n4. Janelas flutuantes</string>
     <string name="incall_bluetooth_devices">Dispositivos Bluetooth</string>
     <string name="settings_blocked_contacts_title">Contatos bloqueados</string>
     <string name="settings_blocked_contacts_subtitle">Gerencie os números que não podem ligar para você</string>

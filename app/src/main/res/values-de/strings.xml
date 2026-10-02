@@ -404,9 +404,6 @@
     <string name="avatar_unsaved_cd">Kontakt nicht gespeichert</string>
     <string name="onboarding_miui_title">MIUI-Berechtigungen</string>
     <string name="onboarding_miui_subtitle">Für den korrekten Betrieb unter MIUI</string>
-    <string name="onboarding_miui_dialog_title">MIUI-Berechtigungen</string>
-    <string name="onboarding_miui_dialog_message">Bitte aktiviere folgende Berechtigungen:\n1. Auf dem Sperrbildschirm anzeigen\n2. Pop-up-Fenster anzeigen\n3. Benachrichtigungen auf dem Sperrbildschirm\n4. Autostart</string>
-    <string name="onboarding_miui_dialog_ok">OK</string>
     <string name="settings_hint_find_app">Suchen Sie „%1$s“ in der Liste und aktivieren Sie es</string>
     <string name="settings_permissions_help_title">Hilfe zu Berechtigungen</string>
     <string name="settings_permissions_help_subtitle">Zum Aktivieren des Anrufbildschirms, falls er nicht erscheint.</string>
@@ -424,16 +421,10 @@
     <string name="settings_permissions_help_item_vivo_battery">**Hohen Energieverbrauch im Hintergrund erlauben:** Aktiviere die App unter **„Hoher Energieverbrauch im Hintergrund“**. Sonst versetzt das System die App mit der Zeit in den Ruhezustand.</string>
     <string name="onboarding_huawei_title">EMUI-/HarmonyOS-Berechtigungen</string>
     <string name="onboarding_huawei_subtitle">Für den korrekten Betrieb auf Huawei / Honor</string>
-    <string name="onboarding_huawei_dialog_title">EMUI-/HarmonyOS-Berechtigungen</string>
-    <string name="onboarding_huawei_dialog_message">Bitte aktiviere folgende Berechtigungen:\n1. Autostart\n2. Im Hintergrund ausführen\n3. Auf dem Sperrbildschirm anzeigen\n4. Pop-up-Fenster anzeigen</string>
     <string name="onboarding_oppo_title">ColorOS-Berechtigungen</string>
     <string name="onboarding_oppo_subtitle">Für den korrekten Betrieb auf OPPO / Realme / OnePlus</string>
-    <string name="onboarding_oppo_dialog_title">ColorOS-Berechtigungen</string>
-    <string name="onboarding_oppo_dialog_message">Bitte aktiviere folgende Berechtigungen:\n1. Autostart\n2. Hintergrundaktivität erlauben\n3. Schwebende Fenster\n4. Benachrichtigungen auf dem Sperrbildschirm</string>
     <string name="onboarding_vivo_title">OriginOS-/Funtouch-Berechtigungen</string>
     <string name="onboarding_vivo_subtitle">Für den korrekten Betrieb auf vivo / iQOO</string>
-    <string name="onboarding_vivo_dialog_title">OriginOS-/Funtouch-Berechtigungen</string>
-    <string name="onboarding_vivo_dialog_message">Bitte aktiviere folgende Berechtigungen:\n1. Autostart\n2. Hoher Energieverbrauch im Hintergrund\n3. Auf dem Sperrbildschirm anzeigen\n4. Schwebende Fenster</string>
     <string name="incall_bluetooth_devices">Bluetooth-Geräte</string>
     <string name="settings_blocked_contacts_title">Blockierte Kontakte</string>
     <string name="settings_blocked_contacts_subtitle">Nummern verwalten, die dich nicht anrufen können</string>

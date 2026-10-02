@@ -44,26 +44,6 @@ enum class OemShellGuide {
             OPPO -> R.string.onboarding_oppo_subtitle
             VIVO -> R.string.onboarding_vivo_subtitle
         }
-
-    @get:StringRes
-    val dialogTitleRes: Int
-        get() = when (this) {
-            NONE -> error("NONE has no strings")
-            MIUI -> R.string.onboarding_miui_dialog_title
-            HUAWEI -> R.string.onboarding_huawei_dialog_title
-            OPPO -> R.string.onboarding_oppo_dialog_title
-            VIVO -> R.string.onboarding_vivo_dialog_title
-        }
-
-    @get:StringRes
-    val dialogMessageRes: Int
-        get() = when (this) {
-            NONE -> error("NONE has no strings")
-            MIUI -> R.string.onboarding_miui_dialog_message
-            HUAWEI -> R.string.onboarding_huawei_dialog_message
-            OPPO -> R.string.onboarding_oppo_dialog_message
-            VIVO -> R.string.onboarding_vivo_dialog_message
-        }
 }
 
 object OemShellHelper {

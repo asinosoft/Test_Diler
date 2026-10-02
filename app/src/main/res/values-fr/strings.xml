@@ -404,9 +404,6 @@
     <string name="avatar_unsaved_cd">Contact non enregistré</string>
     <string name="onboarding_miui_title">Autorisations MIUI</string>
     <string name="onboarding_miui_subtitle">Pour un fonctionnement correct sous MIUI</string>
-    <string name="onboarding_miui_dialog_title">Autorisations MIUI</string>
-    <string name="onboarding_miui_dialog_message">Veuillez activer les autorisations :\n1. Afficher sur l\'écran de verrouillage\n2. Afficher les fenêtres pop-up\n3. Notifications sur l\'écran de verrouillage\n4. Démarrage automatique</string>
-    <string name="onboarding_miui_dialog_ok">OK</string>
     <string name="settings_hint_find_app">Trouvez « %1$s » dans la liste et activez-le</string>
     <string name="settings_permissions_help_title">Aide aux autorisations</string>
     <string name="settings_permissions_help_subtitle">Pour activer l\'écran d\'appel s\'il n\'apparaît pas.</string>
@@ -424,16 +421,10 @@
     <string name="settings_permissions_help_item_vivo_battery">**Autoriser une forte consommation en arrière-plan :** Activez l\'application dans **« Forte consommation d\'énergie en arrière-plan »**. Sinon, le système finira par mettre l\'application en veille.</string>
     <string name="onboarding_huawei_title">Autorisations EMUI / HarmonyOS</string>
     <string name="onboarding_huawei_subtitle">Pour un fonctionnement correct sur Huawei / Honor</string>
-    <string name="onboarding_huawei_dialog_title">Autorisations EMUI / HarmonyOS</string>
-    <string name="onboarding_huawei_dialog_message">Veuillez activer les autorisations :\n1. Démarrage automatique\n2. Exécution en arrière-plan\n3. Afficher sur l\'écran de verrouillage\n4. Afficher les fenêtres pop-up</string>
     <string name="onboarding_oppo_title">Autorisations ColorOS</string>
     <string name="onboarding_oppo_subtitle">Pour un fonctionnement correct sur OPPO / Realme / OnePlus</string>
-    <string name="onboarding_oppo_dialog_title">Autorisations ColorOS</string>
-    <string name="onboarding_oppo_dialog_message">Veuillez activer les autorisations :\n1. Démarrage automatique\n2. Autoriser l\'activité en arrière-plan\n3. Fenêtres flottantes\n4. Notifications sur l\'écran de verrouillage</string>
     <string name="onboarding_vivo_title">Autorisations OriginOS / Funtouch</string>
     <string name="onboarding_vivo_subtitle">Pour un fonctionnement correct sur vivo / iQOO</string>
-    <string name="onboarding_vivo_dialog_title">Autorisations OriginOS / Funtouch</string>
-    <string name="onboarding_vivo_dialog_message">Veuillez activer les autorisations :\n1. Démarrage automatique\n2. Consommation élevée en arrière-plan\n3. Afficher sur l\'écran de verrouillage\n4. Fenêtres flottantes</string>
     <string name="incall_bluetooth_devices">Appareils Bluetooth</string>
     <string name="settings_blocked_contacts_title">Contacts bloqués</string>
     <string name="settings_blocked_contacts_subtitle">Gérer les numéros qui ne peuvent pas vous appeler</string>

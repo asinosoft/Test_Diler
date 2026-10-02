@@ -404,9 +404,6 @@
     <string name="avatar_unsaved_cd">Contact not saved</string>
     <string name="onboarding_miui_title">MIUI permissions</string>
     <string name="onboarding_miui_subtitle">For correct operation on MIUI</string>
-    <string name="onboarding_miui_dialog_title">MIUI permissions</string>
-    <string name="onboarding_miui_dialog_message">Please enable permissions:\n1. Show on Lock screen\n2. Display pop-up windows\n3. Lock screen notifications\n4. Autostart</string>
-    <string name="onboarding_miui_dialog_ok">OK</string>
     <string name="settings_hint_find_app">Find “%1$s” in the list and turn it on</string>
     <string name="settings_permissions_help_title">Permissions help</string>
     <string name="settings_permissions_help_subtitle">To enable the call screen if it doesn\'t appear.</string>
@@ -424,16 +421,10 @@
     <string name="settings_permissions_help_item_vivo_battery">**Allow high background power usage:** Turn the app on in **“High background power consumption”**. Otherwise the system will eventually put the app to sleep.</string>
     <string name="onboarding_huawei_title">EMUI / HarmonyOS permissions</string>
     <string name="onboarding_huawei_subtitle">For correct operation on Huawei / Honor</string>
-    <string name="onboarding_huawei_dialog_title">EMUI / HarmonyOS permissions</string>
-    <string name="onboarding_huawei_dialog_message">Please enable permissions:\n1. Autostart\n2. Run in background\n3. Show on Lock screen\n4. Display pop-up windows</string>
     <string name="onboarding_oppo_title">ColorOS permissions</string>
     <string name="onboarding_oppo_subtitle">For correct operation on OPPO / Realme / OnePlus</string>
-    <string name="onboarding_oppo_dialog_title">ColorOS permissions</string>
-    <string name="onboarding_oppo_dialog_message">Please enable permissions:\n1. Autostart\n2. Allow background activity\n3. Floating windows\n4. Lock screen notifications</string>
     <string name="onboarding_vivo_title">OriginOS / Funtouch permissions</string>
     <string name="onboarding_vivo_subtitle">For correct operation on vivo / iQOO</string>
-    <string name="onboarding_vivo_dialog_title">OriginOS / Funtouch permissions</string>
-    <string name="onboarding_vivo_dialog_message">Please enable permissions:\n1. Autostart\n2. High background power consumption\n3. Show on Lock screen\n4. Floating windows</string>
     <string name="incall_bluetooth_devices">Bluetooth devices</string>
     <string name="settings_blocked_contacts_title">Blocked contacts</string>
     <string name="settings_blocked_contacts_subtitle">Manage numbers that cannot call you</string>

@@ -406,9 +406,6 @@
     <string name="avatar_unsaved_cd">Kontakt niezapisany</string>
     <string name="onboarding_miui_title">Uprawnienia MIUI</string>
     <string name="onboarding_miui_subtitle">Do prawidłowego działania w MIUI</string>
-    <string name="onboarding_miui_dialog_title">Uprawnienia MIUI</string>
-    <string name="onboarding_miui_dialog_message">Włącz uprawnienia:\n1. Pokazuj na ekranie blokady\n2. Wyświetlaj okna wyskakujące\n3. Powiadomienia na ekranie blokady\n4. Autostart</string>
-    <string name="onboarding_miui_dialog_ok">OK</string>
     <string name="settings_hint_find_app">Znajdź „%1$s” na liście i włącz</string>
     <string name="settings_permissions_help_title">Pomoc z uprawnieniami</string>
     <string name="settings_permissions_help_subtitle">Aby włączyć ekran połączenia, jeśli się nie pojawia.</string>
@@ -426,16 +423,10 @@
     <string name="settings_permissions_help_item_vivo_battery">**Zezwól na wysokie zużycie energii w tle:** Włącz aplikację w **„Wysokie zużycie energii w tle”**. W przeciwnym razie system z czasem uśpi aplikację.</string>
     <string name="onboarding_huawei_title">Uprawnienia EMUI / HarmonyOS</string>
     <string name="onboarding_huawei_subtitle">Do prawidłowego działania na Huawei / Honor</string>
-    <string name="onboarding_huawei_dialog_title">Uprawnienia EMUI / HarmonyOS</string>
-    <string name="onboarding_huawei_dialog_message">Włącz uprawnienia:\n1. Autostart\n2. Działanie w tle\n3. Pokazuj na ekranie blokady\n4. Wyświetlaj okna wyskakujące</string>
     <string name="onboarding_oppo_title">Uprawnienia ColorOS</string>
     <string name="onboarding_oppo_subtitle">Do prawidłowego działania na OPPO / Realme / OnePlus</string>
-    <string name="onboarding_oppo_dialog_title">Uprawnienia ColorOS</string>
-    <string name="onboarding_oppo_dialog_message">Włącz uprawnienia:\n1. Autostart\n2. Zezwalaj na aktywność w tle\n3. Okna pływające\n4. Powiadomienia na ekranie blokady</string>
     <string name="onboarding_vivo_title">Uprawnienia OriginOS / Funtouch</string>
     <string name="onboarding_vivo_subtitle">Do prawidłowego działania na vivo / iQOO</string>
-    <string name="onboarding_vivo_dialog_title">Uprawnienia OriginOS / Funtouch</string>
-    <string name="onboarding_vivo_dialog_message">Włącz uprawnienia:\n1. Autostart\n2. Wysokie zużycie energii w tle\n3. Pokazuj na ekranie blokady\n4. Okna pływające</string>
     <string name="incall_bluetooth_devices">Urządzenia Bluetooth</string>
     <string name="settings_blocked_contacts_title">Zablokowane kontakty</string>
     <string name="settings_blocked_contacts_subtitle">Zarządzaj numerami, które nie mogą do Ciebie dzwonić</string>

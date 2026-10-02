@@ -404,9 +404,6 @@
     <string name="avatar_unsaved_cd">संपर्क सहेजा नहीं गया</string>
     <string name="onboarding_miui_title">MIUI अनुमतियाँ</string>
     <string name="onboarding_miui_subtitle">MIUI पर सही ढंग से काम करने के लिए</string>
-    <string name="onboarding_miui_dialog_title">MIUI अनुमतियाँ</string>
-    <string name="onboarding_miui_dialog_message">कृपया ये अनुमतियाँ चालू करें:\n1. लॉक स्क्रीन पर दिखाएँ\n2. पॉप-अप विंडो दिखाएँ\n3. लॉक स्क्रीन सूचनाएँ\n4. ऑटोस्टार्ट</string>
-    <string name="onboarding_miui_dialog_ok">ठीक है</string>
     <string name="settings_hint_find_app">सूची में “%1$s” ढूंढें और चालू करें</string>
     <string name="settings_permissions_help_title">अनुमतियों में सहायता</string>
     <string name="settings_permissions_help_subtitle">अगर कॉल स्क्रीन नहीं दिखती, तो उसे चालू करने के लिए।</string>
@@ -424,16 +421,10 @@
     <string name="settings_permissions_help_item_vivo_battery">**बैकग्राउंड में ज़्यादा बिजली खपत की अनुमति दें:** **“बैकग्राउंड में ज़्यादा बिजली खपत”** में ऐप चालू करें। नहीं तो समय के साथ सिस्टम ऐप को स्लीप मोड में डाल देगा।</string>
     <string name="onboarding_huawei_title">EMUI / HarmonyOS अनुमतियाँ</string>
     <string name="onboarding_huawei_subtitle">Huawei / Honor पर सही ढंग से काम करने के लिए</string>
-    <string name="onboarding_huawei_dialog_title">EMUI / HarmonyOS अनुमतियाँ</string>
-    <string name="onboarding_huawei_dialog_message">कृपया ये अनुमतियाँ चालू करें:\n1. ऑटोस्टार्ट\n2. बैकग्राउंड में चलाएँ\n3. लॉक स्क्रीन पर दिखाएँ\n4. पॉप-अप विंडो दिखाएँ</string>
     <string name="onboarding_oppo_title">ColorOS अनुमतियाँ</string>
     <string name="onboarding_oppo_subtitle">OPPO / Realme / OnePlus पर सही ढंग से काम करने के लिए</string>
-    <string name="onboarding_oppo_dialog_title">ColorOS अनुमतियाँ</string>
-    <string name="onboarding_oppo_dialog_message">कृपया ये अनुमतियाँ चालू करें:\n1. ऑटोस्टार्ट\n2. बैकग्राउंड गतिविधि की अनुमति दें\n3. फ़्लोटिंग विंडो\n4. लॉक स्क्रीन सूचनाएँ</string>
     <string name="onboarding_vivo_title">OriginOS / Funtouch अनुमतियाँ</string>
     <string name="onboarding_vivo_subtitle">vivo / iQOO पर सही ढंग से काम करने के लिए</string>
-    <string name="onboarding_vivo_dialog_title">OriginOS / Funtouch अनुमतियाँ</string>
-    <string name="onboarding_vivo_dialog_message">कृपया ये अनुमतियाँ चालू करें:\n1. ऑटोस्टार्ट\n2. बैकग्राउंड में उच्च बिजली खपत\n3. लॉक स्क्रीन पर दिखाएँ\n4. फ़्लोटिंग विंडो</string>
     <string name="incall_bluetooth_devices">ब्लूटूथ डिवाइस</string>
     <string name="settings_blocked_contacts_title">ब्लॉक किए गए संपर्क</string>
     <string name="settings_blocked_contacts_subtitle">उन नंबरों को प्रबंधित करें जो आपको कॉल नहीं कर सकते</string>
