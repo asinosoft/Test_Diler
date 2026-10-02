@@ -43,6 +43,7 @@ import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -119,6 +120,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.LocalTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -161,7 +163,9 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
@@ -308,6 +312,7 @@ fun ContactDetailDialog(
         isLoadingHistory = false
     }
 
+    var hiddenMessengersVersion by remember(contact) { mutableIntStateOf(0) }
     var messengerAccountsList by remember(contact) {
         mutableStateOf<List<MessengerAccount>>(
             emptyList()
@@ -695,6 +700,7 @@ fun ContactDetailDialog(
                                             ContactTabContent(
                                                 phoneNumbersList = phoneNumbersList,
                                                 messengerAccountsList = messengerAccountsList,
+                                                hiddenMessengersVersion = hiddenMessengersVersion,
                                                 onUpdateMessengerAccounts = {
                                                     messengerAccountsList = it
                                                 },
@@ -1189,6 +1195,7 @@ fun ContactDetailDialog(
                             avatarBitmap = null
                         }
                         saveHiddenMessengers(context, getContactCustomKey(contact), hiddenSet)
+                        hiddenMessengersVersion++
                         saveCustomMessengerLinks(
                             context,
                             getContactCustomKey(updatedContact),
@@ -1281,50 +1288,86 @@ private fun FloatingTabBar(
         shape = RoundedCornerShape(24.dp),
         color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
     ) {
-        Row(
+        val tabs = listOf(
+            Triple(0, stringResource(R.string.contact_tab_contact), Icons.Default.Person),
+            Triple(1, stringResource(R.string.contact_tab_history), Icons.Default.History),
+            Triple(2, stringResource(R.string.contact_tab_settings), Icons.Default.Settings)
+        )
+        val textMeasurer = rememberTextMeasurer()
+        val density = LocalDensity.current
+        val baseStyle = LocalTextStyle.current
+
+        BoxWithConstraints(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(4.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(4.dp)
         ) {
-            val tabs = listOf(
-                Triple(0, stringResource(R.string.contact_tab_contact), Icons.Default.Person),
-                Triple(1, stringResource(R.string.contact_tab_history), Icons.Default.History),
-                Triple(2, stringResource(R.string.contact_tab_settings), Icons.Default.Settings)
-            )
+            // One shared font size for all tabs: shrink a little first, then drop icons to free room.
+            // The estimate is refined by real layout overflow (OEM system fonts may be wider).
+            var fit by remember(tabs, maxWidth, density, baseStyle) {
+                val widest = tabs.maxOf { (_, title, _) ->
+                    textMeasurer.measure(
+                        title,
+                        baseStyle.merge(TextStyle(fontSize = TAB_MAX_SP.sp, fontWeight = FontWeight.Bold))
+                    ).size.width
+                }.toFloat()
+                val estimate = with(density) {
+                    val tabPx = (maxWidth / tabs.size).toPx() - 8.dp.toPx()
+                    val withIconPx = tabPx - 24.dp.toPx()
+                    when {
+                        widest <= withIconPx -> TabLabelFit(true, TAB_MAX_SP)
+                        widest * TAB_MIN_SP / TAB_MAX_SP <= withIconPx ->
+                            TabLabelFit(true, TAB_MAX_SP * withIconPx / widest)
+                        else -> TabLabelFit(false, (TAB_MAX_SP * tabPx / widest).coerceIn(TAB_MIN_SP, TAB_MAX_SP))
+                    }
+                }
+                mutableStateOf(estimate)
+            }
+            val showIcons = fit.showIcons
+            val fontSize = fit.fontSp
 
-            tabs.forEach { (index, title, icon) ->
-                val isSelected = selectedTab == index
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(20.dp))
-                        .clickable { onTabSelected(index) },
-                    shape = RoundedCornerShape(20.dp),
-                    color = if (isSelected) SamsungGreen else Color.Transparent
-                ) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                tabs.forEach { (index, title, icon) ->
+                    val isSelected = selectedTab == index
+                    Surface(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(20.dp))
+                            .clickable { onTabSelected(index) },
+                        shape = RoundedCornerShape(20.dp),
+                        color = if (isSelected) SamsungGreen else Color.Transparent
                     ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = title,
-                            tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = title,
-                            fontSize = 13.sp,
-                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            softWrap = false,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                        Row(
+                            modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
+                            horizontalArrangement = Arrangement.Center,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (showIcons) {
+                                Icon(
+                                    imageVector = icon,
+                                    contentDescription = null,
+                                    tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                            }
+                            Text(
+                                text = title,
+                                fontSize = fontSize.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                softWrap = false,
+                                overflow = TextOverflow.Ellipsis,
+                                onTextLayout = { result ->
+                                    if (result.hasVisualOverflow) fit = fit.shrink()
+                                }
+                            )
+                        }
                     }
                 }
             }
@@ -1332,10 +1375,24 @@ private fun FloatingTabBar(
     }
 }
 
+private const val TAB_MAX_SP = 13f
+private const val TAB_MIN_SP = 11f
+private const val TAB_MIN_SP_NO_ICONS = 10f
+
+private data class TabLabelFit(val showIcons: Boolean, val fontSp: Float) {
+    fun shrink(): TabLabelFit = when {
+        showIcons && fontSp > TAB_MIN_SP -> copy(fontSp = (fontSp - 0.5f).coerceAtLeast(TAB_MIN_SP))
+        showIcons -> TabLabelFit(false, TAB_MAX_SP)
+        fontSp > TAB_MIN_SP_NO_ICONS -> copy(fontSp = (fontSp - 0.5f).coerceAtLeast(TAB_MIN_SP_NO_ICONS))
+        else -> this
+    }
+}
+
 @Composable
 private fun ContactTabContent(
     phoneNumbersList: List<ContactPhoneNumber>,
     messengerAccountsList: List<MessengerAccount>,
+    hiddenMessengersVersion: Int = 0,
     onUpdateMessengerAccounts: (List<MessengerAccount>) -> Unit = {},
     onUpdatePhoneNumbers: (List<ContactPhoneNumber>) -> Unit = {},
     onUpdateEmails: (List<ContactEmail>) -> Unit = {},
@@ -1570,7 +1627,7 @@ private fun ContactTabContent(
         }
 
         // MESSENGER ACCOUNTS CARD
-        val hiddenSet = remember(messengerAccountsList) {
+        val hiddenSet = remember(messengerAccountsList, hiddenMessengersVersion) {
             getHiddenMessengers(
                 context,
                 getContactCustomKey(contact)

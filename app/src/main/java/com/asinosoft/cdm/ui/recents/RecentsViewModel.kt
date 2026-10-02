@@ -79,6 +79,10 @@ sealed class UnsavedNumberFlowStep {
     data class EditExisting(val contact: FavoriteContact) : UnsavedNumberFlowStep()
 }
 
+private const val KEY_FAVORITES_AUTOFILLED = "favorites_autofill_done"
+private const val KEY_FAVORITE_ROWS_USER_SET = "favorite_rows_user_set"
+private const val AUTOFILL_MANY_CONTACTS = 6
+
 data class SearchDialerItem(
     val id: String,
     val name: String,
@@ -562,7 +566,7 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
             val shouldShowLoading = showLoading && !_hasLoadedCallLogs.value
             try {
                 val contacts = contactsRepository.getContacts()
-                val favorites = favoritesRepository.getFavorites()
+                var favorites = favoritesRepository.getFavorites()
 
                 Firebase.analytics.setUserProperty("contacts_count", contacts.size.toString())
                 Firebase.analytics.setUserProperty("favorites_count", favorites.size.toString())
@@ -594,6 +598,9 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                         publish(initialLogs)
                         _hasLoadedCallLogs.value = true
                     }
+                    if (generation == callLogLoadGeneration) {
+                        autofillFavoritesIfNeeded(initialLogs, favorites, contacts)?.let { favorites = it }
+                    }
 
                     val fullLogs = repository.getCallLogs(limit = null)
                     withContext(Dispatchers.Main) {
@@ -604,6 +611,9 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                     val initialLogs = repository.getCallLogs(CallLogRepository.DEFAULT_RECENTS_LIMIT)
                     withContext(Dispatchers.Main) {
                         publish(initialLogs)
+                    }
+                    if (generation == callLogLoadGeneration) {
+                        autofillFavoritesIfNeeded(initialLogs, favorites, contacts)?.let { favorites = it }
                     }
                     val fullLogs = repository.getCallLogs(limit = null)
                     withContext(Dispatchers.Main) {
@@ -623,6 +633,61 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
                 }
             }
         }
+    }
+
+    /**
+     * First launch only: if the user has no favorites, star the most-called saved contacts
+     * (3 for a short call history, 6 for a rich one) and size favorite rows to fit them.
+     * Returns the updated favorites, or null if nothing was added.
+     */
+    private fun autofillFavoritesIfNeeded(
+        logs: List<CallLogItem>,
+        favorites: List<FavoriteContact>,
+        contacts: List<SearchDialerItem>
+    ): List<FavoriteContact>? {
+        if (logs.isEmpty() || prefs.getBoolean(KEY_FAVORITES_AUTOFILLED, false)) return null
+        prefs.edit { putBoolean(KEY_FAVORITES_AUTOFILLED, true) }
+        if (favorites.isNotEmpty()) return null
+
+        val contactByPhone = HashMap<String, SearchDialerItem>(contacts.size * 2)
+        contacts.forEach { c -> phoneMatchKey(c.number)?.let { contactByPhone.putIfAbsent(it, c) } }
+
+        val callsByContact = LinkedHashMap<String, Pair<SearchDialerItem, Int>>()
+        for (log in logs) {
+            val contact = phoneMatchKey(log.number)?.let(contactByPhone::get) ?: continue
+            val key = contact.id.ifBlank { contact.number }
+            val prev = callsByContact[key]
+            callsByContact[key] = (prev?.first ?: contact) to ((prev?.second ?: 0) + log.count)
+        }
+        if (callsByContact.isEmpty()) return null
+
+        val target = if (callsByContact.size >= AUTOFILL_MANY_CONTACTS) 6 else 3
+        val picked = callsByContact.values
+            .sortedByDescending { it.second }
+            .take(target)
+            .map { it.first }
+
+        suppressContactsObserverUntilElapsed = SystemClock.elapsedRealtime() + 2_500L
+        var updated = favorites
+        picked.forEachIndexed { index, c ->
+            updated = favoritesRepository.addFavorite(
+                FavoriteContact(id = c.id, name = c.name, number = c.number, photoUri = c.photoUri, order = index)
+            )
+        }
+
+        _favorites.value = updated
+
+        if (!prefs.getBoolean(KEY_FAVORITE_ROWS_USER_SET, false)) {
+            val gridRows = ((picked.size + 2) / 3).coerceIn(1, 3)
+            val listRows = picked.size.coerceIn(1, 5)
+            prefs.edit {
+                putInt("favorite_rows_count_grid", gridRows)
+                putInt("favorite_rows_count_list", listRows)
+            }
+            _gridRowsCount.value = gridRows
+            _listRowsCount.value = listRows
+        }
+        return updated
     }
 
     /** Prefer favorite display names over stale CallLog.CACHED_NAME. */
@@ -766,10 +831,10 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         val validCount = count.coerceIn(1, 8)
         if (_favoritesViewMode.value == FavoritesViewMode.LIST) {
             _listRowsCount.value = validCount
-            prefs.edit { putInt("favorite_rows_count_list", validCount) }
+            prefs.edit { putInt("favorite_rows_count_list", validCount).putBoolean(KEY_FAVORITE_ROWS_USER_SET, true) }
         } else {
             _gridRowsCount.value = validCount
-            prefs.edit { putInt("favorite_rows_count_grid", validCount) }
+            prefs.edit { putInt("favorite_rows_count_grid", validCount).putBoolean(KEY_FAVORITE_ROWS_USER_SET, true) }
         }
         Firebase.analytics.setUserProperty("favorites_count", count.toString())
     }
