@@ -9,9 +9,6 @@ import android.telecom.Call
 import android.telecom.PhoneAccountHandle
 import android.telecom.PhoneAccountSuggestion
 import android.telecom.TelecomManager
-import android.telephony.SubscriptionInfo
-import android.telephony.SubscriptionManager
-import android.telephony.TelephonyManager
 import androidx.core.content.ContextCompat
 
 data class SelectablePhoneAccount(
@@ -23,10 +20,10 @@ data class SelectablePhoneAccount(
 class PhoneAccountHelper(private val context: Context) {
     fun getSelectableAccounts(call: Call?): List<SelectablePhoneAccount> {
         val handles = getSuggestedHandles(call)
-        val subscriptions = getActiveSubscriptions()
+        val phoneAccountHandles = getPhoneAccountHandles()
 
         return handles.map { handle ->
-            val simNumber = getSimNumberFromHandle(handle, subscriptions)
+            val simNumber = phoneAccountHandles.indexOfFirst { it.id == handle.id }.coerceAtLeast(0) + 1
             SelectablePhoneAccount(
                 handle = handle,
                 simNumber = simNumber,
@@ -104,65 +101,13 @@ class PhoneAccountHelper(private val context: Context) {
         }
     }
 
-    private fun getActiveSubscriptions(): List<SubscriptionInfo> {
+    private fun getPhoneAccountHandles(): List<PhoneAccountHandle> {
         if (!canReadPhoneState()) return listOf()
 
-        val subscriptionManager =
-            context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+        val telecomManager =
+            context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
         @Suppress("MissingPermission")
-        return subscriptionManager?.activeSubscriptionInfoList ?: listOf()
-    }
-
-    private fun getSimNumberFromHandle(
-        handle: PhoneAccountHandle,
-        subscriptions: List<SubscriptionInfo>
-    ): Int {
-        val telephonyManager =
-            context.getSystemService(Context.TELEPHONY_SERVICE) as? TelephonyManager
-        val accountId =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R)
-                @Suppress("MissingPermission")
-                telephonyManager?.getSubscriptionId(handle).toString()
-            else
-                handle.id
-        try {
-            if (subscriptions.size == 1) {
-                return subscriptions[0].simSlotIndex + 1
-            }
-            for (info in subscriptions) {
-                val subId = info.subscriptionId.toString()
-                val slotIndex = info.simSlotIndex
-                val iccId = info.iccId.orEmpty()
-                if (accountId == subId || accountId == "sub_$subId") {
-                    return slotIndex + 1
-                }
-                if (iccId.isNotBlank() && accountId.contains(iccId)) {
-                    return slotIndex + 1
-                }
-                if (accountId == slotIndex.toString() ||
-                    accountId.endsWith(":$slotIndex") ||
-                    accountId.endsWith("_$slotIndex") ||
-                    accountId.contains("slot$slotIndex", ignoreCase = true) ||
-                    accountId.contains("sim${slotIndex + 1}", ignoreCase = true)
-                ) {
-                    return slotIndex + 1
-                }
-            }
-        } catch (_: Exception) {
-            // ignore
-        }
-        val cleanId = accountId.lowercase().trim()
-        if (cleanId.contains("sim2") || cleanId.contains("slot1") || cleanId.contains("sub2") ||
-            cleanId.endsWith("_1") || cleanId.endsWith(":1")
-        ) {
-            return 2
-        }
-        if (cleanId.contains("sim1") || cleanId.contains("slot0") || cleanId.contains("sub1") ||
-            cleanId.endsWith("_0") || cleanId.endsWith(":0")
-        ) {
-            return 1
-        }
-        return 1
+        return telecomManager?.callCapablePhoneAccounts ?: listOf()
     }
 
     private fun canReadPhoneState(): Boolean {

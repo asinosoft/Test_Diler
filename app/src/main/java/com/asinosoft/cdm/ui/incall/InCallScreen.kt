@@ -16,7 +16,6 @@ import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.PhoneAccountHandle
 import android.telecom.TelecomManager
-import android.telephony.SubscriptionManager
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -1937,39 +1936,14 @@ private fun getSimNumberFromCall(call: Call?, context: Context): Int {
         ) == PackageManager.PERMISSION_GRANTED
 
         if (hasPermission) {
-            val subManager =
-                context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
+            val telecomManager =
+                context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
 
             @Suppress("MissingPermission")
-            val activeList = subManager?.activeSubscriptionInfoList
+            val phoneAccountHandles = telecomManager?.callCapablePhoneAccounts
 
-            if (!activeList.isNullOrEmpty()) {
-                if (activeList.size == 1) {
-                    return activeList[0].simSlotIndex + 1
-                }
-
-                for (info in activeList) {
-                    val subId = info.subscriptionId.toString()
-                    val slotIndex = info.simSlotIndex // 0 for SIM1, 1 for SIM2
-                    val iccId = info.iccId.orEmpty()
-
-                    if (accountId == subId || accountId == "sub_$subId") {
-                        return slotIndex + 1
-                    }
-
-                    if (iccId.isNotBlank() && accountId.contains(iccId)) {
-                        return slotIndex + 1
-                    }
-
-                    if (accountId == slotIndex.toString() ||
-                        accountId.endsWith(":$slotIndex") ||
-                        accountId.endsWith("_$slotIndex") ||
-                        accountId.contains("slot$slotIndex", ignoreCase = true) ||
-                        accountId.contains("sim${slotIndex + 1}", ignoreCase = true)
-                    ) {
-                        return slotIndex + 1
-                    }
-                }
+            if (!phoneAccountHandles.isNullOrEmpty()) {
+                return phoneAccountHandles.indexOfFirst { it.id == accountId }.coerceAtLeast(0) + 1
             }
         }
     } catch (_: Exception) {

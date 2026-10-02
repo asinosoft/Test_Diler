@@ -3,14 +3,13 @@ package com.asinosoft.cdm.data.repository
 import android.content.ContentResolver
 import android.content.Context
 import android.content.pm.PackageManager
-import android.database.Cursor
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.CallLog
 import android.provider.ContactsContract
-import android.telephony.SubscriptionInfo
-import android.telephony.SubscriptionManager
+import android.telecom.PhoneAccountHandle
+import android.telecom.TelecomManager
 import androidx.core.content.ContextCompat
 import com.asinosoft.cdm.data.model.CallLogItem
 import com.asinosoft.cdm.data.model.CallType
@@ -34,7 +33,7 @@ class CallLogRepository(private val context: Context) {
     private val nameCache = mutableMapOf<String, String>()
 
     @Volatile
-    private var cachedSubscriptions: List<SubscriptionInfo>? = null
+    private var cachedPhoneAccountHandles: List<PhoneAccountHandle>? = null
 
     init {
         CallLogDiskCache.loadCachedMeta(context, nameCache, photoCache)
@@ -234,10 +233,7 @@ class CallLogRepository(private val context: Context) {
                 val durationIndex = c.getColumnIndex(CallLog.Calls.DURATION)
                 val accountIdIndex = c.getColumnIndex(CallLog.Calls.PHONE_ACCOUNT_ID)
 
-                val subIdIndex = getColumnIndexSafe(c, "sub_id", "subscription_id")
-                val simIdIndex = getColumnIndexSafe(c, "sim_id", "sim_slot")
-
-                val subscriptions = getActiveSubscriptions()
+                val phoneAccountHandles = getPhoneAccountHandles()
 
                 while (c.moveToNext()) {
                     val id = if (idIndex != -1) c.getString(idIndex) else ""
@@ -245,10 +241,8 @@ class CallLogRepository(private val context: Context) {
                     val name = if (nameIndex != -1) c.getString(nameIndex) else null
                     val photoUri = if (photoIndex != -1) c.getString(photoIndex) else null
                     val accountId = if (accountIdIndex != -1) c.getString(accountIdIndex) else null
-                    val subIdStr = if (subIdIndex != -1) c.getString(subIdIndex) else null
-                    val simIdStr = if (simIdIndex != -1) c.getString(simIdIndex) else null
 
-                    val simNumber = detectSimNumber(subscriptions, accountId, subIdStr, simIdStr)
+                    val simNumber = phoneAccountHandles.indexOfFirst { it.id == accountId }.coerceAtLeast(0) + 1
                     val rawType =
                         if (typeIndex != -1) c.getInt(typeIndex) else CallLog.Calls.INCOMING_TYPE
                     val date = if (dateIndex != -1) c.getLong(dateIndex) else 0L
@@ -585,81 +579,18 @@ class CallLogRepository(private val context: Context) {
         return grouped
     }
 
-    private fun getColumnIndexSafe(cursor: Cursor, vararg columnNames: String): Int {
-        for (col in columnNames) {
-            val idx = cursor.getColumnIndex(col)
-            if (idx != -1) return idx
-        }
-        return -1
-    }
-
     @Suppress("MissingPermission")
-    private fun getActiveSubscriptions(): List<SubscriptionInfo> {
-        cachedSubscriptions?.let { return it }
+    private fun getPhoneAccountHandles(): List<PhoneAccountHandle> {
+        cachedPhoneAccountHandles?.let { return it }
         return try {
             val subManager =
-                context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE) as? SubscriptionManager
-            val list = subManager?.activeSubscriptionInfoList.orEmpty()
-            cachedSubscriptions = list
+                context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
+            val list = subManager?.callCapablePhoneAccounts.orEmpty()
+            cachedPhoneAccountHandles = list
             list
         } catch (_: Exception) {
             emptyList()
         }
-    }
-
-    private fun detectSimNumber(
-        subscriptions: List<SubscriptionInfo>,
-        accountHandleId: String?,
-        subIdStr: String?,
-        simIdStr: String?
-    ): Int {
-        try {
-            if (subscriptions.isNotEmpty()) {
-                for (info in subscriptions) {
-                    val subId = info.subscriptionId.toString()
-                    val slotIndex = info.simSlotIndex
-                    val iccId = info.iccId ?: ""
-
-                    if ((subIdStr != null && subIdStr == subId) ||
-                        (simIdStr != null && simIdStr == subId) ||
-                        (accountHandleId != null && accountHandleId == subId) ||
-                        (!accountHandleId.isNullOrBlank() && iccId.isNotBlank() &&
-                                accountHandleId.contains(iccId))
-                    ) {
-                        return slotIndex + 1
-                    }
-
-                    if (accountHandleId == slotIndex.toString() ||
-                        subIdStr == slotIndex.toString() ||
-                        simIdStr == slotIndex.toString()
-                    ) {
-                        return slotIndex + 1
-                    }
-                }
-            }
-        } catch (_: Exception) {
-            // ignore
-        }
-
-        val combined =
-            "${accountHandleId.orEmpty()} ${subIdStr.orEmpty()} ${simIdStr.orEmpty()}".lowercase()
-                .trim()
-
-        if (simIdStr == "1" || subIdStr == "1" || accountHandleId == "1" ||
-            combined.contains("sim2") || combined.contains("sub2") || combined.contains("slot2") ||
-            combined.endsWith("_2") || combined.endsWith(":1")
-        ) {
-            return 2
-        }
-
-        if (simIdStr == "0" || subIdStr == "0" || accountHandleId == "0" ||
-            combined.contains("sim1") || combined.contains("sub1") || combined.contains("slot1") ||
-            combined.endsWith("_1") || combined.endsWith(":0")
-        ) {
-            return 1
-        }
-
-        return 1
     }
 
     private fun digitsOnly(number: String): String {
