@@ -84,6 +84,8 @@ import java.text.SimpleDateFormat
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+private val CALL_ACTION_TYPES = setOf("call_sim1", "call_sim2", "call_single")
+
 @Composable
 fun SwipeableCallLogCard(
     item: CallLogItem,
@@ -147,6 +149,16 @@ fun SwipeableCallLogCard(
     fun dismissMenu() {
         menuExpanded = false
         showDeleteSubmenu = false
+    }
+
+    val runCustomAction: (CustomSwipeAction) -> Unit = { action ->
+        val isCall = action.actionType in CALL_ACTION_TYPES
+        executeCustomSwipeAction(
+            context,
+            if (isCall) action.copy(targetValue = item.number) else action,
+            { num, sim -> if (sim != null) onCallWithSim(num, sim) else onCall(num) },
+            onSms
+        )
     }
 
     val formattedNumber = remember(item.number) { PhoneNumberHelper.format(item.number) }
@@ -252,24 +264,14 @@ fun SwipeableCallLogCard(
                                 if (finalOffset > thresholdPx) {
                                     Analytics.logHistorySwipeRight()
                                     if (customRightAction != null) {
-                                        executeCustomSwipeAction(
-                                            context,
-                                            customRightAction,
-                                            { num, _ -> onCall(num) },
-                                            onSms
-                                        )
+                                        runCustomAction(customRightAction)
                                     } else {
                                         onCall(item.number)
                                     }
                                 } else if (finalOffset < -thresholdPx) {
                                     Analytics.logHistorySwipeLeft()
                                     if (customLeftAction != null) {
-                                        executeCustomSwipeAction(
-                                            context,
-                                            customLeftAction,
-                                            { num, _ -> onCall(num) },
-                                            onSms
-                                        )
+                                        runCustomAction(customLeftAction)
                                     } else {
                                         onSms(item.number)
                                     }
