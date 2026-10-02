@@ -407,6 +407,7 @@
     <string name="onboarding_miui_dialog_title">MIUI-Berechtigungen</string>
     <string name="onboarding_miui_dialog_message">Bitte aktiviere folgende Berechtigungen:\n1. Auf dem Sperrbildschirm anzeigen\n2. Pop-up-Fenster anzeigen\n3. Benachrichtigungen auf dem Sperrbildschirm\n4. Autostart</string>
     <string name="onboarding_miui_dialog_ok">OK</string>
+    <string name="settings_hint_find_app">Suchen Sie „%1$s“ in der Liste und aktivieren Sie es</string>
     <string name="settings_permissions_help_title">Hilfe zu Berechtigungen</string>
     <string name="settings_permissions_help_subtitle">Zum Aktivieren des Anrufbildschirms, falls er nicht erscheint.</string>
     <string name="settings_permissions_help_header">Was unter %1$s manuell eingerichtet werden muss!</string>

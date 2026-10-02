@@ -406,6 +406,7 @@
     <string name="onboarding_miui_dialog_title">MIUI 권한</string>
     <string name="onboarding_miui_dialog_message">다음 권한을 켜 주세요:\n1. 잠금 화면에 표시\n2. 팝업 창 표시\n3. 잠금 화면 알림\n4. 자동 시작</string>
     <string name="onboarding_miui_dialog_ok">확인</string>
+    <string name="settings_hint_find_app">목록에서 “%1$s” 앱을 찾아 켜세요</string>
     <string name="settings_permissions_help_title">권한 도움말</string>
     <string name="settings_permissions_help_subtitle">통화 화면이 나타나지 않을 때 활성화하세요.</string>
     <string name="settings_permissions_help_header">%1$s에서 직접 설정해야 할 항목!</string>

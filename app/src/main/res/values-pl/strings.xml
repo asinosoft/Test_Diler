@@ -409,6 +409,7 @@
     <string name="onboarding_miui_dialog_title">Uprawnienia MIUI</string>
     <string name="onboarding_miui_dialog_message">Włącz uprawnienia:\n1. Pokazuj na ekranie blokady\n2. Wyświetlaj okna wyskakujące\n3. Powiadomienia na ekranie blokady\n4. Autostart</string>
     <string name="onboarding_miui_dialog_ok">OK</string>
+    <string name="settings_hint_find_app">Znajdź „%1$s” na liście i włącz</string>
     <string name="settings_permissions_help_title">Pomoc z uprawnieniami</string>
     <string name="settings_permissions_help_subtitle">Aby włączyć ekran połączenia, jeśli się nie pojawia.</string>
     <string name="settings_permissions_help_header">Co trzeba ręcznie ustawić w %1$s!</string>

@@ -106,7 +106,6 @@ class MainActivity : ComponentActivity() {
                         !showOemPermission || isOemPermissionsDone(onboardingPrefs, oemGuide)
                     )
                 }
-                var awaitingOemReturn by remember { mutableStateOf(false) }
                 // Only leave the permissions UI when everything was already OK at launch,
                 // or when the user presses «Дальше» with all items granted.
                 // Dialer role may auto-grant runtime/overlay — don't skip the screen for that.
@@ -129,15 +128,7 @@ class MainActivity : ComponentActivity() {
                     isOverlayGranted = Settings.canDrawOverlays(this@MainActivity)
                     isNotificationGranted =
                         MissedCallNotificationListener.isEnabled(this@MainActivity)
-                    if (!showOemPermission) {
-                        isOemGranted = true
-                    } else if (awaitingOemReturn) {
-                        isOemGranted = true
-                        awaitingOemReturn = false
-                        onboardingPrefs.edit { putBoolean(KEY_OEM_PERMISSIONS_DONE, true) }
-                    } else {
-                        isOemGranted = isOemPermissionsDone(onboardingPrefs, oemGuide)
-                    }
+                    isOemGranted = !showOemPermission || isOemPermissionsDone(onboardingPrefs, oemGuide)
                 }
 
                 LaunchedEffect(Unit) {
@@ -180,13 +171,6 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val notificationLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.StartActivityForResult()
-                ) {
-                    refreshPermissionFlags()
-                    nextHighlightAfterChange()
-                }
-
-                val oemLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.StartActivityForResult()
                 ) {
                     refreshPermissionFlags()
@@ -258,23 +242,10 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                fun openOemAppInfo() {
-                    highlightedStep = OnboardingPermissionStep.OEM
-                    awaitingOemReturn = true
-                    val intent = Intent(
-                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                        Uri.fromParts("package", packageName, null)
-                    )
-                    try {
-                        oemLauncher.launch(intent)
-                    } catch (_: Exception) {
-                        awaitingOemReturn = false
-                        Toast.makeText(
-                            context,
-                            getString(R.string.error_open_settings),
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    }
+                fun confirmOemPermissions() {
+                    isOemGranted = true
+                    onboardingPrefs.edit { putBoolean(KEY_OEM_PERMISSIONS_DONE, true) }
+                    nextHighlightAfterChange()
                 }
 
                 fun requestDialer() {
@@ -309,7 +280,7 @@ class MainActivity : ComponentActivity() {
                                 onRequestRuntimePermissions = { requestRuntime() },
                                 onRequestOverlayPermission = { openOverlaySettings() },
                                 onRequestNotificationAccess = { openNotificationAccessSettings() },
-                                onRequestOemPermissions = { openOemAppInfo() },
+                                onOemPermissionsDone = { confirmOemPermissions() },
                                 onContinue = {
                                     refreshPermissionFlags()
                                     if (isDialerGranted &&
@@ -477,6 +448,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         com.asinosoft.cdm.util.ActiveSimCount.refreshNow(this)
+        com.asinosoft.cdm.util.SettingsHintOverlay.hide(this)
         clearMissedCallNotifications()
     }
 

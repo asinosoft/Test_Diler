@@ -406,6 +406,7 @@
     <string name="onboarding_miui_dialog_title">MIUI の権限</string>
     <string name="onboarding_miui_dialog_message">次の権限を有効にしてください:\n1. ロック画面に表示\n2. ポップアップウィンドウを表示\n3. ロック画面の通知\n4. 自動起動</string>
     <string name="onboarding_miui_dialog_ok">OK</string>
+    <string name="settings_hint_find_app">リストで「%1$s」を探してオンにしてください</string>
     <string name="settings_permissions_help_title">権限のヘルプ</string>
     <string name="settings_permissions_help_subtitle">通話画面が表示されない場合に有効にします。</string>
     <string name="settings_permissions_help_header">%1$s で手動設定が必要な項目！</string>

@@ -407,6 +407,7 @@
     <string name="onboarding_miui_dialog_title">Autorizzazioni MIUI</string>
     <string name="onboarding_miui_dialog_message">Attiva le autorizzazioni:\n1. Mostra nella schermata di blocco\n2. Mostra finestre pop-up\n3. Notifiche nella schermata di blocco\n4. Avvio automatico</string>
     <string name="onboarding_miui_dialog_ok">OK</string>
+    <string name="settings_hint_find_app">Trova «%1$s» nell\'elenco e attivalo</string>
     <string name="settings_permissions_help_title">Aiuto con le autorizzazioni</string>
     <string name="settings_permissions_help_subtitle">Per attivare la schermata di chiamata se non compare.</string>
     <string name="settings_permissions_help_header">Cosa configurare manualmente su %1$s!</string>

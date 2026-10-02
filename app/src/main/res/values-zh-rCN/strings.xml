@@ -406,6 +406,7 @@
     <string name="onboarding_miui_dialog_title">MIUI 权限</string>
     <string name="onboarding_miui_dialog_message">请开启以下权限:\n1. 锁屏显示\n2. 显示悬浮窗\n3. 锁屏通知\n4. 自启动</string>
     <string name="onboarding_miui_dialog_ok">确定</string>
+    <string name="settings_hint_find_app">在列表中找到“%1$s”并开启</string>
     <string name="settings_permissions_help_title">权限帮助</string>
     <string name="settings_permissions_help_subtitle">来电界面不显示时，用于开启来电界面。</string>
     <string name="settings_permissions_help_header">在 %1$s 上需要手动设置的项目！</string>

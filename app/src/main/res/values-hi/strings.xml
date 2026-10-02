@@ -407,6 +407,7 @@
     <string name="onboarding_miui_dialog_title">MIUI अनुमतियाँ</string>
     <string name="onboarding_miui_dialog_message">कृपया ये अनुमतियाँ चालू करें:\n1. लॉक स्क्रीन पर दिखाएँ\n2. पॉप-अप विंडो दिखाएँ\n3. लॉक स्क्रीन सूचनाएँ\n4. ऑटोस्टार्ट</string>
     <string name="onboarding_miui_dialog_ok">ठीक है</string>
+    <string name="settings_hint_find_app">सूची में “%1$s” ढूंढें और चालू करें</string>
     <string name="settings_permissions_help_title">अनुमतियों में सहायता</string>
     <string name="settings_permissions_help_subtitle">अगर कॉल स्क्रीन नहीं दिखती, तो उसे चालू करने के लिए।</string>
     <string name="settings_permissions_help_header">%1$s पर मैन्युअल रूप से क्या सेट करना होगा!</string>

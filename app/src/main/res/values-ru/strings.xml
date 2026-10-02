@@ -58,6 +58,7 @@
     <string name="onboarding_miui_dialog_title">Разрешения MIUI</string>
     <string name="onboarding_miui_dialog_message">Пожалуйста, включите разрешения:\n1. Показывать на Экране блокировки\n2. Показывать всплывающие окна\n3. Уведомления на Экране блокировки\n4. Автозапуск</string>
     <string name="onboarding_miui_dialog_ok">OK</string>
+    <string name="settings_hint_find_app">Найдите «%1$s» в списке и включите</string>
     <string name="settings_permissions_help_title">Помощь с разрешениями</string>
     <string name="settings_permissions_help_subtitle">Для включения окна звонка, если оно не появляется.</string>
     <string name="settings_permissions_help_header">Что нужно настроить вручную на %1$s!</string>

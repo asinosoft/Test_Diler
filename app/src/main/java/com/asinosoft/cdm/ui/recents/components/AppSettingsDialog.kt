@@ -81,14 +81,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.LinkAnnotation
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.TextLinkStyles
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.text.withLink
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -106,7 +98,6 @@ import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.util.AboutSupportHelper
 import com.asinosoft.cdm.util.AboutSupportHelper.PRIVACY_POLICY_URL
 import com.asinosoft.cdm.util.Analytics
-import com.asinosoft.cdm.util.OemShellGuide
 import com.asinosoft.cdm.util.OemShellHelper
 import com.asinosoft.cdm.util.BlockedNumberItem
 import com.asinosoft.cdm.util.BlockedNumbersHelper
@@ -272,7 +263,7 @@ fun AppSettingsDialog(
                                 .verticalScroll(rememberScrollState())
                                 .padding(bottom = 16.dp)
                         ) {
-                            PermissionsHelpPage()
+                            PermissionsHelpContent()
                         }
                     }
 
@@ -566,92 +557,6 @@ private fun PhoneSettingsNavCard(
                 tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                 modifier = Modifier.size(20.dp)
             )
-        }
-    }
-}
-
-@Composable
-private fun PermissionsHelpPage() {
-    val context = LocalContext.current
-    val guide = remember { OemShellHelper.detectGuide() }
-    val shellName = remember(guide) {
-        when (guide) {
-            OemShellGuide.MIUI -> if (OemShellHelper.isHyperOs()) "HyperOS" else "MIUI"
-            OemShellGuide.HUAWEI -> "Huawei / Honor"
-            OemShellGuide.OPPO -> "OPPO / realme / OnePlus"
-            OemShellGuide.VIVO -> "vivo / iQOO"
-            OemShellGuide.NONE -> ""
-        }
-    }
-    val (autostartRes, popupsRes, batteryRes) = when (guide) {
-        OemShellGuide.HUAWEI -> Triple(
-            R.string.settings_permissions_help_item_huawei_autostart,
-            R.string.settings_permissions_help_item_huawei_popups,
-            R.string.settings_permissions_help_item_huawei_battery
-        )
-        OemShellGuide.OPPO -> Triple(
-            R.string.settings_permissions_help_item_autostart_list,
-            R.string.settings_permissions_help_item_oppo_popups,
-            R.string.settings_permissions_help_item_oppo_battery
-        )
-        OemShellGuide.VIVO -> Triple(
-            R.string.settings_permissions_help_item_autostart_list,
-            R.string.settings_permissions_help_item_vivo_popups,
-            R.string.settings_permissions_help_item_vivo_battery
-        )
-        else -> Triple(
-            R.string.settings_permissions_help_item_autostart,
-            R.string.settings_permissions_help_item_popups,
-            R.string.settings_permissions_help_item_battery
-        )
-    }
-    val helpItems = listOf<Pair<Int, () -> Unit>>(
-        autostartRes to { OemShellHelper.openAutostartSettings(context) },
-        popupsRes to { OemShellHelper.openSpecialPermissionsSettings(context) },
-        batteryRes to { OemShellHelper.openBatterySettings(context) }
-    )
-    Text(
-        text = stringResource(R.string.settings_permissions_help_header, shellName),
-        fontSize = 17.sp,
-        fontWeight = FontWeight.Bold,
-        color = MaterialTheme.colorScheme.onBackground,
-        modifier = Modifier.padding(top = 4.dp, bottom = 16.dp)
-    )
-    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        helpItems.forEach { (res, onTitleClick) ->
-            Row {
-                Text(
-                    text = "•",
-                    fontSize = 15.sp,
-                    color = MaterialTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(end = 10.dp)
-                )
-                Text(
-                    text = boldMarkup(stringResource(res, shellName), onTitleClick),
-                    fontSize = 15.sp,
-                    lineHeight = 22.sp,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-            }
-        }
-    }
-}
-
-/** Renders `**text**` fragments in bold; the first one becomes a link when [onTitleClick] is set. */
-private fun boldMarkup(text: String, onTitleClick: (() -> Unit)? = null): AnnotatedString = buildAnnotatedString {
-    val bold = SpanStyle(fontWeight = FontWeight.Bold)
-    text.split("**").forEachIndexed { index, part ->
-        when {
-            index == 1 && onTitleClick != null -> withLink(
-                LinkAnnotation.Clickable(
-                    tag = "title",
-                    styles = TextLinkStyles(
-                        bold.copy(color = SamsungGreen, textDecoration = TextDecoration.Underline)
-                    )
-                ) { onTitleClick() }
-            ) { append(part) }
-            index % 2 == 1 -> withStyle(bold) { append(part) }
-            else -> append(part)
         }
     }
 }

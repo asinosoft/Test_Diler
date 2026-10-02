@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.provider.Settings
 import androidx.annotation.StringRes
 import com.asinosoft.cdm.R
@@ -97,47 +98,55 @@ object OemShellHelper {
         openFirst(
             context,
             autostartComponents[detectGuide()].orEmpty().map { (pkg, cls) ->
-                Intent().setComponent(ComponentName(pkg, cls))
-            } + appDetailsIntent(context)
+                appList(context, Intent().setComponent(ComponentName(pkg, cls)))
+            } + appPage(appDetailsIntent(context))
         )
     }
 
     /** MIUI "Other permissions" editor (lock screen, background pop-ups); overlay permission elsewhere. */
     fun openSpecialPermissionsSettings(context: Context) {
         val pkgUri = Uri.fromParts("package", context.packageName, null)
-        val miui = if (detectGuide() == OemShellGuide.MIUI) listOf(
+        val miui: List<SettingsTarget> = if (detectGuide() == OemShellGuide.MIUI) listOf(
             Intent("miui.intent.action.APP_PERM_EDITOR")
                 .setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.PermissionsEditorActivity")
                 .putExtra("extra_pkgname", context.packageName),
             Intent("miui.intent.action.APP_PERM_EDITOR")
                 .setClassName("com.miui.securitycenter", "com.miui.permcenter.permissions.AppPermissionsEditorActivity")
                 .putExtra("extra_pkgname", context.packageName)
-        ) else emptyList()
-        openFirst(
-            context,
-            miui + Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, pkgUri) + appDetailsIntent(context)
-        )
+        ).map(::appPage) else emptyList()
+        val overlay = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, pkgUri)
+        // Android 11+ ignores the package URI and shows the full list.
+        val overlayTarget = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            appList(context, overlay)
+        } else {
+            appPage(overlay)
+        }
+        openFirst(context, miui + overlayTarget + appPage(appDetailsIntent(context)))
     }
 
     /** OEM per-app battery screen; system battery optimization list elsewhere. */
     fun openBatterySettings(context: Context) {
-        val oem = when (detectGuide()) {
+        val oem: List<SettingsTarget> = when (detectGuide()) {
             OemShellGuide.MIUI -> listOf(
-                Intent()
-                    .setClassName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsConfigActivity")
-                    .putExtra("package_name", context.packageName)
-                    .putExtra("package_label", context.applicationInfo.loadLabel(context.packageManager).toString())
+                appPage(
+                    Intent()
+                        .setClassName("com.miui.powerkeeper", "com.miui.powerkeeper.ui.HiddenAppsConfigActivity")
+                        .putExtra("package_name", context.packageName)
+                        .putExtra("package_label", context.applicationInfo.loadLabel(context.packageManager).toString())
+                )
             )
-            OemShellGuide.OPPO -> listOf(appDetailsIntent(context))
+            OemShellGuide.OPPO -> listOf(appPage(appDetailsIntent(context)))
             OemShellGuide.VIVO -> listOf(
-                Intent().setClassName("com.vivo.abe", "com.vivo.applicationbehaviorengine.ui.ExcessivePowerManagerActivity"),
-                Intent().setClassName("com.iqoo.powersaving", "com.iqoo.powersaving.PowerSavingManagerActivity")
+                appList(context, Intent().setClassName("com.vivo.abe", "com.vivo.applicationbehaviorengine.ui.ExcessivePowerManagerActivity")),
+                appList(context, Intent().setClassName("com.iqoo.powersaving", "com.iqoo.powersaving.PowerSavingManagerActivity"))
             )
             else -> emptyList()
         }
         openFirst(
             context,
-            oem + Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS) + appDetailsIntent(context)
+            oem +
+                appList(context, Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)) +
+                appPage(appDetailsIntent(context))
         )
     }
 
@@ -146,9 +155,26 @@ object OemShellHelper {
     private fun appDetailsIntent(context: Context) =
         Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
 
-    private fun openFirst(context: Context, intents: List<Intent>) {
-        intents.firstOrNull { tryStart(context, it) }
+    /** A settings screen; [isAppList] means the user still has to find this app in a list. */
+    private class SettingsTarget(val intent: Intent, val isAppList: Boolean)
+
+    private fun appPage(intent: Intent) = SettingsTarget(intent, isAppList = false)
+
+    /** Undocumented AOSP Settings extras: scroll to and highlight this app's row where supported. */
+    private fun appList(context: Context, intent: Intent) = SettingsTarget(
+        intent
+            .putExtra(EXTRA_FRAGMENT_ARG_KEY, context.packageName)
+            .putExtra(EXTRA_SHOW_FRAGMENT_ARGS, Bundle().apply { putString(EXTRA_FRAGMENT_ARG_KEY, context.packageName) }),
+        isAppList = true
+    )
+
+    private fun openFirst(context: Context, targets: List<SettingsTarget>) {
+        val opened = targets.firstOrNull { tryStart(context, it.intent) } ?: return
+        if (opened.isAppList) SettingsHintOverlay.show(context)
     }
+
+    private const val EXTRA_FRAGMENT_ARG_KEY = ":settings:fragment_args_key"
+    private const val EXTRA_SHOW_FRAGMENT_ARGS = ":settings:show_fragment_args"
 
     private fun tryStart(context: Context, intent: Intent): Boolean = try {
         context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

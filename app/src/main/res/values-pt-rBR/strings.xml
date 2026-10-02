@@ -407,6 +407,7 @@
     <string name="onboarding_miui_dialog_title">Permissões do MIUI</string>
     <string name="onboarding_miui_dialog_message">Ative as permissões:\n1. Mostrar na tela de bloqueio\n2. Exibir janelas pop-up\n3. Notificações na tela de bloqueio\n4. Início automático</string>
     <string name="onboarding_miui_dialog_ok">OK</string>
+    <string name="settings_hint_find_app">Encontre “%1$s” na lista e ative</string>
     <string name="settings_permissions_help_title">Ajuda com permissões</string>
     <string name="settings_permissions_help_subtitle">Para ativar a tela de chamada se ela não aparecer.</string>
     <string name="settings_permissions_help_header">O que precisa ser configurado manualmente no %1$s!</string>

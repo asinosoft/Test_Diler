@@ -61,6 +61,7 @@
     <string name="onboarding_miui_dialog_title">MIUI permissions</string>
     <string name="onboarding_miui_dialog_message">Please enable permissions:\n1. Show on Lock screen\n2. Display pop-up windows\n3. Lock screen notifications\n4. Autostart</string>
     <string name="onboarding_miui_dialog_ok">OK</string>
+    <string name="settings_hint_find_app">Find “%1$s” in the list and turn it on</string>
     <string name="settings_permissions_help_title">Permissions help</string>
     <string name="settings_permissions_help_subtitle">To enable the call screen if it doesn\'t appear.</string>
     <string name="settings_permissions_help_header">What to set up manually on %1$s!</string>

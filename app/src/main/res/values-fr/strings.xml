@@ -407,6 +407,7 @@
     <string name="onboarding_miui_dialog_title">Autorisations MIUI</string>
     <string name="onboarding_miui_dialog_message">Veuillez activer les autorisations :\n1. Afficher sur l\'écran de verrouillage\n2. Afficher les fenêtres pop-up\n3. Notifications sur l\'écran de verrouillage\n4. Démarrage automatique</string>
     <string name="onboarding_miui_dialog_ok">OK</string>
+    <string name="settings_hint_find_app">Trouvez « %1$s » dans la liste et activez-le</string>
     <string name="settings_permissions_help_title">Aide aux autorisations</string>
     <string name="settings_permissions_help_subtitle">Pour activer l\'écran d\'appel s\'il n\'apparaît pas.</string>
     <string name="settings_permissions_help_header">Ce qu\'il faut configurer manuellement sous %1$s !</string>

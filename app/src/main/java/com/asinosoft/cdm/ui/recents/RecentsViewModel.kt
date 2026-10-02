@@ -206,6 +206,9 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
 
     private val prefs = application.getSharedPreferences("dialer_settings", Context.MODE_PRIVATE)
 
+    /** Captured once: true only while the very first onboarding is in progress (not for app updates). */
+    private val isFirstLaunch = !prefs.getBoolean("onboarding_complete", false)
+
     private val _gridRowsCount = MutableStateFlow(prefs.getInt("favorite_rows_count_grid", prefs.getInt("favorite_rows_count", 3)))
     val gridRowsCount: StateFlow<Int> = _gridRowsCount.asStateFlow()
 
@@ -636,8 +639,8 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /**
-     * First launch only: if the user has no favorites, star the most-called saved contacts
-     * (3 for a short call history, 6 for a rich one) and size favorite rows to fit them.
+     * First launch only: size favorite rows to existing favorites, or, if there are none, star the
+     * most-called saved contacts (3 for a short call history, 6 for a rich one) and size rows to them.
      * Returns the updated favorites, or null if nothing was added.
      */
     private fun autofillFavoritesIfNeeded(
@@ -645,9 +648,18 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         favorites: List<FavoriteContact>,
         contacts: List<SearchDialerItem>
     ): List<FavoriteContact>? {
-        if (logs.isEmpty() || prefs.getBoolean(KEY_FAVORITES_AUTOFILLED, false)) return null
+        if (prefs.getBoolean(KEY_FAVORITES_AUTOFILLED, false)) return null
+        if (!isFirstLaunch) {
+            prefs.edit { putBoolean(KEY_FAVORITES_AUTOFILLED, true) }
+            return null
+        }
+        if (favorites.isNotEmpty()) {
+            prefs.edit { putBoolean(KEY_FAVORITES_AUTOFILLED, true) }
+            applyDefaultFavoriteRows(favorites.groupingBy { it.tabId }.eachCount().values.max())
+            return null
+        }
+        if (logs.isEmpty() || contacts.isEmpty()) return null
         prefs.edit { putBoolean(KEY_FAVORITES_AUTOFILLED, true) }
-        if (favorites.isNotEmpty()) return null
 
         val contactByPhone = HashMap<String, SearchDialerItem>(contacts.size * 2)
         contacts.forEach { c -> phoneMatchKey(c.number)?.let { contactByPhone.putIfAbsent(it, c) } }
@@ -676,18 +688,21 @@ class RecentsViewModel(application: Application) : AndroidViewModel(application)
         }
 
         _favorites.value = updated
-
-        if (!prefs.getBoolean(KEY_FAVORITE_ROWS_USER_SET, false)) {
-            val gridRows = ((picked.size + 2) / 3).coerceIn(1, 3)
-            val listRows = picked.size.coerceIn(1, 5)
-            prefs.edit {
-                putInt("favorite_rows_count_grid", gridRows)
-                putInt("favorite_rows_count_list", listRows)
-            }
-            _gridRowsCount.value = gridRows
-            _listRowsCount.value = listRows
-        }
+        applyDefaultFavoriteRows(picked.size)
         return updated
+    }
+
+    /** Sizes favorite rows to [count] contacts (grid: 3 per row, max 3 rows; list: max 5) unless set by the user. */
+    private fun applyDefaultFavoriteRows(count: Int) {
+        if (prefs.getBoolean(KEY_FAVORITE_ROWS_USER_SET, false)) return
+        val gridRows = ((count + 2) / 3).coerceIn(1, 3)
+        val listRows = count.coerceIn(1, 5)
+        prefs.edit {
+            putInt("favorite_rows_count_grid", gridRows)
+            putInt("favorite_rows_count_list", listRows)
+        }
+        _gridRowsCount.value = gridRows
+        _listRowsCount.value = listRows
     }
 
     /** Prefer favorite display names over stale CallLog.CACHED_NAME. */
