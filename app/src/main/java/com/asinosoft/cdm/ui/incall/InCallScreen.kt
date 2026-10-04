@@ -136,7 +136,7 @@ import com.asinosoft.cdm.ui.recents.components.getSwipeBackgroundVisuals
 import com.asinosoft.cdm.ui.theme.MissedRed
 import com.asinosoft.cdm.ui.theme.SamsungGreen
 import com.asinosoft.cdm.ui.theme.SamsungSmsBlue
-import com.asinosoft.cdm.util.PhoneAccountHelper
+import com.asinosoft.cdm.util.SimCardHelper
 import com.asinosoft.cdm.util.PhoneNumberHelper
 import com.asinosoft.cdm.util.SelectablePhoneAccount
 import com.asinosoft.cdm.util.rememberActiveSimCount
@@ -175,7 +175,9 @@ fun InCallScreen(
     val handle = activeCall?.details?.handle
     val currentRawNumber = handle?.schemeSpecificPart.orEmpty()
     val currentDisplayName = activeCall?.details?.callerDisplayName ?: currentRawNumber
-    val currentSimNumber = remember(activeCall) { getSimNumberFromCall(activeCall, context) }
+    val currentSimNumber = remember(activeCall) {
+        SimCardHelper(context).getSimNumber(activeCall?.details?.accountHandle?.id)
+    }
 
     var lastKnownNumber by remember { mutableStateOf("") }
     var lastKnownDisplayName by remember { mutableStateOf("") }
@@ -207,7 +209,6 @@ fun InCallScreen(
     val isCallDisconnected = displayableCalls.isEmpty() || !hasLiveCall
     val isCallActive = (callState == Call.STATE_ACTIVE) && !isCallDisconnected
     val isSelectingPhoneAccount = callState == Call.STATE_SELECT_PHONE_ACCOUNT && !isCallDisconnected
-    var phoneAccounts by remember { mutableStateOf<List<SelectablePhoneAccount>>(emptyList()) }
 
     val showMultiCallList = displayableCalls.size >= 2 &&
             incomingWaitingCall == null &&
@@ -262,31 +263,16 @@ fun InCallScreen(
 
     // Call state callback listener
     DisposableEffect(activeCall) {
-        val current = activeCall
-        if (current == null) {
-            return@DisposableEffect onDispose {}
-        }
+        val current = activeCall ?: return@DisposableEffect onDispose {}
 
         val callback = object : Call.Callback() {
             override fun onStateChanged(call: Call, state: Int) {
                 callState = state
-                if (state == Call.STATE_SELECT_PHONE_ACCOUNT) {
-                    phoneAccounts = PhoneAccountHelper(context).getSelectableAccounts(call)
-                }
-            }
-
-            override fun onDetailsChanged(call: Call, details: Call.Details?) {
-                if (call.state == Call.STATE_SELECT_PHONE_ACCOUNT) {
-                    phoneAccounts = PhoneAccountHelper(context).getSelectableAccounts(call)
-                }
             }
         }
 
         current.registerCallback(callback)
         callState = current.state
-        if (current.state == Call.STATE_SELECT_PHONE_ACCOUNT) {
-            phoneAccounts = PhoneAccountHelper(context).getSelectableAccounts(current)
-        }
 
         onDispose {
             current.unregisterCallback(callback)
@@ -817,9 +803,9 @@ fun InCallScreen(
             }
 
             // Middle Section: SIM picker, action grid, or spacer
-            if (isSelectingPhoneAccount) {
+            if (isSelectingPhoneAccount) activeCall?.let { call ->
                 PhoneAccountPicker(
-                    accounts = phoneAccounts,
+                    call = call,
                     onSelect = { account ->
                         CallManager.selectPhoneAccount(activeCall, account.handle)
                     }
@@ -1025,9 +1011,12 @@ fun InCallScreen(
 
 @Composable
 private fun PhoneAccountPicker(
-    accounts: List<SelectablePhoneAccount>,
+    call: Call,
     onSelect: (SelectablePhoneAccount) -> Unit
 ) {
+    val context = LocalContext.current
+    val accounts = remember { SimCardHelper(context).getSelectableAccounts(call) }
+
     Column(
         modifier = Modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -1921,52 +1910,6 @@ private fun InCallKeypadSheet(
             }
         }
     }
-}
-
-private fun getSimNumberFromCall(call: Call?, context: Context): Int {
-    if (call == null) return 1
-    val details = call.details ?: return 1
-    val accountHandle = details.accountHandle ?: return 1
-    val accountId = accountHandle.id ?: return 1
-
-    try {
-        val hasPermission = ContextCompat.checkSelfPermission(
-            context,
-            Manifest.permission.READ_PHONE_STATE
-        ) == PackageManager.PERMISSION_GRANTED
-
-        if (hasPermission) {
-            val telecomManager =
-                context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
-
-            @Suppress("MissingPermission")
-            val phoneAccountHandles = telecomManager?.callCapablePhoneAccounts
-
-            if (!phoneAccountHandles.isNullOrEmpty()) {
-                return phoneAccountHandles.indexOfFirst { it.id == accountId }.coerceAtLeast(0) + 1
-            }
-        }
-    } catch (_: Exception) {
-        // ignore
-    }
-
-    val cleanId = accountId.lowercase().trim()
-
-    if (cleanId.contains("sim2") || cleanId.contains("slot1") || cleanId.contains("sub2") || cleanId.endsWith(
-            "_1"
-        ) || cleanId.endsWith(":1")
-    ) {
-        return 2
-    }
-
-    if (cleanId.contains("sim1") || cleanId.contains("slot0") || cleanId.contains("sub1") || cleanId.endsWith(
-            "_0"
-        ) || cleanId.endsWith(":0")
-    ) {
-        return 1
-    }
-
-    return 1
 }
 
 fun formatDuration(seconds: Int): String {

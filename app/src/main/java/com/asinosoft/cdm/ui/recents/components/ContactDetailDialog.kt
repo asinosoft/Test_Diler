@@ -1547,7 +1547,7 @@ private fun ContactTabContent(
                                 IconButton(
                                     onClick = {
                                         onDismiss()
-                                        onCall(phoneItem.number, null)
+                                        onCall(phoneItem.number, 1)
                                     },
                                     modifier = Modifier
                                         .size(37.6.dp)
@@ -1566,7 +1566,7 @@ private fun ContactTabContent(
                                 IconButton(
                                     onClick = {
                                         onDismiss()
-                                        onCall(phoneItem.number, null)
+                                        onCall(phoneItem.number, 2)
                                     },
                                     modifier = Modifier
                                         .size(37.6.dp)

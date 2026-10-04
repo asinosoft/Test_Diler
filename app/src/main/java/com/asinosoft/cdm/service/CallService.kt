@@ -23,7 +23,7 @@ import com.asinosoft.cdm.data.repository.ContactRingtoneManager
 import com.asinosoft.cdm.ui.incall.FloatingCallOverlayManager
 import com.asinosoft.cdm.ui.incall.InCallActivity
 import com.asinosoft.cdm.ui.incall.IncomingCallPopupActivity
-import com.asinosoft.cdm.util.PhoneAccountHelper
+import com.asinosoft.cdm.util.SimCardHelper
 import java.util.concurrent.Executor
 
 class CallService : InCallService() {
@@ -75,7 +75,7 @@ class CallService : InCallService() {
     override fun onCallAdded(call: Call) {
         super.onCallAdded(call)
         CallManager.onCallAdded(call)
-        PhoneAccountHelper(this).autoSelectIfSingle(call)
+        SimCardHelper(this).autoSelectIfSingle(call)
 
         // Check and update bluetooth audio state immediately upon call added
         try {
@@ -124,7 +124,7 @@ class CallService : InCallService() {
             override fun onStateChanged(call: Call, state: Int) {
                 CallManager.updateCallsState()
                 if (state == Call.STATE_SELECT_PHONE_ACCOUNT) {
-                    PhoneAccountHelper(this@CallService).autoSelectIfSingle(call)
+                    SimCardHelper(this@CallService).autoSelectIfSingle(call)
                 }
                 if (state == Call.STATE_RINGING) {
                     wasRinging = true

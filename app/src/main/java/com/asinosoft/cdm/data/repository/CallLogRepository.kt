@@ -8,11 +8,10 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.CallLog
 import android.provider.ContactsContract
-import android.telecom.PhoneAccountHandle
-import android.telecom.TelecomManager
 import androidx.core.content.ContextCompat
 import com.asinosoft.cdm.data.model.CallLogItem
 import com.asinosoft.cdm.data.model.CallType
+import com.asinosoft.cdm.util.SimCardHelper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -32,8 +31,7 @@ class CallLogRepository(private val context: Context) {
     /** Normalized number → display name from Contacts (overrides stale CallLog cache) */
     private val nameCache = mutableMapOf<String, String>()
 
-    @Volatile
-    private var cachedPhoneAccountHandles: List<PhoneAccountHandle>? = null
+    private val phoneAccountHelper = SimCardHelper(context)
 
     init {
         CallLogDiskCache.loadCachedMeta(context, nameCache, photoCache)
@@ -233,8 +231,6 @@ class CallLogRepository(private val context: Context) {
                 val durationIndex = c.getColumnIndex(CallLog.Calls.DURATION)
                 val accountIdIndex = c.getColumnIndex(CallLog.Calls.PHONE_ACCOUNT_ID)
 
-                val phoneAccountHandles = getPhoneAccountHandles()
-
                 while (c.moveToNext()) {
                     val id = if (idIndex != -1) c.getString(idIndex) else ""
                     val number = if (numberIndex != -1) c.getString(numberIndex).orEmpty() else ""
@@ -242,7 +238,7 @@ class CallLogRepository(private val context: Context) {
                     val photoUri = if (photoIndex != -1) c.getString(photoIndex) else null
                     val accountId = if (accountIdIndex != -1) c.getString(accountIdIndex) else null
 
-                    val simNumber = phoneAccountHandles.indexOfFirst { it.id == accountId }.coerceAtLeast(0) + 1
+                    val simNumber = phoneAccountHelper.getSimNumber(accountId)
                     val rawType =
                         if (typeIndex != -1) c.getInt(typeIndex) else CallLog.Calls.INCOMING_TYPE
                     val date = if (dateIndex != -1) c.getLong(dateIndex) else 0L
@@ -577,20 +573,6 @@ class CallLogRepository(private val context: Context) {
         }
 
         return grouped
-    }
-
-    @Suppress("MissingPermission")
-    private fun getPhoneAccountHandles(): List<PhoneAccountHandle> {
-        cachedPhoneAccountHandles?.let { return it }
-        return try {
-            val subManager =
-                context.getSystemService(Context.TELECOM_SERVICE) as? TelecomManager
-            val list = subManager?.callCapablePhoneAccounts.orEmpty()
-            cachedPhoneAccountHandles = list
-            list
-        } catch (_: Exception) {
-            emptyList()
-        }
     }
 
     private fun digitsOnly(number: String): String {
