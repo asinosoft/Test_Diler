@@ -91,7 +91,6 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.AddAPhoto
-import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Settings
@@ -3972,7 +3971,7 @@ data class CustomSwipeAction(
     val messengerName: String? = null,
     val messengerColorHex: String? = null,
 
-    val code: String = listOf(messengerName, actionType).filterNotNull().joinToString("_")
+    val code: String = listOfNotNull(messengerName, actionType).joinToString("_")
 )
 
 private fun saveCustomSwipeAction(
@@ -5403,7 +5402,6 @@ private fun CameraQrScannerView(
     )
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 private fun showCalendarDatePicker(
     context: Context,
     initialDateString: String,
@@ -7537,8 +7535,7 @@ private fun addContactShortcutToHomeScreen(
  */
 private fun isNumberBlockedInSystem(context: Context, phoneNumber: String): Boolean {
     val number = phoneNumber.trim()
-    if (number.isBlank()) return false
-    return try {
+    return number.isNotBlank() && try {
         if (!BlockedNumberContract.canCurrentUserBlockNumbers(context)) {
             return false
         }
@@ -7553,8 +7550,7 @@ private fun isNumberBlockedInSystem(context: Context, phoneNumber: String): Bool
  */
 private fun blockContactNumber(context: Context, phoneNumber: String): Boolean {
     val number = phoneNumber.trim()
-    if (number.isBlank()) return false
-    return try {
+    return number.isNotBlank() && try {
         if (!BlockedNumberContract.canCurrentUserBlockNumbers(context)) {
             return false
         }
@@ -7579,8 +7575,7 @@ private fun blockContactNumber(context: Context, phoneNumber: String): Boolean {
  */
 private fun unblockContactNumber(context: Context, phoneNumber: String): Boolean {
     val number = phoneNumber.trim()
-    if (number.isBlank()) return false
-    return try {
+    return number.isNotBlank() && try {
         if (!BlockedNumberContract.canCurrentUserBlockNumbers(context)) {
             return false
         }

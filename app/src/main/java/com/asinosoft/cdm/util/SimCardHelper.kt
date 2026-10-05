@@ -36,8 +36,7 @@ class SimCardHelper(private val context: Context) {
     fun autoSelectIfSingle(call: Call): Boolean {
         if (call.state != Call.STATE_SELECT_PHONE_ACCOUNT) return false
         val handles = getSuggestedHandles(call)
-        if (handles.size != 1) return false
-        return try {
+        return handles.size == 1 && try {
             call.phoneAccountSelected(handles.first(), false)
             true
         } catch (_: Exception) {

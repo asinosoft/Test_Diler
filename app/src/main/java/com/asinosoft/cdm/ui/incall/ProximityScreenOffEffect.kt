@@ -29,9 +29,8 @@ private fun shouldUseProximity(callState: Int, audioRoute: Int): Boolean {
     val inCall = callState == Call.STATE_ACTIVE ||
             callState == Call.STATE_DIALING ||
             callState == Call.STATE_CONNECTING
-    if (!inCall) return false
 
-    return when (audioRoute) {
+    return inCall && when (audioRoute) {
         CallAudioState.ROUTE_SPEAKER,
         CallAudioState.ROUTE_BLUETOOTH -> false
         else -> true

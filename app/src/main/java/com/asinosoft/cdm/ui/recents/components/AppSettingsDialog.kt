@@ -47,7 +47,6 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -63,6 +62,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -570,7 +570,7 @@ private fun BlockedContactsPage() {
     var blockedItems by remember { mutableStateOf<List<BlockedNumberItem>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var showAddDialog by remember { mutableStateOf(false) }
-    var refreshKey by remember { mutableStateOf(0) }
+    var refreshKey by remember { mutableIntStateOf(0) }
 
     LaunchedEffect(refreshKey) {
         isLoading = true
@@ -1342,7 +1342,6 @@ private fun LicenseSection(
 /**
  * Диалог редактирования быстрых текстовых ответов при отклонении вызова
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun QuickRepliesPage() {
     val context = LocalContext.current

@@ -65,12 +65,12 @@ fun FavoriteContactCard(
     onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
     onSelect: (FavoriteContact) -> Unit,
-    onContactClick: ((FavoriteContact) -> Unit)? = null,
-    isDragging: Boolean = false,
-    dragVisualOffset: Offset = Offset.Zero,
-    onDragStart: (() -> Unit)? = null,
-    onDrag: ((Offset) -> Unit)? = null,
-    onDragEnd: (() -> Unit)? = null,
+    onContactClick: ((FavoriteContact) -> Unit)?,
+    isDragging: Boolean,
+    dragVisualOffset: Offset,
+    onDragStart: (() -> Unit)?,
+    onDrag: ((Offset) -> Unit)?,
+    onDragEnd: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current

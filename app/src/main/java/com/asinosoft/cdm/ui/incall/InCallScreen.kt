@@ -52,6 +52,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
+import androidx.compose.material.icons.automirrored.filled.CallMerge
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Message
@@ -62,7 +63,6 @@ import androidx.compose.material.icons.filled.Bluetooth
 import androidx.compose.material.icons.filled.BluetoothAudio
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.CallEnd
-import androidx.compose.material.icons.filled.CallMerge
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dialpad
@@ -189,8 +189,8 @@ fun InCallScreen(
         currentSimNumber?.let { lastKnownSimNumber = currentSimNumber }
     }
 
-    val rawNumber = if (currentRawNumber.isNotBlank()) currentRawNumber else lastKnownNumber
-    val displayName = if (currentDisplayName.isNotBlank()) currentDisplayName else lastKnownDisplayName
+    val rawNumber = currentRawNumber.ifBlank { lastKnownNumber }
+    val displayName = currentDisplayName.ifBlank { lastKnownDisplayName }
     val simNumber = currentSimNumber ?: lastKnownSimNumber
 
     val cachedCaller = remember(rawNumber) { CallerLookup.cached(rawNumber) }
@@ -283,7 +283,7 @@ fun InCallScreen(
     LaunchedEffect(isCallDisconnected) {
         if (isCallDisconnected) {
             callState = Call.STATE_DISCONNECTED
-            delay(2000L.milliseconds)
+            delay(2000.milliseconds)
             onFinish()
         }
     }
@@ -296,7 +296,7 @@ fun InCallScreen(
                     (Date().time - it).milliseconds.inWholeSeconds.toInt()
                 } ?: 0
 
-                delay(1000L.milliseconds)
+                delay(1000.milliseconds)
             }
         }
     }
@@ -432,7 +432,7 @@ fun InCallScreen(
                                 ) {
                                     @Suppress("DEPRECATION")
                                     Icon(
-                                        imageVector = Icons.Default.CallMerge,
+                                        imageVector = Icons.AutoMirrored.Default.CallMerge,
                                         contentDescription = stringResource(R.string.incall_conference),
                                         tint = Color.White,
                                         modifier = Modifier.size(72.dp)
@@ -1205,7 +1205,7 @@ private fun MultiCallCardsView(
                     ) {
                         @Suppress("DEPRECATION")
                         Icon(
-                            imageVector = Icons.Default.CallMerge,
+                            imageVector = Icons.AutoMirrored.Default.CallMerge,
                             contentDescription = stringResource(R.string.incall_merge),
                             tint = Color.White,
                             modifier = Modifier.size(18.dp)

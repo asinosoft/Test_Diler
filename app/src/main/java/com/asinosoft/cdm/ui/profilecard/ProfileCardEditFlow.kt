@@ -44,8 +44,6 @@ import androidx.compose.material.icons.filled.CallEnd
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ContentCut
 import androidx.compose.material.icons.filled.Contrast
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -243,7 +241,7 @@ fun ProfileCardEditFlow(
         }
         when {
             tile == null -> step = null
-            hasContent || openEditorWhenEmpty -> openEditor(initialPage = tile!!)
+            hasContent || openEditorWhenEmpty -> openEditor(initialPage = tile)
             else -> step = FlowStep.Source
         }
     }
@@ -548,7 +546,6 @@ private fun TargetOption(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun ProfileCardEditor(
     edit: FlowStep.Edit,

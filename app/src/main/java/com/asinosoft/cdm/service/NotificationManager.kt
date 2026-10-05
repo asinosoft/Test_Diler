@@ -386,7 +386,7 @@ class NotificationManager(val service: Service) {
     }
 
     private fun getCircularBitmap(bitmap: Bitmap): Bitmap {
-        val size = Math.min(bitmap.width, bitmap.height)
+        val size = bitmap.width.coerceAtMost(bitmap.height)
         val output = createBitmap(size, size)
         val canvas = android.graphics.Canvas(output)
 

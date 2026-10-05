@@ -112,10 +112,10 @@ class MainActivity : ComponentActivity() {
                 var permissionsUiCompleted by remember {
                     mutableStateOf(
                         isDialerGranted &&
-                            isRuntimeGranted &&
-                            isOverlayGranted &&
-                            isNotificationGranted &&
-                            (!showOemPermission || isOemGranted)
+                                isRuntimeGranted &&
+                                isOverlayGranted &&
+                                isNotificationGranted &&
+                                (!showOemPermission || isOemGranted)
                     )
                 }
                 var highlightedStep by remember {
@@ -128,7 +128,8 @@ class MainActivity : ComponentActivity() {
                     isOverlayGranted = Settings.canDrawOverlays(this@MainActivity)
                     isNotificationGranted =
                         MissedCallNotificationListener.isEnabled(this@MainActivity)
-                    isOemGranted = !showOemPermission || isOemPermissionsDone(onboardingPrefs, oemGuide)
+                    isOemGranted =
+                        !showOemPermission || isOemPermissionsDone(onboardingPrefs, oemGuide)
                 }
 
                 LaunchedEffect(Unit) {
@@ -435,15 +436,13 @@ class MainActivity : ComponentActivity() {
         private const val KEY_MIUI_PERMISSIONS_DONE = "miui_permissions_done"
     }
 
+    // Миграция с прежнего флага только для MIUI.
     private fun isOemPermissionsDone(
         prefs: android.content.SharedPreferences,
         guide: OemShellGuide
-    ): Boolean {
-        if (prefs.getBoolean(KEY_OEM_PERMISSIONS_DONE, false)) return true
-        // Миграция с прежнего флага только для MIUI.
-        return guide == OemShellGuide.MIUI &&
-            prefs.getBoolean(KEY_MIUI_PERMISSIONS_DONE, false)
-    }
+    ): Boolean =
+        prefs.getBoolean(KEY_OEM_PERMISSIONS_DONE, false) ||
+                guide == OemShellGuide.MIUI && prefs.getBoolean(KEY_MIUI_PERMISSIONS_DONE, false)
 
     override fun onResume() {
         super.onResume()
@@ -474,7 +473,11 @@ class MainActivity : ComponentActivity() {
         }
 
         try {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_CALL_LOG) == PackageManager.PERMISSION_GRANTED) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.WRITE_CALL_LOG
+                ) == PackageManager.PERMISSION_GRANTED
+            ) {
                 val values = ContentValues().apply {
                     put(CallLog.Calls.NEW, 0)
                     put(CallLog.Calls.IS_READ, 1)

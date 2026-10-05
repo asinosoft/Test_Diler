@@ -31,7 +31,6 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -108,7 +107,6 @@ import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
 @SuppressLint("FrequentlyChangingValue")
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecentsScreen(
     viewModel: RecentsViewModel,

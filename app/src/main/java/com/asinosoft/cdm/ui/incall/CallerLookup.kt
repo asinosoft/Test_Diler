@@ -74,16 +74,16 @@ internal object CallerLookup {
         val result = LinkedHashSet<String>()
         if (raw.isNotEmpty()) result += raw
         if (digits.isNotEmpty()) result += digits
-        when {
-            digits.length == 11 && digits.startsWith("8") -> {
+        when (digits.length) {
+            11 if digits.startsWith("8") -> {
                 result += "+7${digits.drop(1)}"
                 result += "7${digits.drop(1)}"
             }
-            digits.length == 11 && digits.startsWith("7") -> {
+            11 if digits.startsWith("7") -> {
                 result += "8${digits.drop(1)}"
                 result += "+$digits"
             }
-            digits.length == 10 -> {
+            10 -> {
                 result += "+7$digits"
                 result += "8$digits"
             }

@@ -1,7 +1,6 @@
 package com.asinosoft.cdm.util
 
 import android.os.Bundle
-import androidx.core.os.bundleOf
 import com.google.firebase.Firebase
 import com.google.firebase.analytics.analytics
 
@@ -57,9 +56,6 @@ object Analytics {
     fun logCallFromSearch() =
         Firebase.analytics.logEvent("call_from_search", Bundle.EMPTY)
 
-    fun logCallHistoryClick() =
-        Firebase.analytics.logEvent("call_history_click", Bundle.EMPTY)
-
     fun logContactDetailsTab() =
         Firebase.analytics.logEvent("contact_details_tab", Bundle.EMPTY)
 
@@ -71,16 +67,14 @@ object Analytics {
 
     fun logContactSetAction(direction: String, action: String) =
         Firebase.analytics.logEvent(
-            "contact_set_action", bundleOf("direction" to direction, "action" to action)
+            "contact_set_action", Bundle().apply {
+                putString("direction", direction)
+                putString("action", action)
+            }
         )
 
     fun logDefaultDialer() =
         Firebase.analytics.logEvent("default_dialer", Bundle.EMPTY)
-
-    fun logCheckDefaultDialer(default: Boolean) =
-        Firebase.analytics.logEvent(
-            "check_default_dialer", bundleOf("default" to default)
-        )
 
     fun logDoubleCall() =
         Firebase.analytics.logEvent("double_call", Bundle.EMPTY)
@@ -92,7 +86,7 @@ object Analytics {
         Firebase.analytics.logEvent("favorite_action_$direction", Bundle.EMPTY)
 
     fun logFavoriteAdd(position: Int) =
-        Firebase.analytics.logEvent("favorite_add", bundleOf("position" to position))
+        Firebase.analytics.logEvent("favorite_add", Bundle().apply { putInt("position", position) })
 
     fun logFavoriteClick() =
         Firebase.analytics.logEvent("favorite_click", Bundle.EMPTY)
@@ -100,35 +94,16 @@ object Analytics {
     fun logFavoriteLongClick() =
         Firebase.analytics.logEvent("favorite_long_click", Bundle.EMPTY)
 
-    fun logFavoritePlus() =
-        Firebase.analytics.logEvent("favorite_plus", Bundle.EMPTY)
-
     fun logFavoriteRemove(position: Int) =
-        Firebase.analytics.logEvent("favorite_remove", bundleOf("position" to position))
+        Firebase.analytics.logEvent(
+            "favorite_remove",
+            Bundle().apply { putInt("position", position) })
 
     fun logFavoriteSwap() =
         Firebase.analytics.logEvent("favorite_swap", Bundle.EMPTY)
 
-    fun logFavoritesBorderColor() =
-        Firebase.analytics.logEvent("favorites_border_color", Bundle.EMPTY)
-
-    fun logFavoritesBorderWidth(width: Int) =
-        Firebase.analytics.logEvent("favorites_border_width", bundleOf("width" to width))
-
     fun logFavoritesCount(count: Int) =
-        Firebase.analytics.logEvent("favorites_count", bundleOf("count" to count))
-
-    fun logFavoritesPosition(position: String) =
-        Firebase.analytics.logEvent("favorites_position", bundleOf("position" to position))
-
-    fun logFavoritesSize(size: Int) =
-        Firebase.analytics.logEvent("favorites_size", bundleOf("size" to size))
-
-    fun logGlobalSetAction(direction: String, action: String) =
-        Firebase.analytics.logEvent(
-            "global_set_action",
-            bundleOf("direction" to direction, "action" to action)
-        )
+        Firebase.analytics.logEvent("favorites_count", Bundle().apply { putInt("count", count) })
 
     fun logHistorySwipeLeft() =
         Firebase.analytics.logEvent("history_swipe_left", Bundle.EMPTY)
@@ -136,17 +111,8 @@ object Analytics {
     fun logHistorySwipeRight() =
         Firebase.analytics.logEvent("history_swipe_right", Bundle.EMPTY)
 
-    fun logContactHistorySwipeLeft() =
-        Firebase.analytics.logEvent("contact_history_swipe_left", Bundle.EMPTY)
-
-    fun logContactHistorySwipeRight() =
-        Firebase.analytics.logEvent("contact_history_swipe_right", Bundle.EMPTY)
-
     fun logKeyboardButton() =
         Firebase.analytics.logEvent("keyboard_button", Bundle.EMPTY)
-
-    fun logLoadCallHistory() =
-        Firebase.analytics.logEvent("load_call_history", Bundle.EMPTY)
 
     fun logSearchKeyboardClose() =
         Firebase.analytics.logEvent("search_keyboard_close", Bundle.EMPTY)
@@ -163,9 +129,6 @@ object Analytics {
     fun logSearchSwipeRight() =
         Firebase.analytics.logEvent("search_swipe_right", Bundle.EMPTY)
 
-    fun logSettingsOutfitTab() =
-        Firebase.analytics.logEvent("settings_outfit_tab", Bundle.EMPTY)
-
     fun logSettingsActionTab() =
         Firebase.analytics.logEvent("settings_action_tab", Bundle.EMPTY)
 
@@ -175,12 +138,4 @@ object Analytics {
     fun logSettingsAboutTab() =
         Firebase.analytics.logEvent("settings_about_tab", Bundle.EMPTY)
 
-    fun logTheme(theme: Int) =
-        Firebase.analytics.logEvent("theme", bundleOf("theme" to theme))
-
-    fun logKeyboardPaste() =
-        Firebase.analytics.logEvent("keyboard_paste", Bundle.EMPTY)
-
-    fun logKeyboardCopy() =
-        Firebase.analytics.logEvent("keyboard_copy", Bundle.EMPTY)
 }

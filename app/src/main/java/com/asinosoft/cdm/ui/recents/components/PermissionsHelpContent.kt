@@ -168,7 +168,7 @@ fun PermissionsHelpContent() {
             R.string.settings_permissions_help_item_battery
         )
     }
-    val helpItems = listOf<Pair<Int, () -> Unit>>(
+    val helpItems = listOf(
         autostartRes to { OemShellHelper.openAutostartSettings(context) },
         popupsRes to { OemShellHelper.openSpecialPermissionsSettings(context) },
         batteryRes to { OemShellHelper.openBatterySettings(context) }

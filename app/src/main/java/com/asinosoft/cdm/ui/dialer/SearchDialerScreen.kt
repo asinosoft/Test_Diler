@@ -1031,7 +1031,7 @@ private fun buildHighlightedText(
             addStyle(
                 style = SpanStyle(color = highlightColor, fontWeight = FontWeight.Bold),
                 start = t9Indexes[start],
-                end = t9Indexes.getOrElse(start + cleanQuery.length, { text.length })
+                end = t9Indexes.getOrElse(start + cleanQuery.length) { text.length }
             )
         }
     }

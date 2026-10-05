@@ -71,15 +71,15 @@ import kotlin.math.roundToInt
 fun SwipeableFavoriteContactCard(
     contact: FavoriteContact,
     activeSimCount: Int,
-    isSelected: Boolean = false,
-    isDragging: Boolean = false,
-    dragVisualOffsetY: Float = 0f,
+    isSelected: Boolean,
+    isDragging: Boolean,
+    dragVisualOffsetY: Float,
     onCall: (String, Int?) -> Unit,
     onSms: (String) -> Unit,
     onClick: (FavoriteContact) -> Unit,
-    onDragStart: (() -> Unit)? = null,
-    onDrag: ((Float) -> Unit)? = null,
-    onDragEnd: (() -> Unit)? = null,
+    onDragStart: (() -> Unit)?,
+    onDrag: ((Float) -> Unit)?,
+    onDragEnd: (() -> Unit)?,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current

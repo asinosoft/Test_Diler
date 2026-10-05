@@ -73,7 +73,7 @@ fun VideoTrimPanel(
     LaunchedEffect(path) {
         strip = loadVideoStrip(path, STRIP_FRAMES, frameHeightPx)
         val duration = strip?.durationMs ?: return@LaunchedEffect
-        if (range.second <= 0L || range.second > duration) onRangeChange(range.first to duration)
+        if (range.second !in 1..duration) onRangeChange(range.first to duration)
     }
 
     Surface(

@@ -21,6 +21,5 @@ data class CallLogItem(
     /** All CallLog row ids in a consecutive group (for delete). Empty → use [id]. */
     val groupedIds: List<String> = emptyList()
 ) {
-    fun allEntryIds(): List<String> =
-        if (groupedIds.isNotEmpty()) groupedIds else listOf(id)
+    fun allEntryIds(): List<String> = groupedIds.ifEmpty { listOf(id) }
 }

@@ -493,8 +493,7 @@ class CallLogRepository(private val context: Context) {
 
     fun blockNumber(phoneNumber: String): Boolean {
         val number = phoneNumber.trim()
-        if (number.isEmpty()) return false
-        return try {
+        return number.isNotEmpty() && try {
             if (!android.provider.BlockedNumberContract.canCurrentUserBlockNumbers(context)) {
                 return false
             }

@@ -16,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Read/write bridge to Android [ContactsContract] for favorites (STARRED)
@@ -115,7 +116,12 @@ class ContactsWriteRepository(private val context: Context) {
                         rawContactId,
                         phoneList.first().number
                     )
-                    if (contactId != null && verifyContactInProvider(contactId, trimmedName, rawContactId)) {
+                    if (contactId != null && verifyContactInProvider(
+                            contactId,
+                            trimmedName,
+                            rawContactId
+                        )
+                    ) {
                         updateCallLogCachedName(phoneList.map { it.number }, trimmedName)
                         return@withContext contactId
                     }
@@ -167,7 +173,10 @@ class ContactsWriteRepository(private val context: Context) {
                     ContactsContract.Data.MIMETYPE,
                     ContactsContract.CommonDataKinds.StructuredName.CONTENT_ITEM_TYPE
                 )
-                .withValue(ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME, trimmedName)
+                .withValue(
+                    ContactsContract.CommonDataKinds.StructuredName.DISPLAY_NAME,
+                    trimmedName
+                )
                 .withValue(ContactsContract.CommonDataKinds.StructuredName.GIVEN_NAME, trimmedName)
                 .build()
         )
@@ -232,11 +241,14 @@ class ContactsWriteRepository(private val context: Context) {
         return if (rawContactHasPhone(rawContactId)) rawContactId else null
     }
 
-    private suspend fun resolveContactIdAfterInsert(rawContactId: Long, phoneNumber: String): Long? {
+    private suspend fun resolveContactIdAfterInsert(
+        rawContactId: Long,
+        phoneNumber: String
+    ): Long? {
         repeat(8) { attempt ->
             getContactIdFromRawContact(rawContactId)?.let { return it }
             lookupContactIdByNumber(phoneNumber)?.let { return it }
-            if (attempt < 7) delay(150L)
+            if (attempt < 7) delay(150.milliseconds)
         }
         return null
     }
@@ -246,9 +258,7 @@ class ContactsWriteRepository(private val context: Context) {
         expectedName: String,
         rawContactId: Long
     ): Boolean {
-        if (!contactExists(contactId) || !rawContactHasPhone(rawContactId)) return false
-
-        return try {
+        return contactExists(contactId) && rawContactHasPhone(rawContactId) && try {
             context.contentResolver.query(
                 ContentUris.withAppendedId(ContactsContract.Contacts.CONTENT_URI, contactId),
                 arrayOf(ContactsContract.Contacts.DISPLAY_NAME),
@@ -314,7 +324,7 @@ class ContactsWriteRepository(private val context: Context) {
                     ContactsContract.RawContacts.DefaultAccount.DefaultAccountAndState.DEFAULT_ACCOUNT_STATE_LOCAL -> {
                         candidates.add(
                             ContactsContract.RawContacts.getLocalAccountType(context) to
-                                ContactsContract.RawContacts.getLocalAccountName(context)
+                                    ContactsContract.RawContacts.getLocalAccountName(context)
                         )
                     }
                 }
@@ -800,13 +810,19 @@ class ContactsWriteRepository(private val context: Context) {
             ContactsContract.Data.CONTENT_URI,
             values,
             "${ContactsContract.Data.RAW_CONTACT_ID}=? AND ${ContactsContract.Data.MIMETYPE}=?",
-            arrayOf(rawContactId.toString(), ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE)
+            arrayOf(
+                rawContactId.toString(),
+                ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE
+            )
         )
         updated > 0 || context.contentResolver.insert(
             ContactsContract.Data.CONTENT_URI,
             values.apply {
                 put(ContactsContract.Data.RAW_CONTACT_ID, rawContactId)
-                put(ContactsContract.Data.MIMETYPE, ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE)
+                put(
+                    ContactsContract.Data.MIMETYPE,
+                    ContactsContract.CommonDataKinds.Photo.CONTENT_ITEM_TYPE
+                )
             }
         ) != null
     } catch (e: Exception) {
@@ -1013,14 +1029,16 @@ class ContactsWriteRepository(private val context: Context) {
     }
 
     private fun phoneTypeFromLabel(label: String): Int {
-        val l = label.lowercase()
         return when {
-            l.contains("моб") || l.contains("mobile") ->
+            label.contains("моб", true) || label.contains("mobile", true) ->
                 ContactsContract.CommonDataKinds.Phone.TYPE_MOBILE
-            l.contains("дом") || l.contains("home") ->
+
+            label.contains("дом", true) || label.contains("home", true) ->
                 ContactsContract.CommonDataKinds.Phone.TYPE_HOME
-            l.contains("раб") || l.contains("work") ->
+
+            label.contains("раб", true) || label.contains("work", true) ->
                 ContactsContract.CommonDataKinds.Phone.TYPE_WORK
+
             else -> ContactsContract.CommonDataKinds.Phone.TYPE_OTHER
         }
     }
@@ -1030,10 +1048,13 @@ class ContactsWriteRepository(private val context: Context) {
         return when {
             l.contains("раб") || l.contains("work") ->
                 ContactsContract.CommonDataKinds.Email.TYPE_WORK
+
             l.contains("моб") || l.contains("mobile") ->
                 ContactsContract.CommonDataKinds.Email.TYPE_MOBILE
+
             l.contains("лич") || l.contains("home") || l.contains("personal") ->
                 ContactsContract.CommonDataKinds.Email.TYPE_HOME
+
             else -> ContactsContract.CommonDataKinds.Email.TYPE_OTHER
         }
     }

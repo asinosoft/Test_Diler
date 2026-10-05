@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.ContactsContract
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.view.Gravity
@@ -56,6 +55,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -91,6 +91,7 @@ import com.asinosoft.cdm.util.rememberActiveSimCount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.milliseconds
 
 class IncomingCallPopupActivity : ComponentActivity() {
 
@@ -147,8 +148,7 @@ class IncomingCallPopupActivity : ComponentActivity() {
 
     @Suppress("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (silenceRingerOnIncomingKey(event)) return true
-        return super.dispatchKeyEvent(event)
+        return silenceRingerOnIncomingKey(event) || super.dispatchKeyEvent(event)
     }
 
     override fun onDestroy() {
@@ -185,7 +185,14 @@ private fun IncomingCallPopupScreen(
         return
     }
 
-    val call by remember(activeCall) { derivedStateOf { CallState.fromSystemCall(activeCall as Call, context) } }
+    val call by remember(activeCall) {
+        derivedStateOf {
+            CallState.fromSystemCall(
+                activeCall as Call,
+                context
+            )
+        }
+    }
 
     var contactName by remember { mutableStateOf(CallerLookup.cached(call.rawNumber)?.name) }
     var contactPhotoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
@@ -216,8 +223,8 @@ private fun IncomingCallPopupScreen(
         }
     }
 
-    var callState by remember { mutableStateOf(activeCall?.state ?: Call.STATE_DISCONNECTED) }
-    var durationSeconds by remember { mutableStateOf(0) }
+    var callState by remember { mutableIntStateOf(activeCall?.state ?: Call.STATE_DISCONNECTED) }
+    var durationSeconds by remember { mutableIntStateOf(0) }
     var isDisconnected by remember { mutableStateOf(false) }
 
     val isMuted by CallManager.isMuted.collectAsState()
@@ -228,7 +235,7 @@ private fun IncomingCallPopupScreen(
     LaunchedEffect(callState) {
         if (callState == Call.STATE_ACTIVE && !isDisconnected) {
             while (true) {
-                delay(1000L)
+                delay(1000.milliseconds)
                 durationSeconds++
             }
         }
@@ -263,7 +270,7 @@ private fun IncomingCallPopupScreen(
 
     LaunchedEffect(isDisconnected) {
         if (isDisconnected) {
-            delay(3000L)
+            delay(3000.milliseconds)
             onDismiss()
         }
     }
@@ -372,11 +379,10 @@ private fun IncomingCallPopupScreen(
                                     color = MissedRed
                                 )
                             } else if (callState == Call.STATE_ACTIVE) {
-                                val isIncomingCall = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                    activeCall?.details?.callDirection == Call.Details.DIRECTION_INCOMING
-                                } else {
-                                    true
-                                }
+                                val isIncomingCall =
+                                    Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+                                            activeCall?.details?.callDirection == Call.Details.DIRECTION_INCOMING
+
                                 Icon(
                                     imageVector = if (isIncomingCall) Icons.AutoMirrored.Filled.CallReceived else Icons.AutoMirrored.Filled.CallMade,
                                     contentDescription = null,
@@ -466,11 +472,15 @@ private fun IncomingCallPopupScreen(
                                         },
                                         onSms = { num ->
                                             try {
-                                                val intent = Intent(Intent.ACTION_SENDTO, "smsto:${Uri.encode(num)}".toUri()).apply {
+                                                val intent = Intent(
+                                                    Intent.ACTION_SENDTO,
+                                                    "smsto:${Uri.encode(num)}".toUri()
+                                                ).apply {
                                                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                                 }
                                                 context.startActivity(intent)
-                                            } catch (_: Exception) {}
+                                            } catch (_: Exception) {
+                                            }
                                         }
                                     )
                                 } else {
@@ -552,7 +562,10 @@ private fun IncomingCallPopupScreen(
                             shape = CircleShape,
                             modifier = Modifier.size(48.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.Call,
                                     contentDescription = stringResource(R.string.incall_answer),

@@ -184,9 +184,8 @@ object OemShellHelper {
         if (!systemProperty("ro.build.version.emui").isNullOrBlank()) return true
         if (!systemProperty("ro.build.version.magic").isNullOrBlank()) return true
         if (!systemProperty("hw_sc.build.platform.version").isNullOrBlank()) return true
-        val harmony = systemProperty("ro.build.version.harmony")
-            ?: systemProperty("ro.huawei.build.display.id")
-        if (!harmony.isNullOrBlank()) return true
+        if (!systemProperty("ro.build.version.harmony").isNullOrBlank()) return true
+        if (!systemProperty("ro.huawei.build.display.id").isNullOrBlank()) return true
         return matchesBrand(huaweiBrands)
     }
 

@@ -5,11 +5,11 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.graphics.Matrix
-import android.media.ExifInterface
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.Build
 import androidx.core.content.edit
+import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,6 +18,8 @@ import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.File
 import kotlin.math.max
+import androidx.core.graphics.scale
+import androidx.core.graphics.get
 
 /** Full-screen call background ("profile card") attached to a contact. */
 data class ProfileCard(
@@ -137,7 +139,7 @@ object ProfileCardRepository {
         val frame = videoFrame(card.mediaPath, card.trimStartMs) ?: return null
         val scale = POSTER_MAX_SIDE.toFloat() / max(frame.width, frame.height)
         val scaled = if (scale < 1f) {
-            Bitmap.createScaledBitmap(frame, (frame.width * scale).toInt(), (frame.height * scale).toInt(), true)
+            frame.scale((frame.width * scale).toInt(), (frame.height * scale).toInt())
                 .also { if (it !== frame) frame.recycle() }
         } else frame
         runCatching { poster.outputStream().use { scaled.compress(Bitmap.CompressFormat.JPEG, 85, it) } }
@@ -157,13 +159,13 @@ object ProfileCardRepository {
 
     /** Picks white or dark text depending on how bright the upper part of the picture is. */
     fun readableTextColor(bitmap: Bitmap, dim: Float): Int {
-        val sample = Bitmap.createScaledBitmap(bitmap, 24, 40, true)
+        val sample = bitmap.scale(24, 40)
         var sum = 0.0
         val rows = sample.height * 2 / 5
         val columns = sample.width
         for (y in 0 until rows) {
             for (x in 0 until columns) {
-                val p = sample.getPixel(x, y)
+                val p = sample[x, y]
                 sum += (0.299 * (p shr 16 and 0xFF) + 0.587 * (p shr 8 and 0xFF) + 0.114 * (p and 0xFF)) / 255.0
             }
         }

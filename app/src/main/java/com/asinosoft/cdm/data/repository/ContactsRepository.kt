@@ -141,12 +141,12 @@ class ContactsRepository(private val context: Context) {
                     `package` = pkg
                 }
 
-                if (mimetype.contains("video")) {
-                    action = action.copy(videoCallIntent = intent)
+                action = if (mimetype.contains("video")) {
+                    action.copy(videoCallIntent = intent)
                 } else if (mimetype.contains(Regex("call|audio"))) {
-                    action = action.copy(audioCallIntent = intent)
+                    action.copy(audioCallIntent = intent)
                 } else if (mimetype.contains(Regex("chat|profile|message"))) {
-                    action = action.copy(chatIntent = intent)
+                    action.copy(chatIntent = intent)
                 } else {
 
                     // ignore

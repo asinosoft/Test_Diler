@@ -82,6 +82,7 @@
     <string name="month_genitive_12">décembre</string>
     <plurals name="age_years">
         <item quantity="one">%d an</item>
+        <item quantity="many">%d ans</item>
         <item quantity="other">%d ans</item>
     </plurals>
 

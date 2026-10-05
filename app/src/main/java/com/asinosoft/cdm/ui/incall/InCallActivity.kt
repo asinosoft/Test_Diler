@@ -65,8 +65,7 @@ class InCallActivity : ComponentActivity() {
 
     @Suppress("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        if (silenceRingerOnIncomingKey(event)) return true
-        return super.dispatchKeyEvent(event)
+        return silenceRingerOnIncomingKey(event) || super.dispatchKeyEvent(event)
     }
 
     override fun onDestroy() {

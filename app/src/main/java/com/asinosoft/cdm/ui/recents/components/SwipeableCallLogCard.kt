@@ -92,13 +92,13 @@ fun SwipeableCallLogCard(
     activeSimCount: Int,
     onCall: (String) -> Unit,
     onSms: (String) -> Unit,
-    onCallWithSim: (String, Int) -> Unit = { number, _ -> onCall(number) },
-    onAvatarClick: ((CallLogItem) -> Unit)? = null,
-    onBodyClick: ((CallLogItem) -> Unit)? = null,
-    onBlockNumber: (CallLogItem) -> Boolean = { false },
-    onDeleteGroup: (CallLogItem) -> Unit = {},
-    onClearContactCalls: (CallLogItem) -> Unit = {},
-    showSimIcon: Boolean = true,
+    onCallWithSim: (String, Int) -> Unit,
+    onAvatarClick: ((CallLogItem) -> Unit)?,
+    onBodyClick: ((CallLogItem) -> Unit)?,
+    onBlockNumber: (CallLogItem) -> Boolean,
+    onDeleteGroup: (CallLogItem) -> Unit,
+    onClearContactCalls: (CallLogItem) -> Unit,
+    showSimIcon: Boolean,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current

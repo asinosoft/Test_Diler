@@ -24,6 +24,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.Locale
 import kotlin.coroutines.resume
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Plays the melody, then speaks the contact name (or the number) in the Bluetooth
@@ -46,7 +47,7 @@ class IncomingCallAnnouncer(private val context: Context) {
         job = scope.launch {
             val file = withContext(Dispatchers.IO) { resolveSpokenText(rawNumber) }?.let { text ->
                 createEngine()?.let { engine ->
-                    withTimeoutOrNull(SYNTHESIS_TIMEOUT_MS) { synthesizeToFile(engine, text) }
+                    withTimeoutOrNull(SYNTHESIS_TIMEOUT_MS.milliseconds) { synthesizeToFile(engine, text) }
                 }
             }
             if (file == null) {
@@ -60,7 +61,7 @@ class IncomingCallAnnouncer(private val context: Context) {
 
             player.pauseForAnnouncement()
             try {
-                withTimeoutOrNull(PLAYBACK_TIMEOUT_MS) {
+                withTimeoutOrNull(PLAYBACK_TIMEOUT_MS.milliseconds) {
                     // Headsets usually ignore A2DP while a call rings, so prefer the voice (SCO) link.
                     val scoDevice = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                         openVoiceLink()
@@ -118,11 +119,11 @@ class IncomingCallAnnouncer(private val context: Context) {
         for (attempt in 0 until VOICE_LINK_ATTEMPTS) {
             if (am.communicationDevice?.id == device.id) {
                 // Give the headset time to actually open the SCO audio link.
-                delay(VOICE_LINK_SETTLE_MS)
+                delay(VOICE_LINK_SETTLE_MS.milliseconds)
                 Log.d(TAG, "voice link ready after #$attempt")
                 return device
             }
-            delay(ROUTING_CHECK_INTERVAL_MS)
+            delay(ROUTING_CHECK_INTERVAL_MS.milliseconds)
         }
         Log.w(TAG, "voice link not established")
         closeVoiceLink()
@@ -155,7 +156,7 @@ class IncomingCallAnnouncer(private val context: Context) {
             try {
                 mp.setAudioAttributes(attributesFor(device))
                 mp.setDataSource(file.absolutePath)
-                mp.setPreferredDevice(device)
+                if (Build.VERSION.SDK_INT >= 28) mp.setPreferredDevice(device)
                 mp.setVolume(0f, 0f)
                 mp.setOnCompletionListener { if (cont.isActive) cont.resume(Unit) }
                 mp.setOnErrorListener { _, _, _ ->
@@ -165,7 +166,7 @@ class IncomingCallAnnouncer(private val context: Context) {
                 mp.setOnPreparedListener {
                     it.isLooping = true
                     it.start()
-                    scope.launch {
+                    if (Build.VERSION.SDK_INT >= 28) scope.launch {
                         // Only unmute once the system confirms Bluetooth routing.
                         var routed: AudioDeviceInfo? = null
                         for (attempt in 0 until ROUTING_CHECK_ATTEMPTS) {
@@ -173,7 +174,7 @@ class IncomingCallAnnouncer(private val context: Context) {
                             routed = it.routedDevice
                             Log.d(TAG, "routing check #$attempt: ${routed?.type} ${routed?.productName}")
                             if (routed?.type in BLUETOOTH_OUTPUT_PRIORITY) break
-                            delay(ROUTING_CHECK_INTERVAL_MS)
+                            delay(ROUTING_CHECK_INTERVAL_MS.milliseconds)
                         }
                         if (!cont.isActive || mediaPlayer !== it) return@launch
                         if (routed?.type in BLUETOOTH_OUTPUT_PRIORITY) {
@@ -290,13 +291,13 @@ class IncomingCallAnnouncer(private val context: Context) {
     }
 
     private companion object {
-        const val SYNTHESIS_TIMEOUT_MS = 5_000L
-        const val PLAYBACK_TIMEOUT_MS = 10_000L
+        const val SYNTHESIS_TIMEOUT_MS = 5_000
+        const val PLAYBACK_TIMEOUT_MS = 10_000
         const val ROUTING_CHECK_ATTEMPTS = 30
-        const val ROUTING_CHECK_INTERVAL_MS = 50L
+        const val ROUTING_CHECK_INTERVAL_MS = 50
         const val TAG = "CallAnnouncer"
         const val VOICE_LINK_ATTEMPTS = 40
-        const val VOICE_LINK_SETTLE_MS = 400L
+        const val VOICE_LINK_SETTLE_MS = 400
         const val UTTERANCE_ID = "incoming_call_announcement"
         const val AUDIO_FILE_NAME = "incoming_call_announcement.wav"
 

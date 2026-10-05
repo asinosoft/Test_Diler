@@ -49,6 +49,8 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import kotlin.math.max
 import kotlin.math.roundToInt
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.scale
 
 private const val MAX_SCALE = 5f
 
@@ -144,7 +146,7 @@ fun cropSquare(source: Bitmap, transform: ProfileCard, outSize: Int = 720): Bitm
         (cx + half).roundToInt().coerceAtMost(source.width),
         (cy + half).roundToInt().coerceAtMost(source.height)
     )
-    return Bitmap.createBitmap(outSize, outSize, Bitmap.Config.ARGB_8888).also { out ->
+    return createBitmap(outSize, outSize).also { out ->
         Canvas(out).drawBitmap(
             source,
             src,
@@ -222,7 +224,7 @@ suspend fun loadVideoStrip(path: String, frameCount: Int, frameHeightPx: Int): V
                 val timeUs = duration * 1000L * index / frameCount
                 retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)?.let { frame ->
                     val width = (frame.width * frameHeightPx / frame.height.toFloat()).roundToInt().coerceAtLeast(1)
-                    val scaled = Bitmap.createScaledBitmap(frame, width, frameHeightPx, true)
+                    val scaled = frame.scale(width, frameHeightPx)
                     if (scaled !== frame) frame.recycle()
                     scaled.asImageBitmap()
                 }
@@ -312,7 +314,7 @@ private class LoopingVideoPlayer(
         if (play && !mp.isPlaying) {
             val position = mp.currentPosition.toLong()
             val cut = effectiveEnd
-            if (position < startMs || (cut > 0 && position >= cut)) seek(startMs)
+            if (position < startMs || (cut in 1..position)) seek(startMs)
             mp.start()
         } else if (!play && mp.isPlaying) {
             mp.pause()

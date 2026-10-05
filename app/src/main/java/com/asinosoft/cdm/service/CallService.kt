@@ -11,6 +11,7 @@ import android.content.IntentFilter
 import android.media.AudioManager
 import android.os.Build
 import android.os.OutcomeReceiver
+import android.provider.Settings
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.CallEndpoint
@@ -96,7 +97,7 @@ class CallService : InCallService() {
 
         val showPopup = (call.state == Call.STATE_RINGING) && shouldShowFloatingPopup(this, call)
         if (showPopup) {
-            if (FloatingCallOverlayManager.canDrawOverlay(this)) {
+            if (Settings.canDrawOverlays(this)) {
                 FloatingCallOverlayManager.show(this, onPromoteToFullScreen = { promoteToFullInCallUi() })
             } else {
                 val intent = Intent(this, IncomingCallPopupActivity::class.java).apply {
@@ -126,15 +127,19 @@ class CallService : InCallService() {
                 if (state == Call.STATE_SELECT_PHONE_ACCOUNT) {
                     SimCardHelper(this@CallService).autoSelectIfSingle(call)
                 }
-                if (state == Call.STATE_RINGING) {
-                    wasRinging = true
-                    startRinging(customRingtoneUri, rawNumber)
-                } else if (state == Call.STATE_ACTIVE) {
-                    wasAnswered = true
-                    stopRinging()
-                    // Stay in Floating window if it is already handling the call
-                } else {
-                    unregisterSilenceReceiver()
+                when (state) {
+                    Call.STATE_RINGING -> {
+                        wasRinging = true
+                        startRinging(customRingtoneUri, rawNumber)
+                    }
+                    Call.STATE_ACTIVE -> {
+                        wasAnswered = true
+                        stopRinging()
+                        // Stay in Floating window if it is already handling the call
+                    }
+                    else -> {
+                        unregisterSilenceReceiver()
+                    }
                 }
 
                 if (state == Call.STATE_DISCONNECTED) {
@@ -180,7 +185,7 @@ class CallService : InCallService() {
         val route = endpointTypeToRoute(callEndpoint.endpointType)
         CallManager.updateAudioRoute(route)
         if (callEndpoint.endpointType == CallEndpoint.TYPE_BLUETOOTH) {
-            val resolvedName = resolveBluetoothDeviceName(callEndpoint.endpointName?.toString())
+            val resolvedName = resolveBluetoothDeviceName(callEndpoint.endpointName.toString())
             CallManager.updateCurrentBluetoothDeviceName(resolvedName)
             refreshBluetoothDevicesFromEndpoints()
         } else {
@@ -209,7 +214,7 @@ class CallService : InCallService() {
                     override fun onResult(result: Void?) {
                         CallManager.updateAudioRoute(CallAudioState.ROUTE_BLUETOOTH)
                         CallManager.updateCurrentBluetoothDeviceName(
-                            resolveBluetoothDeviceName(endpoint.endpointName?.toString())
+                            resolveBluetoothDeviceName(endpoint.endpointName.toString())
                                 .takeIf { it != "Bluetooth" }
                                 ?: device.name
                         )
@@ -259,7 +264,7 @@ class CallService : InCallService() {
         }
 
         val byName = btEndpoints.filter {
-            resolveBluetoothDeviceName(it.endpointName?.toString()) == device.name
+            resolveBluetoothDeviceName(it.endpointName.toString()) == device.name
         }
         return byName.singleOrNull() ?: byName.firstOrNull()
     }
@@ -326,27 +331,19 @@ class CallService : InCallService() {
 
         if (btEndpoints.isEmpty()) return
 
-        val supportedBt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            callAudioState?.supportedBluetoothDevices?.toList().orEmpty()
-        } else {
-            emptyList()
-        }
-        val activeBt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            callAudioState?.activeBluetoothDevice
-        } else {
-            null
-        }
+        val supportedBt = callAudioState?.supportedBluetoothDevices?.toList().orEmpty()
+        val activeBt = callAudioState?.activeBluetoothDevice
         val currentName = CallManager.currentBluetoothDeviceName.value
 
         val devices = btEndpoints.map { endpoint ->
-            val rawName = endpoint.endpointName?.toString()
+            val rawName = endpoint.endpointName.toString()
             val resolvedName = resolveBluetoothDeviceName(rawName)
             val matchedBt = matchBluetoothDeviceForEndpoint(resolvedName, rawName, supportedBt)
             val isCurrentByActive = matchedBt != null && activeBt != null &&
                     matchedBt.address.equals(activeBt.address, ignoreCase = true)
             val isCurrent = isCurrentByActive ||
                     resolvedName == currentName ||
-                    (!rawName.isNullOrBlank() && rawName == currentName)
+                    rawName == currentName
 
             BluetoothAudioDevice(
                 id = endpoint.identifier.toString(),
@@ -389,14 +386,12 @@ class CallService : InCallService() {
             availableEndpoints.any { it.endpointType == CallEndpoint.TYPE_BLUETOOTH }
         ) {
             if (headsetConnected) {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                    val activeName = resolveBluetoothDeviceName(
-                        getDeviceDisplayName(audioState.activeBluetoothDevice)
-                            ?: audioState.activeBluetoothDevice?.address
-                    )
-                    if (activeName != "Bluetooth") {
-                        CallManager.updateCurrentBluetoothDeviceName(activeName)
-                    }
+                val activeName = resolveBluetoothDeviceName(
+                    getDeviceDisplayName(audioState.activeBluetoothDevice)
+                        ?: audioState.activeBluetoothDevice?.address
+                )
+                if (activeName != "Bluetooth") {
+                    CallManager.updateCurrentBluetoothDeviceName(activeName)
                 }
                 refreshBluetoothDevicesFromEndpoints()
             } else {

@@ -32,7 +32,6 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DateRangePicker
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +57,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import com.asinosoft.cdm.R
 import com.asinosoft.cdm.data.model.CallLogItem
@@ -93,13 +93,13 @@ data class BarChartGroup(
     val outgoingDisplay: String
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ContactHistoryStatistics(
     historyLogs: List<CallLogItem>,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     var isExpanded by remember { mutableStateOf(false) }
     var selectedPeriod by remember { mutableStateOf(StatisticsPeriod.ALL_TIME) }
     var showPeriodMenu by remember { mutableStateOf(false) }
@@ -218,7 +218,7 @@ fun ContactHistoryStatistics(
             val fmt = SimpleDateFormat("dd.MM", Locale.getDefault())
             "${fmt.format(Date(customStartDateMillis!!))} - ${fmt.format(Date(customEndDateMillis!!))}"
         } else {
-            context.getString(selectedPeriod.titleRes)
+            resources.getString(selectedPeriod.titleRes)
         }
     }
 
@@ -691,7 +691,6 @@ private fun GroupedBarChartView(
     selectedIndex: Int?,
     onSelectGroup: (Int) -> Unit
 ) {
-    val context = LocalContext.current
     val scrollState = rememberScrollState()
 
     LaunchedEffect(groups.size) {

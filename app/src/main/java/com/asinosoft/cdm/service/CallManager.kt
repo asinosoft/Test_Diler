@@ -99,7 +99,7 @@ object CallManager {
         _currentCall.value = call
         if (call != null) {
             if (!_calls.value.contains(call)) {
-                _calls.value = _calls.value + call
+                _calls.value += call
             }
         } else {
             _calls.value = emptyList()

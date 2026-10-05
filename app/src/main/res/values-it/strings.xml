@@ -82,6 +82,7 @@
     <string name="month_genitive_12">dicembre</string>
     <plurals name="age_years">
         <item quantity="one">%d anno</item>
+        <item quantity="many">%d anni</item>
         <item quantity="other">%d anni</item>
     </plurals>
 
@@ -332,8 +333,8 @@
     <string name="call_type_missed">Persa</string>
     <string name="call_type_rejected">Rifiutata</string>
     <string name="call_type_blocked">Bloccata</string>
-    <string name="call_log_call_sim1">Chiama tramite SIM1</string>
-    <string name="call_log_call_sim2">Chiama tramite SIM2</string>
+    <string name="call_log_call_sim1">Chiama tramite SIM 1</string>
+    <string name="call_log_call_sim2">Chiama tramite SIM 2</string>
     <string name="call_log_copy_number">Copia numero</string>
     <string name="call_log_block">Blocca</string>
     <string name="call_log_delete_one">Elimina 1 elemento</string>

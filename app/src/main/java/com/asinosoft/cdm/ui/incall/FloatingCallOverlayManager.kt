@@ -7,8 +7,6 @@ import android.graphics.PixelFormat
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.provider.ContactsContract
-import android.provider.Settings
 import android.telecom.Call
 import android.telecom.CallAudioState
 import android.view.Gravity
@@ -62,6 +60,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -109,6 +108,7 @@ import com.asinosoft.cdm.util.rememberActiveSimCount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * Manages a true system WindowManager overlay for incoming calls (`TYPE_APPLICATION_OVERLAY`).
@@ -120,14 +120,6 @@ object FloatingCallOverlayManager {
     private var currentComposeView: ComposeView? = null
     private var currentLifecycleOwner: OverlayLifecycleOwner? = null
     private var windowManager: WindowManager? = null
-
-    fun canDrawOverlay(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(context)
-        } else {
-            true
-        }
-    }
 
     fun isShowing(): Boolean = currentComposeView != null
 
@@ -220,7 +212,8 @@ object FloatingCallOverlayManager {
         }
     }
 
-    private class OverlayLifecycleOwner : LifecycleOwner, ViewModelStoreOwner, SavedStateRegistryOwner {
+    private class OverlayLifecycleOwner : LifecycleOwner, ViewModelStoreOwner,
+        SavedStateRegistryOwner {
         private val lifecycleRegistry = LifecycleRegistry(this)
         private val store = ViewModelStore()
         private val savedStateRegistryController = SavedStateRegistryController.create(this)
@@ -232,7 +225,7 @@ object FloatingCallOverlayManager {
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         }
 
-        override val lifecycle: Lifecycle get() = lifecycleRegistry
+        override val lifecycle: Lifecycle = lifecycleRegistry
         override val viewModelStore: ViewModelStore get() = store
         override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
 
@@ -315,14 +308,14 @@ private fun FloatingIncomingCallOverlayContent(
     val isBluetoothHeadsetConnected by CallManager.bluetoothHeadsetConnected.collectAsState()
     val isSpeakerOn = audioRoute == CallAudioState.ROUTE_SPEAKER
 
-    var callState by remember { mutableStateOf(activeCall?.state ?: Call.STATE_DISCONNECTED) }
-    var durationSeconds by remember { mutableStateOf(0) }
+    var callState by remember { mutableIntStateOf(activeCall?.state ?: Call.STATE_DISCONNECTED) }
+    var durationSeconds by remember { mutableIntStateOf(0) }
     val activeSimCount = rememberActiveSimCount()
 
     LaunchedEffect(callState) {
         if (callState == Call.STATE_ACTIVE && !isDisconnected) {
             while (true) {
-                delay(1000L)
+                delay(1000.milliseconds)
                 durationSeconds++
             }
         }
@@ -357,7 +350,7 @@ private fun FloatingIncomingCallOverlayContent(
 
     LaunchedEffect(isDisconnected) {
         if (isDisconnected) {
-            delay(3000L)
+            delay(3000.milliseconds)
             onDismiss()
         }
     }
@@ -493,11 +486,10 @@ private fun FloatingIncomingCallOverlayContent(
                                     color = MissedRed
                                 )
                             } else if (callState == Call.STATE_ACTIVE) {
-                                val isIncomingCall = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                                    activeCall?.details?.callDirection == Call.Details.DIRECTION_INCOMING
-                                } else {
-                                    true
-                                }
+                                val isIncomingCall =
+                                    Build.VERSION.SDK_INT < Build.VERSION_CODES.Q ||
+                                            activeCall?.details?.callDirection == Call.Details.DIRECTION_INCOMING
+
                                 Icon(
                                     imageVector = if (isIncomingCall) Icons.AutoMirrored.Filled.CallReceived else Icons.AutoMirrored.Filled.CallMade,
                                     contentDescription = null,
@@ -554,15 +546,16 @@ private fun FloatingIncomingCallOverlayContent(
                 ) {
                     if (isDisconnected) {
                         // After call disconnect: Only centered green "Вызов" button with configured right-swipe action
-                        val swipeRightAction = remember(contactKey, call.rawNumber, contactId, contactName) {
-                            getCustomSwipeAction(
-                                context,
-                                contactKey,
-                                isRight = true,
-                                fallbackNumber = call.rawNumber,
-                                contactName = contactName
-                            )
-                        }
+                        val swipeRightAction =
+                            remember(contactKey, call.rawNumber, contactId, contactName) {
+                                getCustomSwipeAction(
+                                    context,
+                                    contactKey,
+                                    isRight = true,
+                                    fallbackNumber = call.rawNumber,
+                                    contactName = contactName
+                                )
+                            }
                         val rightVisuals = remember(swipeRightAction) {
                             getSwipeBackgroundVisuals(
                                 swipeRightAction,
@@ -585,11 +578,15 @@ private fun FloatingIncomingCallOverlayContent(
                                         },
                                         onSms = { num ->
                                             try {
-                                                val intent = Intent(Intent.ACTION_SENDTO, "smsto:${Uri.encode(num)}".toUri()).apply {
+                                                val intent = Intent(
+                                                    Intent.ACTION_SENDTO,
+                                                    "smsto:${Uri.encode(num)}".toUri()
+                                                ).apply {
                                                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                                 }
                                                 context.startActivity(intent)
-                                            } catch (_: Exception) {}
+                                            } catch (_: Exception) {
+                                            }
                                         }
                                     )
                                 } else {
@@ -671,7 +668,10 @@ private fun FloatingIncomingCallOverlayContent(
                             shape = CircleShape,
                             modifier = Modifier.size(48.dp)
                         ) {
-                            Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+                            Box(
+                                contentAlignment = Alignment.Center,
+                                modifier = Modifier.fillMaxSize()
+                            ) {
                                 Icon(
                                     imageVector = Icons.Default.Call,
                                     contentDescription = stringResource(R.string.incall_answer),
@@ -700,10 +700,15 @@ private fun FloatingIncomingCallOverlayContent(
                                 color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = if (isDark) 0.45f else 0.7f),
                                 modifier = Modifier
                                     .clip(RoundedCornerShape(20.dp))
-                                    .clickable { showQuickRepliesDropdown = !showQuickRepliesDropdown }
+                                    .clickable {
+                                        showQuickRepliesDropdown = !showQuickRepliesDropdown
+                                    }
                             ) {
                                 Row(
-                                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    modifier = Modifier.padding(
+                                        horizontal = 12.dp,
+                                        vertical = 8.dp
+                                    ),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
@@ -868,20 +873,29 @@ private fun FloatingIncomingCallOverlayContent(
                                                     context = context,
                                                     action = swipeLeftAction,
                                                     onCall = { num, _ ->
-                                                        val intent = Intent(Intent.ACTION_CALL, "tel:${Uri.encode(num)}".toUri()).apply {
+                                                        val intent = Intent(
+                                                            Intent.ACTION_CALL,
+                                                            "tel:${Uri.encode(num)}".toUri()
+                                                        ).apply {
                                                             flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                                         }
                                                         context.startActivity(intent)
                                                     },
                                                     onSms = { num ->
-                                                        val intent = Intent(Intent.ACTION_SENDTO, "smsto:${Uri.encode(num)}".toUri()).apply {
+                                                        val intent = Intent(
+                                                            Intent.ACTION_SENDTO,
+                                                            "smsto:${Uri.encode(num)}".toUri()
+                                                        ).apply {
                                                             flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                                         }
                                                         context.startActivity(intent)
                                                     }
                                                 )
                                             } else {
-                                                val intent = Intent(Intent.ACTION_SENDTO, "smsto:${Uri.encode(call.rawNumber)}".toUri()).apply {
+                                                val intent = Intent(
+                                                    Intent.ACTION_SENDTO,
+                                                    "smsto:${Uri.encode(call.rawNumber)}".toUri()
+                                                ).apply {
                                                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                                 }
                                                 context.startActivity(intent)
@@ -934,4 +948,5 @@ private suspend fun lookupOverlayContactInfo(
     context: Context,
     phoneNumber: String
 ): OverlayContactLookupResult =
-    CallerLookup.lookup(context, phoneNumber).let { OverlayContactLookupResult(it.name, it.photoUri, it.contactId) }
+    CallerLookup.lookup(context, phoneNumber)
+        .let { OverlayContactLookupResult(it.name, it.photoUri, it.contactId) }

@@ -23,8 +23,7 @@ object BlockedNumbersHelper {
 
     fun block(context: Context, phoneNumber: String): Boolean {
         val number = phoneNumber.trim()
-        if (number.isBlank()) return false
-        return try {
+        return number.isNotBlank() && try {
             if (!canBlockNumbers(context)) return false
             val values = ContentValues().apply {
                 put(BlockedNumberContract.BlockedNumbers.COLUMN_ORIGINAL_NUMBER, number)
@@ -40,8 +39,7 @@ object BlockedNumbersHelper {
 
     fun unblock(context: Context, phoneNumber: String): Boolean {
         val number = phoneNumber.trim()
-        if (number.isBlank()) return false
-        return try {
+        return number.isNotBlank() && try {
             if (!canBlockNumbers(context)) return false
             BlockedNumberContract.unblock(context, number) > 0
         } catch (_: Exception) {
