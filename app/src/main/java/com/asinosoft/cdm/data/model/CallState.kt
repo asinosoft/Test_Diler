@@ -17,7 +17,7 @@ data class CallState(
             rawNumber = call.details?.handle?.schemeSpecificPart ?: "",
             displayName = call.details?.callerDisplayName ?: call.details?.handle?.schemeSpecificPart ?: "",
             connectTimeMillis = call.details?.connectTimeMillis,
-            simNumber = SimCardHelper(context).getSimNumber(call.details?.accountHandle?.id)
+            simNumber = SimCardHelper(context).getSimNumber(call.details?.accountHandle?.id) ?: 1
         )
     }
 }

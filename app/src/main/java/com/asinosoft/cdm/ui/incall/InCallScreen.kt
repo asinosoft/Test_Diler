@@ -186,12 +186,12 @@ fun InCallScreen(
     LaunchedEffect(currentRawNumber, currentDisplayName, currentSimNumber) {
         if (currentRawNumber.isNotBlank()) lastKnownNumber = currentRawNumber
         if (currentDisplayName.isNotBlank()) lastKnownDisplayName = currentDisplayName
-        if (currentSimNumber > 0) lastKnownSimNumber = currentSimNumber
+        currentSimNumber?.let { lastKnownSimNumber = currentSimNumber }
     }
 
     val rawNumber = if (currentRawNumber.isNotBlank()) currentRawNumber else lastKnownNumber
     val displayName = if (currentDisplayName.isNotBlank()) currentDisplayName else lastKnownDisplayName
-    val simNumber = if (currentSimNumber > 0) currentSimNumber else lastKnownSimNumber
+    val simNumber = currentSimNumber ?: lastKnownSimNumber
 
     val cachedCaller = remember(rawNumber) { CallerLookup.cached(rawNumber) }
     var contactId by remember { mutableStateOf(cachedCaller?.contactId) }

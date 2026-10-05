@@ -238,7 +238,7 @@ class CallLogRepository(private val context: Context) {
                     val photoUri = if (photoIndex != -1) c.getString(photoIndex) else null
                     val accountId = if (accountIdIndex != -1) c.getString(accountIdIndex) else null
 
-                    val simNumber = phoneAccountHelper.getSimNumber(accountId)
+                    val simNumber = phoneAccountHelper.getSimNumber(accountId) ?: 1
                     val rawType =
                         if (typeIndex != -1) c.getInt(typeIndex) else CallLog.Calls.INCOMING_TYPE
                     val date = if (dateIndex != -1) c.getLong(dateIndex) else 0L

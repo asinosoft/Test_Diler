@@ -10,7 +10,6 @@ import android.telecom.PhoneAccountHandle
 import android.telecom.PhoneAccountSuggestion
 import android.telecom.TelecomManager
 import androidx.core.content.ContextCompat
-import kotlin.collections.indexOfFirst
 
 data class SelectablePhoneAccount(
     val handle: PhoneAccountHandle,
@@ -24,7 +23,8 @@ class SimCardHelper(private val context: Context) {
         val phoneAccountHandles = getPhoneAccountHandles()
 
         return handles.map { handle ->
-            val simNumber = phoneAccountHandles.indexOfFirst { it.id == handle.id }.coerceAtLeast(0) + 1
+            val simNumber =
+                phoneAccountHandles.indexOfFirst { it.id == handle.id }.coerceAtLeast(0) + 1
             SelectablePhoneAccount(
                 handle = handle,
                 simNumber = simNumber,
@@ -46,10 +46,10 @@ class SimCardHelper(private val context: Context) {
     }
 
 
-    fun getSimNumber(accountId: String?): Int =
+    fun getSimNumber(accountId: String?): Int? =
         getPhoneAccountHandles()
             .indexOfFirst { it.id == accountId }
-            .coerceAtLeast(0) + 1
+            .let { if (it == -1) null else it + 1 }
 
     fun getSuggestedHandles(call: Call?): List<PhoneAccountHandle> {
         val details = call?.details
