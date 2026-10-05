@@ -40,6 +40,9 @@ android {
             optimization {
                 enable = true
             }
+            ndk {
+                debugSymbolLevel = "SYMBOL_TABLE"
+            }
         }
     }
     compileOptions {
