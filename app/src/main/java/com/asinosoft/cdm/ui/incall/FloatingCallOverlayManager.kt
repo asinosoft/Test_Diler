@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Bundle
 import android.telecom.Call
 import android.telecom.CallAudioState
+import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
@@ -189,7 +190,8 @@ object FloatingCallOverlayManager {
 
             currentComposeView = composeView
             wm.addView(composeView, params)
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.e("FloatingCallOverlay", "Overlay failed, falling back to full screen", e)
             hide()
             onPromoteToFullScreen()
         }
@@ -225,7 +227,8 @@ object FloatingCallOverlayManager {
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
         }
 
-        override val lifecycle: Lifecycle = lifecycleRegistry
+        // Must stay a getter: init{} above reads it before property initializers below would run.
+        override val lifecycle: Lifecycle get() = lifecycleRegistry
         override val viewModelStore: ViewModelStore get() = store
         override val savedStateRegistry: SavedStateRegistry get() = savedStateRegistryController.savedStateRegistry
 
