@@ -2,7 +2,6 @@ package com.asinosoft.cdm.ui.incall
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.graphics.PixelFormat
 import android.net.Uri
 import android.os.Build
@@ -70,7 +69,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
@@ -277,7 +275,9 @@ private fun FloatingIncomingCallOverlayContent(
     val cachedCaller = remember(call.rawNumber) { CallerLookup.cached(call.rawNumber) }
     var contactId by remember { mutableStateOf(cachedCaller?.contactId) }
     var contactName by remember { mutableStateOf(cachedCaller?.name) }
-    var contactPhotoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    var contactPhotoBitmap by remember {
+        mutableStateOf(CallerLookup.cachedAvatar(call.rawNumber)?.asImageBitmap())
+    }
     var lookupDone by remember { mutableStateOf(cachedCaller != null) }
     val telecomName = CallerLookup.telecomContactName(activeCall)
 
@@ -288,20 +288,9 @@ private fun FloatingIncomingCallOverlayContent(
                 contactId = result.contactId
                 contactName = result.name
                 lookupDone = true
-
-                if (!result.photoUri.isNullOrEmpty()) {
-                    try {
-                        val uri = result.photoUri.toUri()
-                        context.contentResolver.openInputStream(uri)?.use { stream ->
-                            val bitmap = BitmapFactory.decodeStream(stream)
-                            contactPhotoBitmap = bitmap?.asImageBitmap()
-                        }
-                    } catch (_: Exception) {
-                        contactPhotoBitmap = null
-                    }
-                } else {
-                    contactPhotoBitmap = null
-                }
+                contactPhotoBitmap = CallerLookup.loadAvatar(
+                    context, result.photoUri, result.contactId, call.rawNumber
+                )?.asImageBitmap()
             }
         }
     }

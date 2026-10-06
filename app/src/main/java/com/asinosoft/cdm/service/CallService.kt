@@ -21,6 +21,7 @@ import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import com.asinosoft.cdm.data.model.CallState
 import com.asinosoft.cdm.data.repository.ContactRingtoneManager
+import com.asinosoft.cdm.ui.incall.CallerLookup
 import com.asinosoft.cdm.ui.incall.FloatingCallOverlayManager
 import com.asinosoft.cdm.ui.incall.InCallActivity
 import com.asinosoft.cdm.ui.incall.IncomingCallPopupActivity
@@ -94,6 +95,7 @@ class CallService : InCallService() {
 
         val handle = call.details?.handle
         val rawNumber = handle?.schemeSpecificPart ?: ""
+        CallerLookup.prefetch(this, rawNumber)
 
         val showPopup = (call.state == Call.STATE_RINGING) && shouldShowFloatingPopup(this, call)
         if (showPopup) {

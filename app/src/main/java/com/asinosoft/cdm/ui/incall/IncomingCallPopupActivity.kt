@@ -2,7 +2,6 @@ package com.asinosoft.cdm.ui.incall
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.BitmapFactory
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -63,7 +62,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -195,30 +193,21 @@ private fun IncomingCallPopupScreen(
     }
 
     var contactName by remember { mutableStateOf(CallerLookup.cached(call.rawNumber)?.name) }
-    var contactPhotoBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    var contactPhotoBitmap by remember {
+        mutableStateOf(CallerLookup.cachedAvatar(call.rawNumber)?.asImageBitmap())
+    }
     var lookupDone by remember { mutableStateOf(contactName != null) }
     val telecomName = CallerLookup.telecomContactName(activeCall)
 
     LaunchedEffect(call) {
         if (call.rawNumber.isNotBlank()) {
             withContext(Dispatchers.IO) {
-                val result = lookupContactInfo(context, call.rawNumber)
+                val result = CallerLookup.lookup(context, call.rawNumber)
                 contactName = result.name
                 lookupDone = true
-
-                if (!result.photoUri.isNullOrEmpty()) {
-                    try {
-                        val uri = result.photoUri.toUri()
-                        context.contentResolver.openInputStream(uri)?.use { stream ->
-                            val bitmap = BitmapFactory.decodeStream(stream)
-                            contactPhotoBitmap = bitmap?.asImageBitmap()
-                        }
-                    } catch (_: Exception) {
-                        contactPhotoBitmap = null
-                    }
-                } else {
-                    contactPhotoBitmap = null
-                }
+                contactPhotoBitmap = CallerLookup.loadAvatar(
+                    context, result.photoUri, result.contactId, call.rawNumber
+                )?.asImageBitmap()
             }
         }
     }
@@ -654,13 +643,3 @@ private fun IncomingCallPopupScreen(
     }
 }
 
-private data class PopupContactLookupResult(
-    val name: String?,
-    val photoUri: String?
-)
-
-private suspend fun lookupContactInfo(
-    context: Context,
-    phoneNumber: String
-): PopupContactLookupResult =
-    CallerLookup.lookup(context, phoneNumber).let { PopupContactLookupResult(it.name, it.photoUri) }
