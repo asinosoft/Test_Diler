@@ -8,7 +8,6 @@ import android.os.Build
 import android.os.Bundle
 import android.telecom.Call
 import android.telecom.CallAudioState
-import android.util.Log
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.animation.AnimatedVisibility
@@ -189,7 +188,6 @@ object FloatingCallOverlayManager {
             currentComposeView = composeView
             wm.addView(composeView, params)
         } catch (e: Exception) {
-            Log.e("FloatingCallOverlay", "Overlay failed, falling back to full screen", e)
             hide()
             onPromoteToFullScreen()
         }
