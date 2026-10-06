@@ -44,12 +44,15 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.automirrored.filled.CallMerge
@@ -67,6 +70,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Dialpad
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
 import androidx.compose.material.icons.filled.Pause
@@ -359,6 +363,188 @@ fun InCallScreen(
         val card = profileCard
         val cardTextColor = card?.let { Color(it.textColor) } ?: Color.White
         val chipColor = if (card != null) Color.Black.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.12f)
+        val quickRepliesDropdown: @Composable (Boolean) -> Unit = { opensUp ->
+            val anchor = if (opensUp) Alignment.Bottom else Alignment.Top
+            AnimatedVisibility(
+                visible = showQuickRepliesDropdown,
+                enter = expandVertically(animationSpec = tween(240), expandFrom = anchor) +
+                        fadeIn(animationSpec = tween(240)),
+                exit = shrinkVertically(animationSpec = tween(200), shrinkTowards = anchor) +
+                        fadeOut(animationSpec = tween(200))
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(18.dp),
+                    color = Color(0xFF282E3C),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            top = if (opensUp) 0.dp else 12.dp,
+                            bottom = if (opensUp) 12.dp else 0.dp
+                        )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .heightIn(max = 300.dp)
+                            .verticalScroll(rememberScrollState())
+                            .padding(vertical = 4.dp)
+                    ) {
+                        quickReplies.forEachIndexed { index, replyText ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    color = Color.White.copy(alpha = 0.06f),
+                                    modifier = Modifier.padding(horizontal = 14.dp)
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .clickable {
+                                        showQuickRepliesDropdown = false
+                                        CallManager.rejectWithMessage(replyText)
+                                    }
+                                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = replyText,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.White.copy(alpha = 0.92f),
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+
+                        HorizontalDivider(
+                            color = Color.White.copy(alpha = 0.1f),
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    showQuickRepliesDropdown = false
+                                    CallManager.disconnect()
+                                    startSmsFromInCallScreen(context, rawNumber)
+                                }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.Message,
+                                contentDescription = null,
+                                tint = SamsungSmsBlue,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = stringResource(R.string.incall_new_sms_title),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White.copy(alpha = 0.92f)
+                            )
+                        }
+
+                        HorizontalDivider(
+                            color = Color.White.copy(alpha = 0.06f),
+                            modifier = Modifier.padding(horizontal = 14.dp)
+                        )
+
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    showQuickRepliesDropdown = false
+                                    CallManager.disconnect()
+                                    if (swipeLeftAction != null) {
+                                        executeCustomSwipeAction(
+                                            context = context,
+                                            action = swipeLeftAction,
+                                            onCall = { num, sim ->
+                                                startCallFromInCallScreen(context, num, sim)
+                                            },
+                                            onSms = { num ->
+                                                startSmsFromInCallScreen(context, num)
+                                            }
+                                        )
+                                    } else {
+                                        startSmsFromInCallScreen(context, rawNumber)
+                                    }
+                                }
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            if (leftVisuals.iconBitmap != null) {
+                                Image(
+                                    bitmap = leftVisuals.iconBitmap,
+                                    contentDescription = leftVisuals.label,
+                                    modifier = Modifier
+                                        .size(22.dp)
+                                        .clip(CircleShape),
+                                    contentScale = ContentScale.Crop
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = leftVisuals.icon,
+                                    contentDescription = null,
+                                    tint = leftVisuals.backgroundColor,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                text = stringResource(R.string.incall_write_message),
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color.White.copy(alpha = 0.92f)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        // Send message / quick replies chip; the list opens below or above it
+        val quickRepliesBlock: @Composable (Boolean) -> Unit = { opensUp ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (opensUp) quickRepliesDropdown(true)
+                Surface(
+                    shape = RoundedCornerShape(22.dp),
+                    color = chipColor,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(22.dp))
+                        .clickable { showQuickRepliesDropdown = !showQuickRepliesDropdown }
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = stringResource(R.string.incall_send_message),
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = Color.White.copy(alpha = 0.92f)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = if (opensUp) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = stringResource(R.string.incall_quick_sms_cd),
+                            tint = Color.White.copy(alpha = 0.85f),
+                            modifier = Modifier
+                                .size(20.dp)
+                                .rotate(if (showQuickRepliesDropdown) 180f else 0f)
+                        )
+                    }
+                }
+                if (!opensUp) quickRepliesDropdown(false)
+            }
+        }
         if (card != null) {
             ProfileCardMedia(card, profileCardBitmap, Modifier.fillMaxSize())
             Box(
@@ -396,6 +582,104 @@ fun InCallScreen(
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
+                    val numberLine: @Composable () -> Unit = {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            if (activeSimCount > 1 && !isSelectingPhoneAccount) {
+                                SimIcon(simNumber = simNumber, size = 15.dp)
+                                Spacer(modifier = Modifier.width(6.dp))
+                            }
+                            val numberToDisplay = if (contactName != null || displayName != rawNumber) {
+                                PhoneNumberHelper.format(rawNumber)
+                            } else {
+                                ""
+                            }
+                            if (numberToDisplay.isNotBlank()) {
+                                Text(
+                                    text = numberToDisplay,
+                                    fontSize = 16.sp,
+                                    color = cardTextColor.copy(alpha = if (card != null) 0.85f else 0.65f),
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = if (card != null) TextStyle(shadow = profileTextShadow(cardTextColor)) else TextStyle.Default
+                                )
+                            }
+                        }
+                    }
+                    // Call Status & Timer Badge
+                    val statusChip: @Composable () -> Unit = {
+                        val statusText = when(callState) {
+                            Call.STATE_DISCONNECTED -> stringResource(R.string.incall_state_disconnected)
+                            Call.STATE_HOLDING -> stringResource(R.string.incall_state_holding)
+                            Call.STATE_RINGING -> stringResource(R.string.incall_state_ringing)
+                            Call.STATE_DIALING -> stringResource(R.string.incall_state_dialing)
+                            Call.STATE_CONNECTING -> stringResource(R.string.incall_state_connecting)
+                            Call.STATE_DISCONNECTING -> stringResource(R.string.incall_state_disconnecting)
+                            Call.STATE_SELECT_PHONE_ACCOUNT -> stringResource(R.string.incall_state_select_account)
+                            Call.STATE_ACTIVE -> formatDuration(durationSeconds)
+                            else -> "..."
+                        }
+
+                        Surface(
+                            shape = RoundedCornerShape(16.dp),
+                            color = when {
+                                card != null && !isHold -> chipColor
+                                isCallDisconnected -> Color.White.copy(alpha = 0.12f)
+                                    isHold -> Color(0xFFFFB300).copy(alpha = 0.22f)
+                                isCallActive -> Color.White.copy(alpha = 0.12f)
+                                else -> SamsungGreen.copy(alpha = 0.18f)
+                            }
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
+                            ) {
+                                if (isCallActive) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(SamsungGreen)
+                                    )
+                                }
+                                Text(
+                                    text = statusText,
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    softWrap = false,
+                                    overflow = TextOverflow.Ellipsis,
+                                    color = when {
+                                        isCallDisconnected -> Color.White.copy(alpha = 0.85f)
+                                        isHold -> Color(0xFFFFC107)
+                                        isCallActive -> Color.White
+                                        else -> SamsungGreen
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    // Over a photo/video: SIM + number at the right edge, status chip right next to them
+                    if (card != null) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(end = 8.dp),
+                                contentAlignment = Alignment.CenterEnd
+                            ) { statusChip() }
+                            if (rawNumber.isNotBlank() && !isConference) numberLine()
+                        }
+                    }
+
                     // Large One UI Circular Avatar (170dp)
                     if (card != null) {
                         Spacer(modifier = Modifier.height(24.dp))
@@ -479,258 +763,20 @@ fun InCallScreen(
                     )
 
                     // Phone number line with SIM icon in front (without "SIM" text)
-                    if (rawNumber.isNotBlank() && !isConference) {
+                    if (rawNumber.isNotBlank() && !isConference && card == null) {
                         Spacer(modifier = Modifier.height(6.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            if (activeSimCount > 1 && !isSelectingPhoneAccount) {
-                                SimIcon(simNumber = simNumber, size = 15.dp)
-                                Spacer(modifier = Modifier.width(6.dp))
-                            }
-                            val numberToDisplay = if (contactName != null || displayName != rawNumber) {
-                                PhoneNumberHelper.format(rawNumber)
-                            } else {
-                                ""
-                            }
-                            if (numberToDisplay.isNotBlank()) {
-                                Text(
-                                    text = numberToDisplay,
-                                    fontSize = 16.sp,
-                                    color = cardTextColor.copy(alpha = if (card != null) 0.85f else 0.65f),
-                                    textAlign = TextAlign.Center,
-                                    maxLines = 1,
-                                    style = if (card != null) TextStyle(shadow = profileTextShadow(cardTextColor)) else TextStyle.Default
-                                )
-                            }
-                        }
+                        numberLine()
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
-
-                    // Call Status & Timer Badge
-                    val statusText = when(callState) {
-                        Call.STATE_DISCONNECTED -> stringResource(R.string.incall_state_disconnected)
-                        Call.STATE_HOLDING -> stringResource(R.string.incall_state_holding)
-                        Call.STATE_RINGING -> stringResource(R.string.incall_state_ringing)
-                        Call.STATE_DIALING -> stringResource(R.string.incall_state_dialing)
-                        Call.STATE_CONNECTING -> stringResource(R.string.incall_state_connecting)
-                        Call.STATE_DISCONNECTING -> stringResource(R.string.incall_state_disconnecting)
-                        Call.STATE_SELECT_PHONE_ACCOUNT -> stringResource(R.string.incall_state_select_account)
-                        Call.STATE_ACTIVE -> formatDuration(durationSeconds)
-                        else -> "..."
+                    if (card == null) {
+                        Spacer(modifier = Modifier.height(14.dp))
+                        statusChip()
                     }
 
-                    Surface(
-                        shape = RoundedCornerShape(16.dp),
-                        color = when {
-                            card != null && !isHold -> chipColor
-                            isCallDisconnected -> Color.White.copy(alpha = 0.12f)
-                                isHold -> Color(0xFFFFB300).copy(alpha = 0.22f)
-                            isCallActive -> Color.White.copy(alpha = 0.12f)
-                            else -> SamsungGreen.copy(alpha = 0.18f)
-                        }
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
-                        ) {
-                            if (isCallActive) {
-                                Box(
-                                    modifier = Modifier
-                                        .size(8.dp)
-                                        .clip(CircleShape)
-                                        .background(SamsungGreen)
-                                )
-                            }
-                            Text(
-                                text = statusText,
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                color = when {
-                                    isCallDisconnected -> Color.White.copy(alpha = 0.85f)
-                                    isHold -> Color(0xFFFFC107)
-                                    isCallActive -> Color.White
-                                    else -> SamsungGreen
-                                }
-                            )
-                        }
-                    }
-
-                    // Send message / quick replies — directly under "Incoming call"
-                    if (callState == Call.STATE_RINGING && incomingWaitingCall == null) {
+                    // Send message / quick replies - directly under "Incoming call" (no media background)
+                    if (callState == Call.STATE_RINGING && incomingWaitingCall == null && card == null) {
                         Spacer(modifier = Modifier.height(16.dp))
-
-                        Surface(
-                            shape = RoundedCornerShape(22.dp),
-                            color = chipColor,
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(22.dp))
-                                .clickable { showQuickRepliesDropdown = !showQuickRepliesDropdown }
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = stringResource(R.string.incall_send_message),
-                                    fontSize = 14.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = Color.White.copy(alpha = 0.92f)
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Icon(
-                                    imageVector = Icons.Default.KeyboardArrowDown,
-                                    contentDescription = stringResource(R.string.incall_quick_sms_cd),
-                                    tint = Color.White.copy(alpha = 0.85f),
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .rotate(if (showQuickRepliesDropdown) 180f else 0f)
-                                )
-                            }
-                        }
-
-                        AnimatedVisibility(
-                            visible = showQuickRepliesDropdown,
-                            enter = expandVertically(animationSpec = tween(240)) +
-                                    fadeIn(animationSpec = tween(240)),
-                            exit = shrinkVertically(animationSpec = tween(200)) +
-                                    fadeOut(animationSpec = tween(200))
-                        ) {
-                            Surface(
-                                shape = RoundedCornerShape(18.dp),
-                                color = Color(0xFF282E3C),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(top = 12.dp)
-                            ) {
-                                Column(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                ) {
-                                    quickReplies.forEachIndexed { index, replyText ->
-                                        if (index > 0) {
-                                            HorizontalDivider(
-                                                color = Color.White.copy(alpha = 0.06f),
-                                                modifier = Modifier.padding(horizontal = 14.dp)
-                                            )
-                                        }
-
-                                        Row(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clip(RoundedCornerShape(12.dp))
-                                                .clickable {
-                                                    showQuickRepliesDropdown = false
-                                                    CallManager.rejectWithMessage(replyText)
-                                                }
-                                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                                            verticalAlignment = Alignment.CenterVertically
-                                        ) {
-                                            Text(
-                                                text = replyText,
-                                                fontSize = 14.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = Color.White.copy(alpha = 0.92f),
-                                                maxLines = 2,
-                                                overflow = TextOverflow.Ellipsis
-                                            )
-                                        }
-                                    }
-
-                                    HorizontalDivider(
-                                        color = Color.White.copy(alpha = 0.1f),
-                                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 4.dp)
-                                    )
-
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .clickable {
-                                                showQuickRepliesDropdown = false
-                                                CallManager.disconnect()
-                                                startSmsFromInCallScreen(context, rawNumber)
-                                            }
-                                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.AutoMirrored.Filled.Message,
-                                            contentDescription = null,
-                                            tint = SamsungSmsBlue,
-                                            modifier = Modifier.size(20.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(
-                                            text = stringResource(R.string.incall_new_sms_title),
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White.copy(alpha = 0.92f)
-                                        )
-                                    }
-
-                                    HorizontalDivider(
-                                        color = Color.White.copy(alpha = 0.06f),
-                                        modifier = Modifier.padding(horizontal = 14.dp)
-                                    )
-
-                                    Row(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .clickable {
-                                                showQuickRepliesDropdown = false
-                                                CallManager.disconnect()
-                                                if (swipeLeftAction != null) {
-                                                    executeCustomSwipeAction(
-                                                        context = context,
-                                                        action = swipeLeftAction,
-                                                        onCall = { num, sim ->
-                                                            startCallFromInCallScreen(context, num, sim)
-                                                        },
-                                                        onSms = { num ->
-                                                            startSmsFromInCallScreen(context, num)
-                                                        }
-                                                    )
-                                                } else {
-                                                    startSmsFromInCallScreen(context, rawNumber)
-                                                }
-                                            }
-                                            .padding(horizontal = 14.dp, vertical = 12.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        if (leftVisuals.iconBitmap != null) {
-                                            Image(
-                                                bitmap = leftVisuals.iconBitmap,
-                                                contentDescription = leftVisuals.label,
-                                                modifier = Modifier
-                                                    .size(22.dp)
-                                                    .clip(CircleShape),
-                                                contentScale = ContentScale.Crop
-                                            )
-                                        } else {
-                                            Icon(
-                                                imageVector = leftVisuals.icon,
-                                                contentDescription = null,
-                                                tint = leftVisuals.backgroundColor,
-                                                modifier = Modifier.size(20.dp)
-                                            )
-                                        }
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(
-                                            text = stringResource(R.string.incall_write_message),
-                                            fontSize = 14.sp,
-                                            fontWeight = FontWeight.SemiBold,
-                                            color = Color.White.copy(alpha = 0.92f)
-                                        )
-                                    }
-                                }
-                            }
-                        }
+                        quickRepliesBlock(false)
                     }
                 }
             }
@@ -923,6 +969,12 @@ fun InCallScreen(
                     }
                 }
                 Spacer(modifier = Modifier.height(36.dp))
+            }
+
+            // With a photo/video background quick replies sit above answer/decline and open upward
+            if (callState == Call.STATE_RINGING && incomingWaitingCall == null && card != null) {
+                quickRepliesBlock(true)
+                Spacer(modifier = Modifier.height(20.dp))
             }
 
             // Bottom Section: Answer / Decline / End Call Buttons
